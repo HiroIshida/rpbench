@@ -4,8 +4,8 @@ from typing import Any, Dict, Generic, List, Protocol, Tuple, Type, TypeVar
 
 import numpy as np
 
-WorldT = TypeVar("WorldT", bound="WorldProtocol")
-ProblemT = TypeVar("ProblemT", bound="ProblemProtocol")
+WorldT = TypeVar("WorldT", bound="WorldBase")
+ProblemT = TypeVar("ProblemT", bound="ProblemBase")
 
 
 class SDFProtocol(Protocol):
@@ -24,7 +24,7 @@ class SDFProtocol(Protocol):
         ...
 
 
-class WorldProtocol(ABC):
+class WorldBase(ABC):
     @classmethod
     @abstractmethod
     def sample(cls: Type[WorldT], standard: bool = True) -> WorldT:
@@ -49,8 +49,8 @@ class DescriptionTable:
     table: Dict[str, ArrayData]
 
 
-class ProblemProtocol(ABC, Generic[WorldT]):
-    """Problem Protocol
+class ProblemBase(ABC, Generic[WorldT]):
+    """Problem base class
     Problem is composed of world and *descriptions*
 
     One may wonder why *descriptions* instead of a description.
