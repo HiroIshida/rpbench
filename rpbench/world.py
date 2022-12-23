@@ -1,19 +1,24 @@
 from dataclasses import dataclass
-from typing import List
+from typing import Any, List, Type
 
 import numpy as np
 from skrobot.coordinates import Coordinates
 from skrobot.model.link import Link
 from skrobot.model.primitives import Box
 from skrobot.sdf import UnionSDF
+from voxbloxpy.core import Grid, GridSDF
 
-from rpbench.interface import WorldBase
+from rpbench.interface import ProblemBase, WorldBase
 
 
 @dataclass
-class TabletopWorld(WorldBase):
+class TabletopWorldBase(WorldBase):
     table: Box
     obstacles: List[Link]
+
+
+@dataclass
+class TabletopBoxWorld(TabletopWorldBase):
     box_center: Coordinates
     box_d: float
     box_w: float
@@ -27,7 +32,7 @@ class TabletopWorld(WorldBase):
         return UnionSDF(lst)
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "TabletopWorld":
+    def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
         table = cls.create_standard_table()
         table_depth, table_width, table_height = table._extents
         x = np.random.rand() * 0.2
@@ -93,3 +98,82 @@ class TabletopWorld(WorldBase):
         pos = [0.5 + table_depth * 0.5, 0.0, table_height * 0.5]
         table = Box(extents=[table_depth, table_width, table_height], pos=pos, with_sdf=True)
         return table
+
+    def get_grid(self) -> Grid:
+        grid_sizes = (56, 56, 28)
+        mesh_height = 0.5
+        depth, width, height = self.table._extents
+        lb = np.array([-0.5 * depth, -0.5 * width, 0.5 * height - 0.1])
+        ub = np.array([+0.5 * depth, +0.5 * width, 0.5 * height + mesh_height])
+        lb = self.table.transform_vector(lb)
+        ub = self.table.transform_vector(ub)
+        return Grid(lb, ub, grid_sizes)
+
+
+class SimpleCreateGridSdfMixin:
+    @staticmethod
+    def create_gridsdf(world: TabletopWorldBase) -> GridSDF:
+        grid = world.get_grid()
+        sdf = world.get_exact_sdf()
+
+        X, Y, Z = grid.get_meshgrid(indexing="ij")
+        pts = np.array(list(zip(X.flatten(), Y.flatten(), Z.flatten())))
+        values = sdf.__call__(pts)
+        gridsdf = GridSDF(grid, values, 2.0, create_itp_lazy=True)
+        gridsdf = gridsdf.get_quantized()
+        return gridsdf
+
+
+class SingleArmSampleDescriptionsMixin:
+    @staticmethod
+    def sample_target_pose(
+        world: TabletopBoxWorld, n_sample: int, standard: bool = False
+    ) -> Coordinates:
+        table = world.table
+        table_depth, table_width, table_height = table._extents
+
+        co = world.box_center.copy_worldcoords()
+        if standard:
+            d_trans = 0.0
+            w_trans = 0.0
+            h_trans = 0.5 * world.box_h
+            theta = 0.0
+        else:
+            margin = 0.03
+            box_dt = world.box_d - 2 * (world.box_t + margin)
+            box_wt = world.box_w - 2 * (world.box_t + margin)
+            box_ht = world.box_h - 2 * (world.box_t + margin)
+            d_trans = -0.5 * box_dt + np.random.rand() * box_dt
+            w_trans = -0.5 * box_wt + np.random.rand() * box_wt
+            h_trans = world.box_t + margin + np.random.rand() * box_ht
+            theta = -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
+
+        co.translate([d_trans, w_trans, h_trans])
+        co.rotate(theta, "z")
+
+        points = np.expand_dims(co.worldpos(), axis=0)
+        sdf = world.get_exact_sdf()
+
+        sd_val = sdf(points)[0]
+        assert sd_val > -0.0001
+        return co
+
+    @staticmethod
+    def sample_descriptions(
+        world: TabletopBoxWorld, n_sample: int, standard: bool = False
+    ) -> List[Any]:
+        if standard:
+            assert n_sample == 1
+        pose_list: List[Coordinates] = []
+        while len(pose_list) < n_sample:
+            pose = SingleArmSampleDescriptionsMixin.sample_target_pose(world, n_sample, standard)
+            position = np.expand_dims(pose.worldpos(), axis=0)
+            if world.get_exact_sdf()(position)[0] > 1e-3:
+                pose_list.append(pose)
+        return pose_list
+
+
+class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld]):
+    @staticmethod
+    def get_world_type() -> Type[TabletopBoxWorld]:
+        return TabletopBoxWorld
