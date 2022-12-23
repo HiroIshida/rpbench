@@ -1,22 +1,21 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import numpy as np
-from typing import Protocol, Generic, TypeVar, Type, Dict, Any, Tuple, List
+from typing import Any, Dict, Generic, List, Protocol, Tuple, Type, TypeVar
 
+import numpy as np
 
 WorldT = TypeVar("WorldT", bound="WorldProtocol")
 ProblemT = TypeVar("ProblemT", bound="ProblemProtocol")
 
 
 class SDFProtocol(Protocol):
-
     def __call__(self, __X: np.ndarray) -> np.ndarray:
-        """ return signed distance corresponds to _x
+        """return signed distance corresponds to _x
         Parameters
         ----------
         __x: np.ndarray[float, 2]
             2dim (n_point, n_dim) array of points
-        
+
         Returns
         ----------
         sd: np.ndarray[float, 1]
@@ -26,7 +25,6 @@ class SDFProtocol(Protocol):
 
 
 class WorldProtocol(ABC):
-
     @classmethod
     @abstractmethod
     def sample(cls: Type[WorldT], standard: bool = True) -> WorldT:
@@ -56,13 +54,14 @@ class ProblemProtocol(ABC, Generic[WorldT]):
     instance share the same world, it should be handle it as a single problem
     for the memory efficiency.
     """
+
     world: WorldT
     descriptions: List[Any]
 
     @classmethod
     @abstractmethod
     def sample(cls: Type[ProblemT], n_sample: int, standard: bool = True) -> ProblemT:
-        """Sample problem with a single scene with n_sample descriptions. """
+        """Sample problem with a single scene with n_sample descriptions."""
         ...
 
     @abstractmethod
@@ -74,7 +73,7 @@ class ProblemProtocol(ABC, Generic[WorldT]):
         ...
 
     def __len__(self) -> int:
-        """ return number of descriptions"""
+        """return number of descriptions"""
         return len(self.descriptions)
 
 
@@ -99,11 +98,11 @@ class SolverConfig:
 
 
 class SolverProtocol(ABC, Generic[ProblemT]):
-
     @classmethod
     @abstractmethod
     def get_config(cls) -> SolverConfig:
         ...
 
+    @abstractmethod
     def solve(self, problem: ProblemT) -> List[SolverResult]:
         ...
