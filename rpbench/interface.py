@@ -27,7 +27,7 @@ class SDFProtocol(Protocol):
 class WorldBase(ABC):
     @classmethod
     @abstractmethod
-    def sample(cls: Type[WorldT], standard: bool = True) -> WorldT:
+    def sample(cls: Type[WorldT], standard: bool = False) -> WorldT:
         ...
 
     @abstractmethod
@@ -65,7 +65,7 @@ class ProblemBase(ABC, Generic[WorldT]):
 
     @classmethod
     @abstractmethod
-    def sample(cls: Type[ProblemT], n_sample: int, standard: bool = True) -> ProblemT:
+    def sample(cls: Type[ProblemT], n_sample: int, standard: bool = False) -> ProblemT:
         """Sample problem with a single scene with n_sample descriptions."""
         ...
 
