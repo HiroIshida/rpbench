@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Protocol, Tuple, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Protocol, Type, TypeVar
 
 import numpy as np
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 ProblemT = TypeVar("ProblemT", bound="ProblemBase")
+DescriptionT = TypeVar("DescriptionT", bound=Any)
 
 
 class SDFProtocol(Protocol):
@@ -41,21 +42,18 @@ class WorldBase(ABC):
         ...
 
 
+@dataclass
 class DescriptionTable:
     """Unified format of description for all problems
     both world and descriptions should be encoded into ArrayData
     """
 
-    @dataclass
-    class ArrayData:
-        shape: Tuple[int, ...]
-        data: np.ndarray
-
-    table: Dict[str, ArrayData]
+    world_table: Dict[str, np.ndarray]  # world common for all sub problems
+    desc_table: List[Dict[str, np.ndarray]]  # sub problem wise
 
 
 @dataclass
-class ProblemBase(ABC, Generic[WorldT]):
+class ProblemBase(ABC, Generic[WorldT, DescriptionT]):
     """Problem base class
     Problem is composed of world and *descriptions*
 
@@ -67,7 +65,7 @@ class ProblemBase(ABC, Generic[WorldT]):
     """
 
     world: WorldT
-    descriptions: List[Any]
+    descriptions: List[DescriptionT]
     _gridsdf: Optional[GridSDF]
 
     @classmethod
@@ -102,7 +100,9 @@ class ProblemBase(ABC, Generic[WorldT]):
 
     @staticmethod
     @abstractmethod
-    def sample_descriptions(world: WorldT, n_sample: int, standard: bool = False) -> List[Any]:
+    def sample_descriptions(
+        world: WorldT, n_sample: int, standard: bool = False
+    ) -> List[DescriptionT]:
         """Typically this function is implmented by mixin"""
         ...
 

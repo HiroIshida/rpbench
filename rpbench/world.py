@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Type
+from typing import List, Tuple, Type
 
 import numpy as np
 from skrobot.coordinates import Coordinates
@@ -8,7 +8,7 @@ from skrobot.model.primitives import Box
 from skrobot.sdf import UnionSDF
 from voxbloxpy.core import Grid, GridSDF
 
-from rpbench.interface import ProblemBase, WorldBase
+from rpbench.interface import DescriptionTable, ProblemBase, WorldBase
 
 
 @dataclass
@@ -124,56 +124,61 @@ class SimpleCreateGridSdfMixin:
         return gridsdf
 
 
-class SingleArmSampleDescriptionsMixin:
-    @staticmethod
-    def sample_target_pose(
-        world: TabletopBoxWorld, n_sample: int, standard: bool = False
-    ) -> Coordinates:
-        table = world.table
-        table_depth, table_width, table_height = table._extents
+def tabletop_box_sample_target_pose(
+    world: TabletopBoxWorld, n_sample: int, standard: bool = False
+) -> Coordinates:
+    table = world.table
+    table_depth, table_width, table_height = table._extents
 
-        co = world.box_center.copy_worldcoords()
-        if standard:
-            d_trans = 0.0
-            w_trans = 0.0
-            h_trans = 0.5 * world.box_h
-            theta = 0.0
-        else:
-            margin = 0.03
-            box_dt = world.box_d - 2 * (world.box_t + margin)
-            box_wt = world.box_w - 2 * (world.box_t + margin)
-            box_ht = world.box_h - 2 * (world.box_t + margin)
-            d_trans = -0.5 * box_dt + np.random.rand() * box_dt
-            w_trans = -0.5 * box_wt + np.random.rand() * box_wt
-            h_trans = world.box_t + margin + np.random.rand() * box_ht
-            theta = -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
+    co = world.box_center.copy_worldcoords()
+    if standard:
+        d_trans = 0.0
+        w_trans = 0.0
+        h_trans = 0.5 * world.box_h
+        theta = 0.0
+    else:
+        margin = 0.03
+        box_dt = world.box_d - 2 * (world.box_t + margin)
+        box_wt = world.box_w - 2 * (world.box_t + margin)
+        box_ht = world.box_h - 2 * (world.box_t + margin)
+        d_trans = -0.5 * box_dt + np.random.rand() * box_dt
+        w_trans = -0.5 * box_wt + np.random.rand() * box_wt
+        h_trans = world.box_t + margin + np.random.rand() * box_ht
+        theta = -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
 
-        co.translate([d_trans, w_trans, h_trans])
-        co.rotate(theta, "z")
+    co.translate([d_trans, w_trans, h_trans])
+    co.rotate(theta, "z")
 
-        points = np.expand_dims(co.worldpos(), axis=0)
-        sdf = world.get_exact_sdf()
+    points = np.expand_dims(co.worldpos(), axis=0)
+    sdf = world.get_exact_sdf()
 
-        sd_val = sdf(points)[0]
-        assert sd_val > -0.0001
-        return co
+    sd_val = sdf(points)[0]
+    assert sd_val > -0.0001
+    return co
 
+
+class TabletopBoxSingleArmSampleDescriptionsMixin:
     @staticmethod
     def sample_descriptions(
         world: TabletopBoxWorld, n_sample: int, standard: bool = False
-    ) -> List[Any]:
+    ) -> List[Tuple[Coordinates]]:
+        # using single element Tuple looks bit cumbsersome but
+        # for generality
         if standard:
             assert n_sample == 1
-        pose_list: List[Coordinates] = []
+        pose_list: List[Tuple[Coordinates]] = []
         while len(pose_list) < n_sample:
-            pose = SingleArmSampleDescriptionsMixin.sample_target_pose(world, n_sample, standard)
+            pose = tabletop_box_sample_target_pose(world, n_sample, standard)
             position = np.expand_dims(pose.worldpos(), axis=0)
             if world.get_exact_sdf()(position)[0] > 1e-3:
-                pose_list.append(pose)
+                pose_list.append((pose,))
         return pose_list
 
 
-class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld]):
+class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
     @staticmethod
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
+
+    def as_table(self) -> DescriptionTable:
+        ...
