@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import numpy as np
 from typing import Protocol, Generic, TypeVar, Type, Dict, Any, Tuple, List
@@ -24,9 +25,10 @@ class SDFProtocol(Protocol):
         ...
 
 
-class WorldProtocol(Protocol):
+class WorldProtocol(ABC):
 
     @classmethod
+    @abstractmethod
     def sample(cls: Type[WorldT], standard: bool = True) -> WorldT:
         ...
 
@@ -44,7 +46,7 @@ class DescriptionTable:
     table: Dict[str, ArrayData]
 
 
-class ProblemProtocol(Protocol, Generic[WorldT]):
+class ProblemProtocol(ABC, Generic[WorldT]):
     """Problem Protocol
     Problem is composed of world and *descriptions*
 
@@ -58,13 +60,16 @@ class ProblemProtocol(Protocol, Generic[WorldT]):
     descriptions: List[Any]
 
     @classmethod
+    @abstractmethod
     def sample(cls: Type[ProblemT], n_sample: int, standard: bool = True) -> ProblemT:
         """Sample problem with a single scene with n_sample descriptions. """
         ...
 
+    @abstractmethod
     def as_table(self) -> DescriptionTable:
         ...
 
+    @abstractmethod
     def get_sdf(self) -> SDFProtocol:
         ...
 
@@ -73,22 +78,32 @@ class ProblemProtocol(Protocol, Generic[WorldT]):
         return len(self.descriptions)
 
 
-class ResultProtocol(Protocol):
+@dataclass
+class SolverResult:
     nit: int
     success: bool
     x: np.ndarray
 
+    @classmethod
+    def cast_from(cls, result: Any):
+        return cls(result.nit, result.success, result.x)
 
-class SolverConfigProtocol(Protocol):
+
+@dataclass
+class SolverConfig:
     maxiter: int
 
+    @classmethod
+    def cast_from(cls, config: Any):
+        return cls(config.maxiter)
 
-class SolverProtocol(Protocol, Generic[ProblemT]):
+
+class SolverProtocol(ABC, Generic[ProblemT]):
 
     @classmethod
-    def get_config(cls) -> SolverConfigProtocol:
+    @abstractmethod
+    def get_config(cls) -> SolverConfig:
         ...
 
-
-    def solve(self, problem: ProblemT) -> List[ResultProtocol]:
+    def solve(self, problem: ProblemT) -> List[SolverResult]:
         ...
