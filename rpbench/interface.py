@@ -48,8 +48,8 @@ class DescriptionTable:
     both world and descriptions should be encoded into ArrayData
     """
 
-    world_table: Dict[str, np.ndarray]  # world common for all sub problems
-    desc_table: List[Dict[str, np.ndarray]]  # sub problem wise
+    world_dict: Dict[str, np.ndarray]  # world common for all sub problems
+    desc_dicts: List[Dict[str, np.ndarray]]  # sub problem wise
 
 
 @dataclass

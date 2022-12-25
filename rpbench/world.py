@@ -9,6 +9,7 @@ from skrobot.sdf import UnionSDF
 from voxbloxpy.core import Grid, GridSDF
 
 from rpbench.interface import DescriptionTable, ProblemBase, WorldBase
+from rpbench.utils import skcoords_to_pose_vec
 
 
 @dataclass
@@ -181,4 +182,23 @@ class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld, Tuple[Coordinates, ..
         return TabletopBoxWorld
 
     def as_table(self) -> DescriptionTable:
-        ...
+        assert self._gridsdf is not None
+        world_dict = {}
+        world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+        world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.worldcoords())
+
+        desc_dicts = []
+        for desc in self.descriptions:
+            desc_dict = {}
+            for idx, co in enumerate(desc):
+                pose = skcoords_to_pose_vec(co)
+                name = "target_pose-{}".format(idx)
+                desc_dict[name] = pose
+            desc_dicts.append(desc_dict)
+        return DescriptionTable(world_dict, desc_dicts)
+
+
+class TabletopBoxSingleArmReaching(
+    TabletopWorldBase, TabletopBoxSingleArmSampleDescriptionsMixin, SimpleCreateGridSdfMixin
+):
+    ...
