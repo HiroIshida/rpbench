@@ -162,12 +162,12 @@ class TabletopBoxSingleArmSampleDescriptionsMixin:
     @staticmethod
     def sample_descriptions(
         world: TabletopBoxWorld, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates]]:
+    ) -> List[Tuple[Coordinates, ...]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
         if standard:
             assert n_sample == 1
-        pose_list: List[Tuple[Coordinates]] = []
+        pose_list: List[Tuple[Coordinates, ...]] = []
         while len(pose_list) < n_sample:
             pose = tabletop_box_sample_target_pose(world, n_sample, standard)
             position = np.expand_dims(pose.worldpos(), axis=0)
@@ -198,7 +198,6 @@ class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld, Tuple[Coordinates, ..
         return DescriptionTable(world_dict, desc_dicts)
 
 
-class TabletopBoxSingleArmReaching(
-    TabletopWorldBase, TabletopBoxSingleArmSampleDescriptionsMixin, SimpleCreateGridSdfMixin
-):
-    ...
+# fmt: off
+class TabletopBoxSingleArmReaching(TabletopBoxSingleArmSampleDescriptionsMixin, SimpleCreateGridSdfMixin, TabletopBoxProblemBase): ...
+# fmt: on
