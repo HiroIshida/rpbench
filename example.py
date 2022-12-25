@@ -1,6 +1,11 @@
-from rpbench.world import TabletopBoxSingleArmReaching, TabletopBoxWorld
+import time
 
+from skrobot.viewers import TrimeshSceneViewer
 
-def test_tabletop_box_world():
-    TabletopBoxWorld.sample()
-    TabletopBoxSingleArmReaching.sample()
+from rpbench.world import TabletopBoxSingleArmReaching
+
+prob = TabletopBoxSingleArmReaching.sample(1)
+viewer = TrimeshSceneViewer()
+prob.visualize(viewer)
+viewer.show()
+time.sleep(10)

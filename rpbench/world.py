@@ -4,8 +4,9 @@ from typing import List, Tuple, Type
 import numpy as np
 from skrobot.coordinates import Coordinates
 from skrobot.model.link import Link
-from skrobot.model.primitives import Box
+from skrobot.model.primitives import Axis, Box
 from skrobot.sdf import UnionSDF
+from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid, GridSDF
 
 from rpbench.interface import DescriptionTable, ProblemBase, WorldBase
@@ -110,6 +111,11 @@ class TabletopBoxWorld(TabletopWorldBase):
         ub = self.table.transform_vector(ub)
         return Grid(lb, ub, grid_sizes)
 
+    def visualize(self, viewer: TrimeshSceneViewer) -> None:
+        viewer.add(self.table)
+        for obs in self.obstacles:
+            viewer.add(obs)
+
 
 class SimpleCreateGridSdfMixin:
     @staticmethod
@@ -196,6 +202,13 @@ class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld, Tuple[Coordinates, ..
                 desc_dict[name] = pose
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
+
+    def visualize(self, viewer: TrimeshSceneViewer) -> None:
+        self.world.visualize(viewer)
+        for desc in self.descriptions:
+            for co in desc:
+                axis = Axis.from_coords(co)
+                viewer.add(axis)
 
 
 # fmt: off
