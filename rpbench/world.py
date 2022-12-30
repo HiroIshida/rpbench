@@ -1,10 +1,20 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, Type
+from functools import lru_cache
+from typing import Callable, List, Tuple, Type
 
 import numpy as np
+from skmp.constraint import BoxConst, CollFreeConst, IneqCompositeConst, PoseConstraint
+from skmp.kinematics import (
+    ArticulatedCollisionKinematicsMap,
+    ArticulatedEndEffectorKinematicsMap,
+)
+from skmp.robot.pr2 import PR2Config
+from skmp.solver.interface import Problem
 from skrobot.coordinates import Coordinates
 from skrobot.model.link import Link
 from skrobot.model.primitives import Axis, Box
+from skrobot.models.pr2 import PR2
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid, GridSDF
@@ -117,18 +127,16 @@ class TabletopBoxWorld(TabletopWorldBase):
             viewer.add(obs)
 
 
-class SimpleCreateGridSdfMixin:
-    @staticmethod
-    def create_gridsdf(world: TabletopWorldBase) -> GridSDF:
-        grid = world.get_grid()
-        sdf = world.get_exact_sdf()
+def create_exact_gridsdf(world: TabletopWorldBase) -> GridSDF:
+    grid = world.get_grid()
+    sdf = world.get_exact_sdf()
 
-        X, Y, Z = grid.get_meshgrid(indexing="ij")
-        pts = np.array(list(zip(X.flatten(), Y.flatten(), Z.flatten())))
-        values = sdf.__call__(pts)
-        gridsdf = GridSDF(grid, values, 2.0, create_itp_lazy=True)
-        gridsdf = gridsdf.get_quantized()
-        return gridsdf
+    X, Y, Z = grid.get_meshgrid(indexing="ij")
+    pts = np.array(list(zip(X.flatten(), Y.flatten(), Z.flatten())))
+    values = sdf.__call__(pts)
+    gridsdf = GridSDF(grid, values, 2.0, create_itp_lazy=True)
+    gridsdf = gridsdf.get_quantized()
+    return gridsdf
 
 
 def tabletop_box_sample_target_pose(
@@ -164,22 +172,77 @@ def tabletop_box_sample_target_pose(
     return co
 
 
-class TabletopBoxSingleArmSampleDescriptionsMixin:
-    @staticmethod
-    def sample_descriptions(
-        world: TabletopBoxWorld, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates, ...]]:
-        # using single element Tuple looks bit cumbsersome but
-        # for generality
-        if standard:
-            assert n_sample == 1
-        pose_list: List[Tuple[Coordinates, ...]] = []
-        while len(pose_list) < n_sample:
-            pose = tabletop_box_sample_target_pose(world, n_sample, standard)
-            position = np.expand_dims(pose.worldpos(), axis=0)
-            if world.get_exact_sdf()(position)[0] > 1e-3:
-                pose_list.append((pose,))
-        return pose_list
+class CachedPR2ConstProvider(ABC):
+    """
+    loading robot model is a process that takes some times.
+    So, by utilizing classmethod with lru_cache, all program
+    that calls this class share the same robot model and
+    other stuff.
+    """
+
+    @classmethod
+    @abstractmethod
+    def get_config(cls) -> PR2Config:
+        ...
+
+    @classmethod
+    @lru_cache
+    def get_pr2(cls) -> PR2:
+        pr2 = PR2(use_tight_joint_limit=False)
+        pr2.reset_manip_pose()
+        return pr2
+
+    @classmethod
+    @lru_cache
+    def get_box_const(cls) -> BoxConst:
+        config = cls.get_config()
+        return config.get_box_const()
+
+    @classmethod
+    @lru_cache
+    def get_pose_const(cls, target_pose_list: List[Coordinates]) -> PoseConstraint:
+        config = cls.get_config()
+        const = PoseConstraint.from_skrobot_coords(
+            target_pose_list, config.get_endeffector_kin(), cls.get_pr2()
+        )
+        return const
+
+    @classmethod
+    @lru_cache
+    def get_start_config(cls) -> np.ndarray:
+        config = cls.get_config()
+        pr2 = cls.get_pr2()
+        angles = []
+        for jn in config._get_control_joint_names():
+            a = pr2.__dict__[jn].joint_angle()
+            angles.append(a)
+        return np.array(angles)
+
+    @classmethod
+    @lru_cache
+    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> IneqCompositeConst:
+        config = cls.get_config()
+        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
+        selcolfree = config.get_neural_selcol_const(cls.get_pr2())
+        return IneqCompositeConst([colfree, selcolfree])
+
+    @classmethod
+    @lru_cache
+    def get_efkin(cls) -> ArticulatedEndEffectorKinematicsMap:
+        config = cls.get_config()
+        return config.get_endeffector_kin()
+
+    @classmethod
+    @lru_cache
+    def get_colkin(cls) -> ArticulatedCollisionKinematicsMap:
+        config = cls.get_config()
+        return config.get_collision_kin()
+
+
+class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
+    @classmethod
+    def get_config(cls) -> PR2Config:
+        return PR2Config(with_base=False)
 
 
 class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
@@ -211,6 +274,38 @@ class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
                 viewer.add(axis)
 
 
-# fmt: off
-class TabletopBoxSingleArmReaching(TabletopBoxSingleArmSampleDescriptionsMixin, SimpleCreateGridSdfMixin, TabletopBoxTaskBase): ...
-# fmt: on
+class TabletopBoxRightArmReachingTask(TabletopBoxTaskBase):
+    @staticmethod
+    def sample_descriptions(
+        world: TabletopBoxWorld, n_sample: int, standard: bool = False
+    ) -> List[Tuple[Coordinates, ...]]:
+        # using single element Tuple looks bit cumbsersome but
+        # for generality
+        if standard:
+            assert n_sample == 1
+        pose_list: List[Tuple[Coordinates, ...]] = []
+        while len(pose_list) < n_sample:
+            pose = tabletop_box_sample_target_pose(world, n_sample, standard)
+            position = np.expand_dims(pose.worldpos(), axis=0)
+            if world.get_exact_sdf()(position)[0] > 1e-3:
+                pose_list.append((pose,))
+        return pose_list
+
+    def export_problems(self) -> List[Problem]:
+        provider = CachedRArmPR2ConstProvider
+        q_start = provider.get_start_config()
+        box_const = provider.get_box_const()
+
+        assert self._gridsdf is not None
+        ineq_const = provider.get_collfree_const(self._gridsdf)
+
+        problems = []
+        for desc in self.descriptions:
+            pose_const = provider.get_pose_const(desc)
+            problem = Problem(q_start, box_const, pose_const, ineq_const, None)
+            problems.append(problem)
+        return problems
+
+    @staticmethod
+    def create_gridsdf(world: TabletopBoxWorld) -> GridSDF:
+        return create_exact_gridsdf(world)

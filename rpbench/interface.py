@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, Protocol, Type, TypeVar
 
 import numpy as np
+from skmp.solver.interface import Problem
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
@@ -108,6 +109,10 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
 
     @abstractmethod
     def as_table(self) -> DescriptionTable:
+        ...
+
+    @abstractmethod
+    def export_problems(self) -> List[Problem]:
         ...
 
 
