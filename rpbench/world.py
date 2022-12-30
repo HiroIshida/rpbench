@@ -9,7 +9,7 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid, GridSDF
 
-from rpbench.interface import DescriptionTable, ProblemBase, WorldBase
+from rpbench.interface import DescriptionTable, TaskBase, WorldBase
 from rpbench.utils import skcoords_to_pose_vec
 
 
@@ -182,7 +182,7 @@ class TabletopBoxSingleArmSampleDescriptionsMixin:
         return pose_list
 
 
-class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
+class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
     @staticmethod
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
@@ -212,5 +212,5 @@ class TabletopBoxProblemBase(ProblemBase[TabletopBoxWorld, Tuple[Coordinates, ..
 
 
 # fmt: off
-class TabletopBoxSingleArmReaching(TabletopBoxSingleArmSampleDescriptionsMixin, SimpleCreateGridSdfMixin, TabletopBoxProblemBase): ...
+class TabletopBoxSingleArmReaching(TabletopBoxSingleArmSampleDescriptionsMixin, SimpleCreateGridSdfMixin, TabletopBoxTaskBase): ...
 # fmt: on

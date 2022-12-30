@@ -6,7 +6,7 @@ import numpy as np
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
-ProblemT = TypeVar("ProblemT", bound="ProblemBase")
+TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 
 
@@ -44,23 +44,23 @@ class WorldBase(ABC):
 
 @dataclass
 class DescriptionTable:
-    """Unified format of description for all problems
+    """Unified format of description for all tasks
     both world and descriptions should be encoded into ArrayData
     """
 
-    world_dict: Dict[str, np.ndarray]  # world common for all sub problems
-    desc_dicts: List[Dict[str, np.ndarray]]  # sub problem wise
+    world_dict: Dict[str, np.ndarray]  # world common for all sub tasks
+    desc_dicts: List[Dict[str, np.ndarray]]  # sub task wise
 
 
 @dataclass
-class ProblemBase(ABC, Generic[WorldT, DescriptionT]):
-    """Problem base class
-    Problem is composed of world and *descriptions*
+class TaskBase(ABC, Generic[WorldT, DescriptionT]):
+    """Task base class
+    Task is composed of world and *descriptions*
 
     One may wonder why *descriptions* instead of a description.
-    When serialize the problem to a data, serialized world data tends to
-    be very larget, though the description is light. So, if mupltiple problems
-    instance share the same world, it should be handle it as a single problem
+    When serialize the task to a data, serialized world data tends to
+    be very larget, though the description is light. So, if mupltiple tasks
+    instance share the same world, it should be handle it as a single task
     for the memory efficiency.
     """
 
@@ -70,9 +70,9 @@ class ProblemBase(ABC, Generic[WorldT, DescriptionT]):
 
     @classmethod
     def sample(
-        cls: Type[ProblemT], n_sample: int, standard: bool = False, with_gridsdf: bool = True
-    ) -> ProblemT:
-        """Sample problem with a single scene with n_sample descriptions."""
+        cls: Type[TaskT], n_sample: int, standard: bool = False, with_gridsdf: bool = True
+    ) -> TaskT:
+        """Sample task with a single scene with n_sample descriptions."""
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
         descriptions = cls.sample_descriptions(world, n_sample, standard)
@@ -131,12 +131,12 @@ class SolverConfig:
         return cls(config.maxiter)
 
 
-class SolverProtocol(ABC, Generic[ProblemT]):
+class SolverProtocol(ABC, Generic[TaskT]):
     @classmethod
     @abstractmethod
     def get_config(cls) -> SolverConfig:
         ...
 
     @abstractmethod
-    def solve(self, problem: ProblemT) -> List[SolverResult]:
+    def solve(self, task: TaskT) -> List[SolverResult]:
         ...
