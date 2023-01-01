@@ -90,13 +90,11 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
-        """Typically this function is implmented by mixin"""
         ...
 
     @staticmethod
     @abstractmethod
     def create_gridsdf(world: WorldT) -> GridSDF:
-        """Typically this function is implmented by mixin"""
         ...
 
     @staticmethod
@@ -104,7 +102,6 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
     def sample_descriptions(
         world: WorldT, n_sample: int, standard: bool = False
     ) -> List[DescriptionT]:
-        """Typically this function is implmented by mixin"""
         ...
 
     @abstractmethod
