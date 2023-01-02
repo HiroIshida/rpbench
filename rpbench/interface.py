@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Protocol, Type, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Type, TypeVar
 
 import numpy as np
 from skmp.solver.interface import Problem
@@ -77,6 +77,42 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
         descriptions = cls.sample_descriptions(world, n_sample, standard)
+        if with_gridsdf:
+            gridsdf = cls.create_gridsdf(world)
+        else:
+            gridsdf = None
+        return cls(world, descriptions, gridsdf)
+
+    @classmethod
+    def predicated_sample(
+        cls: Type[TaskT],
+        n_sample: int,
+        predicate: Callable[[TaskT], bool],
+        max_trial_per_desc: int,
+        with_gridsdf: bool = True,
+    ) -> TaskT:
+        """sample task that maches the predicate function"""
+
+        # predicated sample cannot be a standard task
+        standard = False
+
+        world_t = cls.get_world_type()
+        world = world_t.sample(standard=standard)
+
+        # do some bit tricky thing.
+        # Naively, we can sample task with multiple description and then check if
+        # it satisfies the predicate. However, by this method, as the number of
+        # sample descriptions increase, satisfying the predicate becomes exponentially
+        # difficult. Thus, we sample the description one by one, and then concatanate
+        # and marge into a task.
+        descriptions: List[DescriptionT] = []
+        while len(descriptions) < n_sample:
+            desc = cls.sample_descriptions(world, 1, standard)[0]
+            temp_problem = cls(world, [desc], None)
+
+            if predicate(temp_problem):
+                descriptions.append(desc)
+
         if with_gridsdf:
             gridsdf = cls.create_gridsdf(world)
         else:
