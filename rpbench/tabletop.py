@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import Callable, ClassVar, List, Tuple, Type
 
 import numpy as np
-from skmp.constraint import BoxConst, CollFreeConst, IneqCompositeConst, PoseConstraint
+from skmp.constraint import AbstractIneqConst, BoxConst, CollFreeConst, PoseConstraint
 from skmp.kinematics import (
     ArticulatedCollisionKinematicsMap,
     ArticulatedEndEffectorKinematicsMap,
@@ -212,11 +212,12 @@ class CachedPR2ConstProvider(ABC):
         return np.array(angles)
 
     @classmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> IneqCompositeConst:
-        config = cls.get_config()
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
-        selcolfree = config.get_neural_selcol_const(cls.get_pr2())
-        return IneqCompositeConst([colfree, selcolfree])
+    @abstractmethod
+    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> AbstractIneqConst:
+        """get collision free constraint"""
+        # make this method abstract because usually self-collision must be considerd
+        # when dual-arm planning, but not have to be in single arm planning.
+        ...
 
     @classmethod
     @lru_cache
@@ -242,6 +243,11 @@ class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
         return PR2Config(with_base=False)
+
+    @classmethod
+    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
+        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
+        return colfree
 
 
 @dataclass
