@@ -258,7 +258,7 @@ class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
 
-    def as_table(self) -> DescriptionTable:
+    def export_table(self) -> DescriptionTable:
         assert self._gridsdf is not None
         world_dict = {}
         world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)

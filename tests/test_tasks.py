@@ -13,7 +13,7 @@ def test_tabletop_task():
     task = TabletopBoxRightArmReachingTask.sample(n_desc)
 
     # test conversion to numpy format
-    desc_table = task.as_table()
+    desc_table = task.export_table()
     assert desc_table.world_dict["world"].ndim == 3
     assert desc_table.world_dict["table_pose"].shape == (6,)
 

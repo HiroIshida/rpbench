@@ -141,7 +141,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
         ...
 
     @abstractmethod
-    def as_table(self) -> DescriptionTable:
+    def export_table(self) -> DescriptionTable:
         ...
 
     @abstractmethod
