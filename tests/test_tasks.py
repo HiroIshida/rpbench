@@ -34,6 +34,20 @@ def test_tabletop_task():
     res = solver.solve(None)
     assert res.traj is not None
 
+    # test predicated sampling
+    def predicate(task: TabletopBoxRightArmReachingTask):
+        assert len(task.descriptions) == 1
+        for desc in task.descriptions:
+            pose = desc[0]
+            pos = pose.worldpos()
+            if pos[2] > 0.85:
+                return False
+        return True
+
+    predicated_task = TabletopBoxRightArmReachingTask.predicated_sample(n_desc, predicate, 100)
+    assert predicated_task is not None
+    assert len(predicated_task.descriptions) == n_desc
+
 
 if __name__ == "__main__":
     test_tabletop_task()

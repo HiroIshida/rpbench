@@ -90,7 +90,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
         predicate: Callable[[TaskT], bool],
         max_trial_per_desc: int,
         with_gridsdf: bool = True,
-    ) -> TaskT:
+    ) -> Optional[TaskT]:
         """sample task that maches the predicate function"""
 
         # predicated sample cannot be a standard task
@@ -106,12 +106,20 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
         # difficult. Thus, we sample the description one by one, and then concatanate
         # and marge into a task.
         descriptions: List[DescriptionT] = []
+        count_trial_before_first_success = 0
         while len(descriptions) < n_sample:
+
+            if len(descriptions) == 0:
+                count_trial_before_first_success += 1
+
             desc = cls.sample_descriptions(world, 1, standard)[0]
             temp_problem = cls(world, [desc], None)
 
             if predicate(temp_problem):
                 descriptions.append(desc)
+
+            if count_trial_before_first_success > max_trial_per_desc:
+                return None
 
         if with_gridsdf:
             gridsdf = cls.create_gridsdf(world)
