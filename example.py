@@ -3,7 +3,7 @@ from ompl import Algorithm, set_ompl_random_seed
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.world import TabletopBoxRightArmReachingTask, TaskVisualizer
+from rpbench.tabletop import TabletopBoxRightArmReachingTask, TaskVisualizer
 
 set_ompl_random_seed(0)
 np.random.seed(0)
