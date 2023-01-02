@@ -14,11 +14,11 @@ def test_tabletop_task():
 
     # test conversion to numpy format
     desc_table = task.export_table()
-    assert desc_table.world_dict["world"].ndim == 3
-    assert desc_table.world_dict["table_pose"].shape == (6,)
+    assert desc_table.world_desc_dict["world"].ndim == 3
+    assert desc_table.world_desc_dict["table_pose"].shape == (6,)
 
-    assert len(desc_table.desc_dicts) == n_desc
-    desc_dict = desc_table.desc_dicts[0]
+    assert len(desc_table.wcond_desc_dicts) == n_desc
+    desc_dict = desc_table.wcond_desc_dicts[0]
     assert desc_dict["target_pose-0"].shape == (6,)
 
     # test conversion to problem format

@@ -49,8 +49,8 @@ class DescriptionTable:
     both world and descriptions should be encoded into ArrayData
     """
 
-    world_dict: Dict[str, np.ndarray]  # world common for all sub tasks
-    desc_dicts: List[Dict[str, np.ndarray]]  # sub task wise
+    world_desc_dict: Dict[str, np.ndarray]  # world common for all sub tasks
+    wcond_desc_dicts: List[Dict[str, np.ndarray]]  # world conditioned
 
 
 @dataclass
@@ -71,12 +71,12 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
 
     @classmethod
     def sample(
-        cls: Type[TaskT], n_sample: int, standard: bool = False, with_gridsdf: bool = True
+        cls: Type[TaskT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
     ) -> TaskT:
-        """Sample task with a single scene with n_sample descriptions."""
+        """Sample task with a single scene with n_wcond_desc descriptions."""
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
-        descriptions = cls.sample_descriptions(world, n_sample, standard)
+        descriptions = cls.sample_descriptions(world, n_wcond_desc, standard)
         if with_gridsdf:
             gridsdf = cls.create_gridsdf(world)
         else:
@@ -86,7 +86,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
     @classmethod
     def predicated_sample(
         cls: Type[TaskT],
-        n_sample: int,
+        n_wcond_desc: int,
         predicate: Callable[[TaskT], bool],
         max_trial_per_desc: int,
         with_gridsdf: bool = True,
@@ -107,7 +107,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
         # and marge into a task.
         descriptions: List[DescriptionT] = []
         count_trial_before_first_success = 0
-        while len(descriptions) < n_sample:
+        while len(descriptions) < n_wcond_desc:
 
             if len(descriptions) == 0:
                 count_trial_before_first_success += 1
