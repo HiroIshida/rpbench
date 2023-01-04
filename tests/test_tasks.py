@@ -1,3 +1,6 @@
+import pickle
+from hashlib import md5
+
 import numpy as np
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
@@ -9,6 +12,18 @@ set_ompl_random_seed(0)
 
 
 def test_tabletop_task():
+    # test standard task's consistency
+    # note that, because skrobot link has uuid, we must convert it to table by
+    # export_table function beforehand
+    task_standard = TabletopBoxRightArmReachingTask.sample(1, True)
+    table = task_standard.export_table()
+    value = md5(pickle.dumps(table)).hexdigest()
+    for _ in range(5):
+        task_standard = TabletopBoxRightArmReachingTask.sample(1, True)
+        table = task_standard.export_table()
+        value_test = md5(pickle.dumps(table)).hexdigest()
+        assert value == value_test
+
     n_desc = 10
     task = TabletopBoxRightArmReachingTask.sample(n_desc)
 

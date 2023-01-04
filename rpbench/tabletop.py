@@ -50,10 +50,12 @@ class TabletopBoxWorld(TabletopWorldBase):
     def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
         table = cls.create_standard_table()
         table_depth, table_width, table_height = table._extents
-        x = np.random.rand() * 0.2
-        y = -0.2 + np.random.rand() * 0.4
-        z = 0.0
-        table.translate([x, y, z])
+
+        if not standard:
+            x = np.random.rand() * 0.2
+            y = -0.2 + np.random.rand() * 0.4
+            z = 0.0
+            table.translate([x, y, z])
 
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
@@ -63,9 +65,13 @@ class TabletopBoxWorld(TabletopWorldBase):
         color = np.array([255, 220, 0, 150])
 
         # box
-        d = 0.2 + np.random.rand() * 0.3
-        w = 0.3 + np.random.rand() * 0.3
-        h = 0.2 + np.random.rand() * 0.3
+        d = 0.2
+        w = 0.3
+        h = 0.2
+        if not standard:
+            d += np.random.rand() * 0.3
+            w += np.random.rand() * 0.3
+            h += np.random.rand() * 0.3
         t = 0.03
 
         if standard:
