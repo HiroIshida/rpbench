@@ -11,7 +11,7 @@ np.random.seed(0)
 task = TabletopBoxRightArmReachingTask.sample(1, True)
 problem = task.export_problems()[0]
 
-ompl_solcon = OMPLSolverConfig(n_max_eval=100000, algorithm=Algorithm.RRTConnect)
+ompl_solcon = OMPLSolverConfig(n_max_call=100000, algorithm=Algorithm.RRTConnect)
 ompl_sovler = OMPLSolver.setup(problem, ompl_solcon)
 ompl_result = ompl_sovler.solve()
 assert ompl_result.traj is not None

@@ -29,7 +29,7 @@ def test_tabletop_task():
     task = TabletopBoxRightArmReachingTask.sample(1, standard=True)
     raw_problems = task.export_problems()
     raw_problem = raw_problems[0]
-    solcon = OMPLSolverConfig(n_max_eval=100000)
+    solcon = OMPLSolverConfig(n_max_call=100000)
     solver = OMPLSolver.setup(raw_problem, solcon)
     res = solver.solve(None)
     assert res.traj is not None
