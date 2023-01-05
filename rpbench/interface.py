@@ -8,6 +8,7 @@ from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 SamplableT = TypeVar("SamplableT", bound="SamplableBase")
+OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 
@@ -209,6 +210,10 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
     def __len__(self) -> int:
         """return number of descriptions"""
         return len(self.descriptions)
+
+    @classmethod
+    def cast_from(cls: Type[SamplableT], obj: OtherSamplableT) -> SamplableT:
+        raise NotImplementedError()
 
 
 @dataclass

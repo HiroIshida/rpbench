@@ -2,7 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Callable, ClassVar, List, Tuple, Type
+from typing import Callable, ClassVar, List, Tuple, Type, TypeVar
 
 import numpy as np
 from skmp.constraint import AbstractIneqConst, BoxConst, CollFreeConst, PoseConstraint
@@ -28,10 +28,14 @@ from rpbench.interface import (
     DescriptionT,
     DescriptionTable,
     SamplableBase,
+    SamplableT,
     TaskBase,
     WorldBase,
 )
 from rpbench.utils import skcoords_to_pose_vec
+
+TabletopBoxSamplableT = TypeVar("TabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
+OtherTabletopBoxSamplableT = TypeVar("OtherTabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
 
 
 @dataclass
@@ -294,6 +298,13 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
                 desc_dict[name] = pose
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
+
+    @classmethod
+    def cast_from(cls: Type[TabletopBoxSamplableT], other: SamplableT) -> TabletopBoxSamplableT:
+        assert isinstance(other, TabletopBoxSamplableBase)
+        is_compatible_meshgen = cls.create_gridsdf == other.create_gridsdf
+        assert is_compatible_meshgen
+        return cls(other.world, [], other._gridsdf)
 
 
 class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):

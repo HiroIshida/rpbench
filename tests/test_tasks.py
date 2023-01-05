@@ -12,7 +12,12 @@ set_ompl_random_seed(0)
 
 
 def test_tabletop_samplable():
-    TabletopBoxWorldWrap.sample(1)
+    ww = TabletopBoxWorldWrap.sample(10)
+    assert ww.n_inner_task == 10
+    # cast
+    task = TabletopBoxRightArmReachingTask.cast_from(ww)
+    assert task.n_inner_task == 0
+    TabletopBoxWorldWrap.cast_from(task)
 
 
 def test_tabletop_task():
