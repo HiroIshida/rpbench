@@ -28,6 +28,9 @@ def test_tabletop_task():
     task = TabletopBoxRightArmReachingTask.sample(n_desc)
     assert task.n_inner_task == n_desc
 
+    # test dof
+    assert task.get_dof() == 7
+
     # test conversion to numpy format
     desc_table = task.export_table()
     assert desc_table.world_desc_dict["world"].ndim == 3

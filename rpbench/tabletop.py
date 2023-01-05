@@ -244,6 +244,16 @@ class CachedPR2ConstProvider(ABC):
         config = cls.get_config()
         return config.get_collision_kin()
 
+    @classmethod
+    @lru_cache
+    def get_dof(cls) -> int:
+        config = cls.get_config()
+        names = config._get_control_joint_names()
+        dof = len(names)
+        if config.with_base:
+            dof += 3
+        return dof
+
 
 class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
@@ -263,6 +273,10 @@ class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
     @staticmethod
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
+
+    @classmethod
+    def get_dof(cls) -> int:
+        return cls.config_provider.get_dof()
 
     def export_table(self) -> DescriptionTable:
         assert self._gridsdf is not None

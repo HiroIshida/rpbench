@@ -188,6 +188,12 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
         """return number of descriptions"""
         return len(self.descriptions)
 
+    @classmethod
+    @abstractmethod
+    def get_dof(self) -> int:
+        """get dof of robot in this task"""
+        ...
+
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
