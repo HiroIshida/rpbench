@@ -13,6 +13,7 @@ from skmp.kinematics import (
 from skmp.robot.pr2 import PR2Config
 from skmp.robot.utils import set_robot_state
 from skmp.solver.interface import Problem, ResultProtocol
+from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
@@ -312,14 +313,29 @@ class TabletopBoxRightArmReachingTask(TabletopBoxTaskBase):
             ss = OMPLSolver.setup(problem, solcon)
             ret = ss.solve()
             if ret.traj is not None:
-                return ret
+                # now, smooth out the solution
+
+                # first solve with smaller number of waypoint
+                nlp_conf = SQPBasedSolverConfig(
+                    n_wp=20, n_max_call=20, motion_step_satisfaction="debug_ignore"
+                )
+                ss_nlp = SQPBasedSolver.setup(problem, nlp_conf)
+                nlp_ret = ss_nlp.solve(ret.traj)
+
+                # Then try to find more find-grained solution
+                if nlp_ret.traj is not None:
+                    nlp_conf = SQPBasedSolverConfig(
+                        n_wp=60, n_max_call=20, motion_step_satisfaction="post"
+                    )
+                    ss_nlp = SQPBasedSolver.setup(problem, nlp_conf)
+                    nlp_ret = ss_nlp.solve(nlp_ret.traj)
+                    if nlp_ret.traj is not None:
+                        return nlp_ret
+
             if ret.terminate_state == TerminateState.FAIL_SATISFACTION:
                 satisfaction_fail_count += 1
-            elif ret.terminate_state == TerminateState.FAIL_PLANNING:
-                planning_fail_count += 1
             else:
-                assert False, "not gonna happen"
-        assert ret.traj is None
+                planning_fail_count += 1
         return ret  # return latest one (failed)
 
     @staticmethod
