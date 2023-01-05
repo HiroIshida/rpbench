@@ -26,6 +26,7 @@ def test_tabletop_task():
 
     n_desc = 10
     task = TabletopBoxRightArmReachingTask.sample(n_desc)
+    assert task.n_inner_task == n_desc
 
     # test conversion to numpy format
     desc_table = task.export_table()

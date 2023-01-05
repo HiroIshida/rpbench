@@ -122,6 +122,10 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
     descriptions: List[DescriptionT]
     _gridsdf: Optional[GridSDF]
 
+    @property
+    def n_inner_task(self) -> int:
+        return len(self.descriptions)
+
     @classmethod
     def sample(
         cls: Type[TaskT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
