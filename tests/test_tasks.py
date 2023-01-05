@@ -5,10 +5,14 @@ import numpy as np
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.tabletop import TabletopBoxRightArmReachingTask
+from rpbench.tabletop import TabletopBoxRightArmReachingTask, TabletopBoxWorldWrap
 
 np.random.seed(0)
 set_ompl_random_seed(0)
+
+
+def test_tabletop_samplable():
+    TabletopBoxWorldWrap.sample(1)
 
 
 def test_tabletop_task():

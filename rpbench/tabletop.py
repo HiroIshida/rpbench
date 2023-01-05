@@ -296,6 +296,14 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
         return DescriptionTable(world_dict, desc_dicts)
 
 
+class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
+    @staticmethod
+    def sample_descriptions(
+        world: TabletopWorldBase, n_sample: int, standard: bool = False
+    ) -> List[None]:
+        return [None for _ in range(n_sample)]
+
+
 class TabletopBoxTaskBase(
     TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]],
     TabletopBoxSamplableBase[Tuple[Coordinates, ...]],
@@ -381,6 +389,10 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
 
 
 class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase):
+    ...
+
+
+class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase):
     ...
 
 
