@@ -67,6 +67,11 @@ def test_tabletop_task():
     assert predicated_task is not None
     assert len(predicated_task.descriptions) == n_desc
 
+    # test solve_default
+    task = TabletopBoxRightArmReachingTask.sample(1, standard=True)
+    result = task.solve_default()[0]
+    assert result.traj is not None
+
 
 if __name__ == "__main__":
     test_tabletop_task()

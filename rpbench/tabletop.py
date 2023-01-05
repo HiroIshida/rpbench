@@ -12,7 +12,8 @@ from skmp.kinematics import (
 )
 from skmp.robot.pr2 import PR2Config
 from skmp.robot.utils import set_robot_state
-from skmp.solver.interface import Problem
+from skmp.solver.interface import Problem, ResultProtocol
+from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
 from skrobot.model.link import Link
@@ -297,6 +298,29 @@ class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
 
 class TabletopBoxRightArmReachingTask(TabletopBoxTaskBase):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
+
+    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        n_satisfaction_budget = 20
+        n_planning_budget = 4
+        solcon = OMPLSolverConfig(n_max_call=8000, n_max_satisfaction_trial=100)
+
+        satisfaction_fail_count = 0
+        planning_fail_count = 0
+        while (satisfaction_fail_count < n_satisfaction_budget) and (
+            planning_fail_count < n_planning_budget
+        ):
+            ss = OMPLSolver.setup(problem, solcon)
+            ret = ss.solve()
+            if ret.traj is not None:
+                return ret
+            if ret.terminate_state == TerminateState.FAIL_SATISFACTION:
+                satisfaction_fail_count += 1
+            elif ret.terminate_state == TerminateState.FAIL_PLANNING:
+                planning_fail_count += 1
+            else:
+                assert False, "not gonna happen"
+        assert ret.traj is None
+        return ret  # return latest one (failed)
 
     @staticmethod
     def sample_descriptions(

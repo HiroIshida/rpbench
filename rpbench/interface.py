@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Type, TypeVar
 
 import numpy as np
-from skmp.solver.interface import Problem
+from skmp.solver.interface import Problem, ResultProtocol
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
@@ -187,6 +187,23 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
     def __len__(self) -> int:
         """return number of descriptions"""
         return len(self.descriptions)
+
+    def solve_default(self) -> List[ResultProtocol]:
+        """solve the task by using default setting without initial solution
+        This solve function is expected to successfully solve
+        the problem if it is feasible. Thus, typically a sampling-based
+        algorithm with large sampling budget would be used. Contrary,
+        nlp-based algrithm, which depends heavily on init solution
+        should be avoided.
+
+        This method is abstract, because depending on the task type
+        sampling budget could be much different.
+        """
+        return [self.solve_default_each(p) for p in self.export_problems()]
+
+    @abstractmethod
+    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        ...
 
     @classmethod
     @abstractmethod
