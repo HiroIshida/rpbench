@@ -24,7 +24,13 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid, GridSDF
 
-from rpbench.interface import DescriptionTable, TaskBase, WorldBase
+from rpbench.interface import (
+    DescriptionT,
+    DescriptionTable,
+    SamplableBase,
+    TaskBase,
+    WorldBase,
+)
 from rpbench.utils import skcoords_to_pose_vec
 
 
@@ -268,16 +274,10 @@ class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
 
 
 @dataclass
-class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
-    config_provider: ClassVar[Type[CachedPR2ConstProvider]]
-
+class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
     @staticmethod
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
-
-    @classmethod
-    def get_dof(cls) -> int:
-        return cls.config_provider.get_dof()
 
     def export_table(self) -> DescriptionTable:
         assert self._gridsdf is not None
@@ -294,6 +294,17 @@ class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
                 desc_dict[name] = pose
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
+
+
+class TabletopBoxTaskBase(
+    TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]],
+    TabletopBoxSamplableBase[Tuple[Coordinates, ...]],
+):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]]
+
+    @classmethod
+    def get_dof(cls) -> int:
+        return cls.config_provider.get_dof()
 
 
 class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
