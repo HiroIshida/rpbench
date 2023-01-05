@@ -218,34 +218,3 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
     @abstractmethod
     def export_problems(self) -> List[Problem]:
         ...
-
-
-@dataclass
-class SolverResult:
-    nit: int
-    success: bool
-    x: np.ndarray
-
-    @classmethod
-    def cast_from(cls, result: Any):
-        return cls(result.nit, result.success, result.x)
-
-
-@dataclass
-class SolverConfig:
-    maxiter: int
-
-    @classmethod
-    def cast_from(cls, config: Any):
-        return cls(config.maxiter)
-
-
-class SolverProtocol(ABC, Generic[TaskT]):
-    @classmethod
-    @abstractmethod
-    def get_config(cls) -> SolverConfig:
-        ...
-
-    @abstractmethod
-    def solve(self, task: TaskT) -> List[SolverResult]:
-        ...
