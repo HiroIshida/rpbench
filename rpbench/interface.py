@@ -7,6 +7,7 @@ from skmp.solver.interface import Problem, ResultProtocol
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
+SamplableT = TypeVar("SamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 
@@ -107,7 +108,7 @@ class DescriptionTable:
 
 
 @dataclass
-class TaskBase(ABC, Generic[WorldT, DescriptionT]):
+class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
     """Task base class
     Task is composed of world and *descriptions*
 
@@ -128,8 +129,8 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
 
     @classmethod
     def sample(
-        cls: Type[TaskT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
-    ) -> TaskT:
+        cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
+    ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
@@ -142,12 +143,12 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
 
     @classmethod
     def predicated_sample(
-        cls: Type[TaskT],
+        cls: Type[SamplableT],
         n_wcond_desc: int,
-        predicate: Callable[[TaskT], bool],
+        predicate: Callable[[SamplableT], bool],
         max_trial_per_desc: int,
         with_gridsdf: bool = True,
-    ) -> Optional[TaskT]:
+    ) -> Optional[SamplableT]:
         """sample task that maches the predicate function"""
 
         # predicated sample cannot be a standard task
@@ -184,33 +185,6 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
             gridsdf = None
         return cls(world, descriptions, gridsdf)
 
-    def __len__(self) -> int:
-        """return number of descriptions"""
-        return len(self.descriptions)
-
-    def solve_default(self) -> List[ResultProtocol]:
-        """solve the task by using default setting without initial solution
-        This solve function is expected to successfully solve
-        the problem if it is feasible. Thus, typically a sampling-based
-        algorithm with large sampling budget would be used. Contrary,
-        nlp-based algrithm, which depends heavily on init solution
-        should be avoided.
-
-        This method is abstract, because depending on the task type
-        sampling budget could be much different.
-        """
-        return [self.solve_default_each(p) for p in self.export_problems()]
-
-    @abstractmethod
-    def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def get_dof(self) -> int:
-        """get dof of robot in this task"""
-        ...
-
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
@@ -230,6 +204,36 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT]):
 
     @abstractmethod
     def export_table(self) -> DescriptionTable:
+        ...
+
+    def __len__(self) -> int:
+        """return number of descriptions"""
+        return len(self.descriptions)
+
+
+@dataclass
+class TaskBase(SamplableBase[WorldT, DescriptionT]):
+    def solve_default(self) -> List[ResultProtocol]:
+        """solve the task by using default setting without initial solution
+        This solve function is expected to successfully solve
+        the problem if it is feasible. Thus, typically a sampling-based
+        algorithm with large sampling budget would be used. Contrary,
+        nlp-based algrithm, which depends heavily on init solution
+        should be avoided.
+
+        This method is abstract, because depending on the task type
+        sampling budget could be much different.
+        """
+        return [self.solve_default_each(p) for p in self.export_problems()]
+
+    @abstractmethod
+    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def get_dof(cls) -> int:
+        """get dof of robot in this task"""
         ...
 
     @abstractmethod
