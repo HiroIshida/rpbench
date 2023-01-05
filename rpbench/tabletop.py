@@ -138,16 +138,18 @@ class TabletopBoxWorld(TabletopWorldBase):
             viewer.add(obs)
 
 
-def create_exact_gridsdf(world: TabletopWorldBase) -> GridSDF:
-    grid = world.get_grid()
-    sdf = world.get_exact_sdf()
+class ExactGridSDFCreator:
+    @staticmethod
+    def create_gridsdf(world: TabletopBoxWorld) -> GridSDF:
+        grid = world.get_grid()
+        sdf = world.get_exact_sdf()
 
-    X, Y, Z = grid.get_meshgrid(indexing="ij")
-    pts = np.array(list(zip(X.flatten(), Y.flatten(), Z.flatten())))
-    values = sdf.__call__(pts)
-    gridsdf = GridSDF(grid, values, 2.0, create_itp_lazy=True)
-    gridsdf = gridsdf.get_quantized()
-    return gridsdf
+        X, Y, Z = grid.get_meshgrid(indexing="ij")
+        pts = np.array(list(zip(X.flatten(), Y.flatten(), Z.flatten())))
+        values = sdf.__call__(pts)
+        gridsdf = GridSDF(grid, values, 2.0, create_itp_lazy=True)
+        gridsdf = gridsdf.get_quantized()
+        return gridsdf
 
 
 def tabletop_box_sample_target_pose(
@@ -294,7 +296,7 @@ class TabletopBoxTaskBase(TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]]):
         return DescriptionTable(world_dict, desc_dicts)
 
 
-class TabletopBoxRightArmReachingTask(TabletopBoxTaskBase):
+class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
@@ -366,9 +368,9 @@ class TabletopBoxRightArmReachingTask(TabletopBoxTaskBase):
             problems.append(problem)
         return problems
 
-    @staticmethod
-    def create_gridsdf(world: TabletopBoxWorld) -> GridSDF:
-        return create_exact_gridsdf(world)
+
+class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase):
+    ...
 
 
 class TaskVisualizer:
