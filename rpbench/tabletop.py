@@ -11,7 +11,7 @@ from skmp.kinematics import (
     ArticulatedEndEffectorKinematicsMap,
 )
 from skmp.robot.pr2 import PR2Config
-from skmp.robot.utils import set_robot_state
+from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
@@ -213,11 +213,8 @@ class CachedPR2ConstProvider(ABC):
     def get_start_config(cls) -> np.ndarray:
         config = cls.get_config()
         pr2 = cls.get_pr2()
-        angles = []
-        for jn in config._get_control_joint_names():
-            a = pr2.__dict__[jn].joint_angle()
-            angles.append(a)
-        return np.array(angles)
+        angles = get_robot_state(pr2, config._get_control_joint_names(), config.with_base)
+        return angles
 
     @classmethod
     @abstractmethod
@@ -260,7 +257,7 @@ class CachedPR2ConstProvider(ABC):
 class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
-        return PR2Config(with_base=False)
+        return PR2Config(with_base=True)
 
     @classmethod
     def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:

@@ -29,7 +29,7 @@ def test_tabletop_task():
     assert task.n_inner_task == n_desc
 
     # test dof
-    assert task.get_dof() == 7
+    assert task.get_dof() == 10
 
     # test conversion to numpy format
     desc_table = task.export_table()
