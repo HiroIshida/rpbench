@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Type,
 
 import numpy as np
 from skmp.solver.interface import Problem, ResultProtocol
+from skrobot.model import RobotModel
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
@@ -120,6 +121,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
     for the memory efficiency.
     """
 
+    robot: RobotModel
     world: WorldT
     descriptions: List[DescriptionT]
     _gridsdf: Optional[GridSDF]
@@ -133,14 +135,15 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
         cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
     ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
+        robot_model = cls.get_robot_model()
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
         descriptions = cls.sample_descriptions(world, n_wcond_desc, standard)
         if with_gridsdf:
-            gridsdf = cls.create_gridsdf(world)
+            gridsdf = cls.create_gridsdf(world, robot_model)
         else:
             gridsdf = None
-        return cls(world, descriptions, gridsdf)
+        return cls(robot_model, world, descriptions, gridsdf)
 
     @classmethod
     def predicated_sample(
@@ -155,6 +158,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
         # predicated sample cannot be a standard task
         standard = False
 
+        robot_model = cls.get_robot_model()
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
 
@@ -172,7 +176,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
                 count_trial_before_first_success += 1
 
             desc = cls.sample_descriptions(world, 1, standard)[0]
-            temp_problem = cls(world, [desc], None)
+            temp_problem = cls(robot_model, world, [desc], None)
 
             if predicate(temp_problem):
                 descriptions.append(desc)
@@ -181,10 +185,10 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
                 return None
 
         if with_gridsdf:
-            gridsdf = cls.create_gridsdf(world)
+            gridsdf = cls.create_gridsdf(world, robot_model)
         else:
             gridsdf = None
-        return cls(world, descriptions, gridsdf)
+        return cls(robot_model, world, descriptions, gridsdf)
 
     @staticmethod
     @abstractmethod
@@ -193,7 +197,22 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
 
     @staticmethod
     @abstractmethod
-    def create_gridsdf(world: WorldT) -> GridSDF:
+    def get_robot_model() -> RobotModel:
+        """get robot model set by initial joint angles
+        Because loading the model everytime takes time a lot,
+        we assume this function utilize some cache.
+        Also, we assume that robot joint configuration for every
+        call of this method is consistent.
+        """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def create_gridsdf(world: WorldT, robot_model: RobotModel) -> GridSDF:
+        """create gridsdf of the world given robot state
+        The reason why this takes RobotModel as input is that, this method
+        may involves vision-simulation using robot model (e.g. synthetic pcloud)
+        """
         ...
 
     @staticmethod

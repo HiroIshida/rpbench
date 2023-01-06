@@ -1,11 +1,17 @@
 import pickle
 from hashlib import md5
+from typing import Type
 
 import numpy as np
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.tabletop import TabletopBoxRightArmReachingTask, TabletopBoxWorldWrap
+from rpbench.tabletop import (
+    TabletopBoxRightArmReachingTask,
+    TabletopBoxTaskBase,
+    TabletopBoxVoxbloxRightArmReachingTask,
+    TabletopBoxWorldWrap,
+)
 
 np.random.seed(0)
 set_ompl_random_seed(0)
@@ -20,21 +26,24 @@ def test_tabletop_samplable():
     TabletopBoxWorldWrap.cast_from(task)
 
 
-def test_tabletop_task():
+def _test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     # test standard task's consistency
     # note that, because skrobot link has uuid, we must convert it to table by
     # export_table function beforehand
-    task_standard = TabletopBoxRightArmReachingTask.sample(1, True)
-    table = task_standard.export_table()
-    value = md5(pickle.dumps(table)).hexdigest()
-    for _ in range(5):
-        task_standard = TabletopBoxRightArmReachingTask.sample(1, True)
+    task_standard = task_type.sample(1, True)
+
+    # NOTE: voxblox sdf generation is not deterministic so ignore
+    if task_type is not TabletopBoxVoxbloxRightArmReachingTask:
         table = task_standard.export_table()
-        value_test = md5(pickle.dumps(table)).hexdigest()
-        assert value == value_test
+        value = md5(pickle.dumps(table)).hexdigest()
+        for _ in range(5):
+            task_standard = task_type.sample(1, True)
+            table = task_standard.export_table()
+            value_test = md5(pickle.dumps(table)).hexdigest()
+            assert value == value_test
 
     n_desc = 10
-    task = TabletopBoxRightArmReachingTask.sample(n_desc)
+    task = task_type.sample(n_desc)
     assert task.n_inner_task == n_desc
 
     # test dof
@@ -54,7 +63,7 @@ def test_tabletop_task():
     assert len(raw_problems) == n_desc
 
     # test if standard problem can be solved by rrt-connect
-    task = TabletopBoxRightArmReachingTask.sample(1, standard=True)
+    task = task_type.sample(1, standard=True)
     raw_problems = task.export_problems()
     raw_problem = raw_problems[0]
     solcon = OMPLSolverConfig(n_max_call=100000)
@@ -63,7 +72,7 @@ def test_tabletop_task():
     assert res.traj is not None
 
     # test predicated sampling
-    def predicate(task: TabletopBoxRightArmReachingTask):
+    def predicate(task: TabletopBoxTaskBase):
         assert len(task.descriptions) == 1
         for desc in task.descriptions:
             pose = desc[0]
@@ -72,14 +81,19 @@ def test_tabletop_task():
                 return False
         return True
 
-    predicated_task = TabletopBoxRightArmReachingTask.predicated_sample(n_desc, predicate, 100)
+    predicated_task = task_type.predicated_sample(n_desc, predicate, 100)
     assert predicated_task is not None
     assert len(predicated_task.descriptions) == n_desc
 
     # test solve_default
-    task = TabletopBoxRightArmReachingTask.sample(1, standard=True)
+    task = task_type.sample(1, standard=True)
     result = task.solve_default()[0]
     assert result.traj is not None
+
+
+def test_tabletop_task():
+    _test_tabletop_task(TabletopBoxRightArmReachingTask)
+    _test_tabletop_task(TabletopBoxVoxbloxRightArmReachingTask)
 
 
 if __name__ == "__main__":

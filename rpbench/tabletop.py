@@ -17,12 +17,13 @@ from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
+from skrobot.model import RobotModel
 from skrobot.model.link import Link
 from skrobot.model.primitives import Axis, Box
 from skrobot.models.pr2 import PR2
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
-from voxbloxpy.core import Grid, GridSDF
+from voxbloxpy.core import Grid, GridSDF, IntegratorType
 
 from rpbench.interface import (
     DescriptionT,
@@ -33,6 +34,7 @@ from rpbench.interface import (
     WorldBase,
 )
 from rpbench.utils import skcoords_to_pose_vec
+from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf
 
 TabletopBoxSamplableT = TypeVar("TabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
 OtherTabletopBoxSamplableT = TypeVar("OtherTabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
@@ -150,7 +152,7 @@ class TabletopBoxWorld(TabletopWorldBase):
 
 class ExactGridSDFCreator:
     @staticmethod
-    def create_gridsdf(world: TabletopBoxWorld) -> GridSDF:
+    def create_gridsdf(world: TabletopBoxWorld, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -160,6 +162,29 @@ class ExactGridSDFCreator:
         gridsdf = GridSDF(grid, values, 2.0, create_itp_lazy=True)
         gridsdf = gridsdf.get_quantized()
         return gridsdf
+
+
+class VoxbloxGridSDFCreator:
+    @staticmethod
+    def get_pr2_kinect_camera(robot_model: RobotModel) -> Camera:
+        camera = Camera()
+        # actually this is pr2 specific
+        robot_model.head_plate_frame.assoc(camera, relative_coords="local")
+        camera.translate(np.array([-0.2, 0.0, 0.17]))
+        return camera
+
+    @staticmethod
+    def create_gridsdf(world: TabletopBoxWorld, robot_model: RobotModel) -> GridSDF:
+        grid = world.get_grid()
+        sdf = world.get_exact_sdf()
+
+        camera = VoxbloxGridSDFCreator.get_pr2_kinect_camera(robot_model)
+        rm_config = RayMarchingConfig(max_dist=2.0)
+
+        esdf = EsdfMap.create(0.02, integrator_type=IntegratorType.MERGED)
+        esdf = create_synthetic_esdf(sdf, camera, rm_config=rm_config, esdf=esdf)
+        grid_sdf = esdf.get_grid_sdf(grid, fill_value=1.0, create_itp_lazy=True)
+        return grid_sdf
 
 
 def tabletop_box_sample_target_pose(
@@ -283,6 +308,10 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
 
+    @staticmethod
+    def get_robot_model() -> RobotModel:
+        return CachedPR2ConstProvider.get_pr2()
+
     def export_table(self) -> DescriptionTable:
         assert self._gridsdf is not None
         world_dict = {}
@@ -304,7 +333,7 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
         assert isinstance(other, TabletopBoxSamplableBase)
         is_compatible_meshgen = cls.create_gridsdf == other.create_gridsdf
         assert is_compatible_meshgen
-        return cls(other.world, [], other._gridsdf)
+        return cls(other.robot, other.world, [], other._gridsdf)
 
 
 class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
@@ -399,12 +428,12 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
         return problems
 
 
-class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase):
-    ...
-
-
-class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase):
-    ...
+# fmt: off
+class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
+class TabletopBoxVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
+class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
+class TabletopVoxbloxBoxWorldWrap(VoxbloxGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
+# fmt: on
 
 
 class TaskVisualizer:
