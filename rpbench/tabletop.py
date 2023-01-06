@@ -82,7 +82,11 @@ class TabletopBoxWorld(TabletopWorldBase):
         d = 0.2
         w = 0.3
         h = 0.2
-        if not standard:
+        if standard:
+            d += 0.15
+            w += 0.15
+            h += 0.15
+        else:
             d += np.random.rand() * 0.3
             w += np.random.rand() * 0.3
             h += np.random.rand() * 0.3
@@ -195,7 +199,7 @@ def tabletop_box_sample_target_pose(
 
     co = world.box_center.copy_worldcoords()
     if standard:
-        d_trans = 0.0
+        d_trans = -0.1
         w_trans = 0.0
         h_trans = 0.5 * world.box_h
         theta = 0.0
