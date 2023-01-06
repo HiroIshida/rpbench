@@ -17,8 +17,8 @@ ompl_result = ompl_sovler.solve()
 assert ompl_result.traj is not None
 print(ompl_result.time_elapsed)
 
-n_wp = 60
-nlp_solcon = SQPBasedSolverConfig(n_wp, motion_step_satisfaction="post")
+n_wp = 40
+nlp_solcon = SQPBasedSolverConfig(n_wp, motion_step_satisfaction="explicit")
 nlp_solver = SQPBasedSolver.setup(problem, nlp_solcon)
 nlp_result = nlp_solver.solve(ompl_result.traj.resample(n_wp))
 assert nlp_result.traj is not None
