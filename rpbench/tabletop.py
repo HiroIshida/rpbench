@@ -337,7 +337,7 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
         assert isinstance(other, TabletopBoxSamplableBase)
         is_compatible_meshgen = cls.create_gridsdf == other.create_gridsdf
         assert is_compatible_meshgen
-        return cls(other.robot, other.world, [], other._gridsdf)
+        return cls(other.world, [], other._gridsdf)
 
 
 class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):

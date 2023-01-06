@@ -121,7 +121,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
     for the memory efficiency.
     """
 
-    robot: RobotModel
     world: WorldT
     descriptions: List[DescriptionT]
     _gridsdf: Optional[GridSDF]
@@ -143,7 +142,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
             gridsdf = cls.create_gridsdf(world, robot_model)
         else:
             gridsdf = None
-        return cls(robot_model, world, descriptions, gridsdf)
+        return cls(world, descriptions, gridsdf)
 
     @classmethod
     def predicated_sample(
@@ -176,7 +175,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
                 count_trial_before_first_success += 1
 
             desc = cls.sample_descriptions(world, 1, standard)[0]
-            temp_problem = cls(robot_model, world, [desc], None)
+            temp_problem = cls(world, [desc], None)
 
             if predicate(temp_problem):
                 descriptions.append(desc)
@@ -188,7 +187,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
             gridsdf = cls.create_gridsdf(world, robot_model)
         else:
             gridsdf = None
-        return cls(robot_model, world, descriptions, gridsdf)
+        return cls(world, descriptions, gridsdf)
 
     @staticmethod
     @abstractmethod
