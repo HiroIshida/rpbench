@@ -363,7 +363,7 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        n_satisfaction_budget = 20
+        n_satisfaction_budget = 1
         n_planning_budget = 4
         solcon = OMPLSolverConfig(n_max_call=8000, n_max_satisfaction_trial=100)
 
