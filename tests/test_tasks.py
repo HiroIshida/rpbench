@@ -67,7 +67,8 @@ def _test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     raw_problems = task.export_problems()
     raw_problem = raw_problems[0]
     solcon = OMPLSolverConfig(n_max_call=100000)
-    solver = OMPLSolver.setup(raw_problem, solcon)
+    solver = OMPLSolver.init(solcon)
+    solver.setup(raw_problem)
     res = solver.solve(None)
     assert res.traj is not None
 

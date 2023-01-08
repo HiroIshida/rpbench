@@ -366,14 +366,15 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
         n_satisfaction_budget = 1
         n_planning_budget = 4
         solcon = OMPLSolverConfig(n_max_call=8000, n_max_satisfaction_trial=100)
+        ompl_solver = OMPLSolver.init(solcon)
 
         satisfaction_fail_count = 0
         planning_fail_count = 0
         while (satisfaction_fail_count < n_satisfaction_budget) and (
             planning_fail_count < n_planning_budget
         ):
-            ss = OMPLSolver.setup(problem, solcon)
-            ret = ss.solve()
+            ompl_solver.setup(problem)
+            ret = ompl_solver.solve()
             if ret.traj is not None:
                 # now, smooth out the solution
 
@@ -381,16 +382,18 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
                 nlp_conf = SQPBasedSolverConfig(
                     n_wp=20, n_max_call=20, motion_step_satisfaction="debug_ignore"
                 )
-                ss_nlp = SQPBasedSolver.setup(problem, nlp_conf)
-                nlp_ret = ss_nlp.solve(ret.traj)
+                nlp_solver = SQPBasedSolver.init(nlp_conf)
+                nlp_solver.setup(problem)
+                nlp_ret = nlp_solver.solve(ret.traj)
 
                 # Then try to find more find-grained solution
                 if nlp_ret.traj is not None:
                     nlp_conf = SQPBasedSolverConfig(
                         n_wp=60, n_max_call=20, motion_step_satisfaction="post"
                     )
-                    ss_nlp = SQPBasedSolver.setup(problem, nlp_conf)
-                    nlp_ret = ss_nlp.solve(nlp_ret.traj)
+                    nlp_solver = SQPBasedSolver.init(nlp_conf)
+                    nlp_solver.setup(problem)
+                    nlp_ret = nlp_solver.solve(nlp_ret.traj)
                     if nlp_ret.traj is not None:
                         return nlp_ret
 
