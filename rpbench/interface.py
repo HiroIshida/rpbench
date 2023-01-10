@@ -3,7 +3,13 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Type, TypeVar
 
 import numpy as np
-from skmp.solver.interface import Problem, ResultProtocol
+from skmp.solver.interface import (
+    AbstractSolver,
+    ConfigT,
+    Problem,
+    ResultProtocol,
+    ResultT,
+)
 from skrobot.model import RobotModel
 from voxbloxpy.core import Grid, GridSDF
 
@@ -262,3 +268,48 @@ class TaskBase(SamplableBase[WorldT, DescriptionT]):
     @abstractmethod
     def export_problems(self) -> List[Problem]:
         ...
+
+
+class AbstractTaskSolver(ABC, Generic[TaskT, ResultT]):
+    """TaskSolver interface
+
+    Unlike AbstractSolver in skmp, this solver is task-specific.
+    Of corse, non-task-specific solver such as those in skmp can be
+    used as task-specific solver. See SkmpTaskSolver for the detail.
+    """
+
+    task_type: Type[TaskT]
+
+    @abstractmethod
+    def setup(self, task: TaskT) -> None:
+        """setup solver for a paticular task"""
+        ...
+
+    @abstractmethod
+    def solve(self) -> ResultT:
+        """solve problem
+
+        NOTE: unlike AbstractSolver, this function does not
+        take init solution
+        """
+        ...
+
+
+@dataclass
+class SkmpTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
+    skmp_solver: AbstractSolver
+    task_type: Type[TaskT]
+
+    @classmethod
+    def init(
+        cls, skmp_solver: AbstractSolver[ConfigT, ResultT], task_type: Type[TaskT]
+    ) -> "SkmpTaskSolver[TaskT, ResultT]":
+        return cls(skmp_solver, task_type)
+
+    def setup(self, task: TaskT) -> None:
+        assert task.n_inner_task == 1
+        prob = task.export_problems()[0]
+        self.skmp_solver.setup(prob)
+
+    def solve(self) -> ResultT:
+        return self.skmp_solver.solve()
