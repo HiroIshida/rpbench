@@ -8,10 +8,14 @@ from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.tabletop import (
+    TabletopBoxDualArmReachingTask,
+    TabletopBoxDualArmReachingTaskBase,
     TabletopBoxRightArmReachingTask,
     TabletopBoxTaskBase,
+    TabletopBoxVoxbloxDualArmReachingTask,
     TabletopBoxVoxbloxRightArmReachingTask,
     TabletopBoxWorldWrap,
+    VoxbloxGridSDFCreator,
 )
 
 np.random.seed(0)
@@ -28,7 +32,13 @@ def test_tabletop_samplable():
 
 
 @pytest.mark.parametrize(
-    "task_type", [TabletopBoxRightArmReachingTask, TabletopBoxVoxbloxRightArmReachingTask]
+    "task_type",
+    [
+        TabletopBoxRightArmReachingTask,
+        TabletopBoxVoxbloxRightArmReachingTask,
+        TabletopBoxDualArmReachingTask,
+        TabletopBoxVoxbloxDualArmReachingTask,
+    ],
 )
 def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     # test standard task's consistency
@@ -37,7 +47,7 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     task_standard = task_type.sample(1, True)
 
     # NOTE: voxblox sdf generation is not deterministic so ignore
-    if task_type is not TabletopBoxVoxbloxRightArmReachingTask:
+    if not issubclass(task_type, VoxbloxGridSDFCreator):
         table = task_standard.export_table()
         value = md5(pickle.dumps(table)).hexdigest()
         for _ in range(5):
@@ -51,7 +61,10 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     assert task.n_inner_task == n_desc
 
     # test dof
-    assert task.get_dof() == 10
+    if isinstance(task, TabletopBoxDualArmReachingTaskBase):
+        assert task.get_dof() == 17
+    else:
+        assert task.get_dof() == 10
 
     # test conversion to numpy format
     desc_table = task.export_table()
@@ -61,6 +74,9 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     assert len(desc_table.wcond_desc_dicts) == n_desc
     desc_dict = desc_table.wcond_desc_dicts[0]
     assert desc_dict["target_pose-0"].shape == (6,)
+
+    if isinstance(task, TabletopBoxDualArmReachingTaskBase):
+        assert desc_dict["target_pose-1"].shape == (6,)
 
     # test conversion to problem format
     raw_problems = task.export_problems()

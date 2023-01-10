@@ -19,7 +19,6 @@ from skmp.kinematics import (
 from skmp.robot.pr2 import PR2Config
 from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.solver.interface import Problem, ResultProtocol
-from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
@@ -376,10 +375,6 @@ class TabletopBoxTaskBase(
     def get_dof(cls) -> int:
         return cls.config_provider.get_dof()
 
-
-class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
-    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
-
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
         n_satisfaction_budget = 1
         n_planning_budget = 4
@@ -401,6 +396,10 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
             else:
                 planning_fail_count += 1
         return ret  # return latest one (failed)
+
+
+class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
 
     @staticmethod
     def sample_descriptions(
@@ -436,47 +435,6 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
 
 class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
-
-    def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        n_satisfaction_budget = 1
-        n_planning_budget = 4
-        solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100)
-        ompl_solver = OMPLSolver.init(solcon)
-
-        satisfaction_fail_count = 0
-        planning_fail_count = 0
-        while (satisfaction_fail_count < n_satisfaction_budget) and (
-            planning_fail_count < n_planning_budget
-        ):
-            ompl_solver.setup(problem)
-            ret = ompl_solver.solve()
-            if ret.traj is not None:
-                # now, smooth out the solution
-
-                # first solve with smaller number of waypoint
-                nlp_conf = SQPBasedSolverConfig(
-                    n_wp=20, n_max_call=20, motion_step_satisfaction="debug_ignore"
-                )
-                nlp_solver = SQPBasedSolver.init(nlp_conf)
-                nlp_solver.setup(problem)
-                nlp_ret = nlp_solver.solve(ret.traj)
-
-                # Then try to find more find-grained solution
-                if nlp_ret.traj is not None:
-                    nlp_conf = SQPBasedSolverConfig(
-                        n_wp=60, n_max_call=20, motion_step_satisfaction="post"
-                    )
-                    nlp_solver = SQPBasedSolver.init(nlp_conf)
-                    nlp_solver.setup(problem)
-                    nlp_ret = nlp_solver.solve(nlp_ret.traj)
-                    if nlp_ret.traj is not None:
-                        return nlp_ret
-
-            if ret.terminate_state == TerminateState.FAIL_SATISFACTION:
-                satisfaction_fail_count += 1
-            else:
-                planning_fail_count += 1
-        return ret  # return latest one (failed)
 
     @staticmethod
     def sample_descriptions(
@@ -549,6 +507,7 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
 class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
 class TabletopBoxVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
 class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
+class TabletopBoxVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
 class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
 class TabletopVoxbloxBoxWorldWrap(VoxbloxGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
 # fmt: on
