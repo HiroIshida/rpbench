@@ -375,6 +375,21 @@ class TabletopBoxTaskBase(
     def get_dof(cls) -> int:
         return cls.config_provider.get_dof()
 
+    def export_problems(self) -> List[Problem]:
+        provider = self.config_provider
+        q_start = provider.get_start_config()
+        box_const = provider.get_box_const()
+
+        assert self._gridsdf is not None
+        ineq_const = provider.get_collfree_const(self._gridsdf)
+
+        problems = []
+        for desc in self.descriptions:
+            pose_const = provider.get_pose_const(list(desc))
+            problem = Problem(q_start, box_const, pose_const, ineq_const, None)
+            problems.append(problem)
+        return problems
+
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
         n_satisfaction_budget = 1
         n_planning_budget = 4
@@ -416,21 +431,6 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
             if world.get_exact_sdf()(position)[0] > 1e-3:
                 pose_list.append((pose,))
         return pose_list
-
-    def export_problems(self) -> List[Problem]:
-        provider = self.config_provider
-        q_start = provider.get_start_config()
-        box_const = provider.get_box_const()
-
-        assert self._gridsdf is not None
-        ineq_const = provider.get_collfree_const(self._gridsdf)
-
-        problems = []
-        for desc in self.descriptions:
-            pose_const = provider.get_pose_const(list(desc))
-            problem = Problem(q_start, box_const, pose_const, ineq_const, None)
-            problems.append(problem)
-        return problems
 
 
 class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
@@ -491,21 +491,6 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
         right_co.rotate(np.deg2rad(90), "x")
         left_co.rotate(np.deg2rad(90), "x")
         return (right_co, left_co)
-
-    def export_problems(self) -> List[Problem]:
-        provider = self.config_provider
-        q_start = provider.get_start_config()
-        box_const = provider.get_box_const()
-
-        assert self._gridsdf is not None
-        ineq_const = provider.get_collfree_const(self._gridsdf)
-
-        problems = []
-        for desc in self.descriptions:
-            pose_const = provider.get_pose_const(list(desc))
-            problem = Problem(q_start, box_const, pose_const, ineq_const, None)
-            problems.append(problem)
-        return problems
 
 
 # fmt: off
