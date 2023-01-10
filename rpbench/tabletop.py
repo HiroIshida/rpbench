@@ -5,7 +5,13 @@ from functools import lru_cache
 from typing import Callable, ClassVar, List, Tuple, Type, TypeVar
 
 import numpy as np
-from skmp.constraint import AbstractIneqConst, BoxConst, CollFreeConst, PoseConstraint
+from skmp.constraint import (
+    AbstractIneqConst,
+    BoxConst,
+    CollFreeConst,
+    IneqCompositeConst,
+    PoseConstraint,
+)
 from skmp.kinematics import (
     ArticulatedCollisionKinematicsMap,
     ArticulatedEndEffectorKinematicsMap,
@@ -306,6 +312,18 @@ class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
         return colfree
 
 
+class CachedDualArmPR2ConstProvider(CachedPR2ConstProvider):
+    @classmethod
+    def get_config(cls) -> PR2Config:
+        return PR2Config(with_base=True, control_arm="dual")
+
+    @classmethod
+    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> IneqCompositeConst:
+        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
+        selcolfree = cls.get_config().get_neural_selcol_const(cls.get_pr2())
+        return IneqCompositeConst([colfree, selcolfree])
+
+
 @dataclass
 class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
     @staticmethod
@@ -435,9 +453,121 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
         return problems
 
 
+class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
+
+    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        n_satisfaction_budget = 1
+        n_planning_budget = 4
+        solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100)
+        ompl_solver = OMPLSolver.init(solcon)
+
+        satisfaction_fail_count = 0
+        planning_fail_count = 0
+        while (satisfaction_fail_count < n_satisfaction_budget) and (
+            planning_fail_count < n_planning_budget
+        ):
+            ompl_solver.setup(problem)
+            ret = ompl_solver.solve()
+            if ret.traj is not None:
+                # now, smooth out the solution
+
+                # first solve with smaller number of waypoint
+                nlp_conf = SQPBasedSolverConfig(
+                    n_wp=20, n_max_call=20, motion_step_satisfaction="debug_ignore"
+                )
+                nlp_solver = SQPBasedSolver.init(nlp_conf)
+                nlp_solver.setup(problem)
+                nlp_ret = nlp_solver.solve(ret.traj)
+
+                # Then try to find more find-grained solution
+                if nlp_ret.traj is not None:
+                    nlp_conf = SQPBasedSolverConfig(
+                        n_wp=60, n_max_call=20, motion_step_satisfaction="post"
+                    )
+                    nlp_solver = SQPBasedSolver.init(nlp_conf)
+                    nlp_solver.setup(problem)
+                    nlp_ret = nlp_solver.solve(nlp_ret.traj)
+                    if nlp_ret.traj is not None:
+                        return nlp_ret
+
+            if ret.terminate_state == TerminateState.FAIL_SATISFACTION:
+                satisfaction_fail_count += 1
+            else:
+                planning_fail_count += 1
+        return ret  # return latest one (failed)
+
+    @staticmethod
+    def sample_descriptions(
+        world: TabletopBoxWorld, n_sample: int, standard: bool = False
+    ) -> List[Tuple[Coordinates, ...]]:
+        # using single element Tuple looks bit cumbsersome but
+        # for generality
+        if standard:
+            assert n_sample == 1
+        pose_list: List[Tuple[Coordinates, ...]] = []
+        while len(pose_list) < n_sample:
+            poses = TabletopBoxDualArmReachingTaskBase.sample_target_poses(world, standard)
+            is_valid_poses = True
+            for pose in poses:
+                position = np.expand_dims(pose.worldpos(), axis=0)
+                if world.get_exact_sdf()(position)[0] < 1e-3:
+                    is_valid_poses = False
+            if is_valid_poses:
+                pose_list.append(poses)
+        return pose_list
+
+    @staticmethod
+    def sample_target_poses(world: TabletopBoxWorld, standard: bool) -> Tuple[Coordinates, ...]:
+        table = world.table
+        table_depth, table_width, table_height = table._extents
+        co = world.box_center.copy_worldcoords()
+
+        if standard:
+            # d_trans = -0.1
+            d_trans = 0.0
+            w_trans = 0.0
+            h_trans = 0.5 * world.box_h
+        else:
+            margin = 0.03
+            box_dt = world.box_d - 2 * (world.box_t + margin)
+            box_wt = world.box_w - 2 * (world.box_t + margin)
+            box_ht = world.box_h - 2 * (world.box_t + margin)
+            d_trans = -0.5 * box_dt + np.random.rand() * box_dt
+            w_trans = -0.5 * box_wt + np.random.rand() * box_wt
+            h_trans = world.box_t + margin + np.random.rand() * box_ht
+            -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
+
+        co.translate([d_trans, w_trans, h_trans])
+        left_co = co.copy_worldcoords()
+        right_co = co.copy_worldcoords()
+
+        right_co.translate([0.0, -0.06, 0.0])
+        left_co.translate([0.0, 0.06, 0.0])
+        right_co.rotate(np.deg2rad(90), "x")
+        left_co.rotate(np.deg2rad(90), "x")
+        return (right_co, left_co)
+
+    def export_problems(self) -> List[Problem]:
+        provider = self.config_provider
+        q_start = provider.get_start_config()
+        box_const = provider.get_box_const()
+
+        assert self._gridsdf is not None
+        ineq_const = provider.get_collfree_const(self._gridsdf)
+
+        problems = []
+        for desc in self.descriptions:
+            pose_const = provider.get_pose_const(list(desc))
+            problem = Problem(q_start, box_const, pose_const, ineq_const, None)
+            problems.append(problem)
+        return problems
+
+
 # fmt: off
 class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
 class TabletopBoxVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
+class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
 class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
 class TabletopVoxbloxBoxWorldWrap(VoxbloxGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
 # fmt: on
