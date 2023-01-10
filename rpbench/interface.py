@@ -222,7 +222,9 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
 
     @classmethod
     @abstractmethod
-    def sample_descriptions(cls, world: WorldT, n_sample: int, standard: bool = False) -> List[DescriptionT]:
+    def sample_descriptions(
+        cls, world: WorldT, n_sample: int, standard: bool = False
+    ) -> List[DescriptionT]:
         ...
 
     @abstractmethod

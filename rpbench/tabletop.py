@@ -196,39 +196,6 @@ class VoxbloxGridSDFCreator:
         return grid_sdf
 
 
-def tabletop_box_sample_target_pose(
-    world: TabletopBoxWorld, n_sample: int, standard: bool = False
-) -> Coordinates:
-    table = world.table
-    table_depth, table_width, table_height = table._extents
-
-    co = world.box_center.copy_worldcoords()
-    if standard:
-        d_trans = -0.1
-        w_trans = 0.0
-        h_trans = 0.5 * world.box_h
-        theta = 0.0
-    else:
-        margin = 0.03
-        box_dt = world.box_d - 2 * (world.box_t + margin)
-        box_wt = world.box_w - 2 * (world.box_t + margin)
-        box_ht = world.box_h - 2 * (world.box_t + margin)
-        d_trans = -0.5 * box_dt + np.random.rand() * box_dt
-        w_trans = -0.5 * box_wt + np.random.rand() * box_wt
-        h_trans = world.box_t + margin + np.random.rand() * box_ht
-        theta = -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
-
-    co.translate([d_trans, w_trans, h_trans])
-    co.rotate(theta, "z")
-
-    points = np.expand_dims(co.worldpos(), axis=0)
-    sdf = world.get_exact_sdf()
-
-    sd_val = sdf(points)[0]
-    assert sd_val > -0.0001
-    return co
-
-
 class CachedPR2ConstProvider(ABC):
     """
     loading robot model is a process that takes some times.
@@ -359,7 +326,9 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
 
 class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
     @classmethod
-    def sample_descriptions(cls, world: TabletopWorldBase, n_sample: int, standard: bool = False) -> List[None]:
+    def sample_descriptions(
+        cls, world: TabletopWorldBase, n_sample: int, standard: bool = False
+    ) -> List[None]:
         return [None for _ in range(n_sample)]
 
 
@@ -410,37 +379,17 @@ class TabletopBoxTaskBase(
                 planning_fail_count += 1
         return ret  # return latest one (failed)
 
-
-class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
-    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
-
     @classmethod
-    def sample_descriptions(cls, world: TabletopBoxWorld, n_sample: int, standard: bool = False) -> List[Tuple[Coordinates, ...]]:
+    def sample_descriptions(
+        cls, world: TabletopBoxWorld, n_sample: int, standard: bool = False
+    ) -> List[Tuple[Coordinates, ...]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
         if standard:
             assert n_sample == 1
         pose_list: List[Tuple[Coordinates, ...]] = []
         while len(pose_list) < n_sample:
-            pose = tabletop_box_sample_target_pose(world, n_sample, standard)
-            position = np.expand_dims(pose.worldpos(), axis=0)
-            if world.get_exact_sdf()(position)[0] > 1e-3:
-                pose_list.append((pose,))
-        return pose_list
-
-
-class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
-    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
-
-    @classmethod
-    def sample_descriptions(cls, world: TabletopBoxWorld, n_sample: int, standard: bool = False) -> List[Tuple[Coordinates, ...]]:
-        # using single element Tuple looks bit cumbsersome but
-        # for generality
-        if standard:
-            assert n_sample == 1
-        pose_list: List[Tuple[Coordinates, ...]] = []
-        while len(pose_list) < n_sample:
-            poses = TabletopBoxDualArmReachingTaskBase.sample_target_poses(world, standard)
+            poses = cls.sample_target_poses(world, standard)
             is_valid_poses = True
             for pose in poses:
                 position = np.expand_dims(pose.worldpos(), axis=0)
@@ -450,8 +399,58 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
                 pose_list.append(poses)
         return pose_list
 
-    @staticmethod
-    def sample_target_poses(world: TabletopBoxWorld, standard: bool) -> Tuple[Coordinates, ...]:
+    @classmethod
+    @abstractmethod
+    def sample_target_poses(
+        cls, world: TabletopBoxWorld, standard: bool
+    ) -> Tuple[Coordinates, ...]:
+        ...
+
+
+class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
+
+    @classmethod
+    def sample_target_poses(
+        cls, world: TabletopBoxWorld, standard: bool
+    ) -> Tuple[Coordinates, ...]:
+        table = world.table
+        table_depth, table_width, table_height = table._extents
+
+        co = world.box_center.copy_worldcoords()
+        if standard:
+            d_trans = -0.1
+            w_trans = 0.0
+            h_trans = 0.5 * world.box_h
+            theta = 0.0
+        else:
+            margin = 0.03
+            box_dt = world.box_d - 2 * (world.box_t + margin)
+            box_wt = world.box_w - 2 * (world.box_t + margin)
+            box_ht = world.box_h - 2 * (world.box_t + margin)
+            d_trans = -0.5 * box_dt + np.random.rand() * box_dt
+            w_trans = -0.5 * box_wt + np.random.rand() * box_wt
+            h_trans = world.box_t + margin + np.random.rand() * box_ht
+            theta = -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
+
+        co.translate([d_trans, w_trans, h_trans])
+        co.rotate(theta, "z")
+
+        points = np.expand_dims(co.worldpos(), axis=0)
+        sdf = world.get_exact_sdf()
+
+        sd_val = sdf(points)[0]
+        assert sd_val > -0.0001
+        return (co,)
+
+
+class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
+
+    @classmethod
+    def sample_target_poses(
+        cls, world: TabletopBoxWorld, standard: bool
+    ) -> Tuple[Coordinates, ...]:
         table = world.table
         table_depth, table_width, table_height = table._extents
         co = world.box_center.copy_worldcoords()
