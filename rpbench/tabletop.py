@@ -358,10 +358,8 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
 
 
 class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
-    @staticmethod
-    def sample_descriptions(
-        world: TabletopWorldBase, n_sample: int, standard: bool = False
-    ) -> List[None]:
+    @classmethod
+    def sample_descriptions(cls, world: TabletopWorldBase, n_sample: int, standard: bool = False) -> List[None]:
         return [None for _ in range(n_sample)]
 
 
@@ -416,10 +414,8 @@ class TabletopBoxTaskBase(
 class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
 
-    @staticmethod
-    def sample_descriptions(
-        world: TabletopBoxWorld, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates, ...]]:
+    @classmethod
+    def sample_descriptions(cls, world: TabletopBoxWorld, n_sample: int, standard: bool = False) -> List[Tuple[Coordinates, ...]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
         if standard:
@@ -436,10 +432,8 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
 class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
 
-    @staticmethod
-    def sample_descriptions(
-        world: TabletopBoxWorld, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates, ...]]:
+    @classmethod
+    def sample_descriptions(cls, world: TabletopBoxWorld, n_sample: int, standard: bool = False) -> List[Tuple[Coordinates, ...]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
         if standard:
