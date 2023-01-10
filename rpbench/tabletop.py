@@ -463,10 +463,11 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
         co = world.box_center.copy_worldcoords()
 
         if standard:
-            # d_trans = -0.1
+            d_trans = -0.1
             d_trans = 0.0
             w_trans = 0.0
             h_trans = 0.5 * world.box_h
+            hands_width = 0.15
         else:
             margin = 0.03
             box_dt = world.box_d - 2 * (world.box_t + margin)
@@ -475,14 +476,18 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
             d_trans = -0.5 * box_dt + np.random.rand() * box_dt
             w_trans = -0.5 * box_wt + np.random.rand() * box_wt
             h_trans = world.box_t + margin + np.random.rand() * box_ht
-            -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
 
-        co.translate([d_trans, w_trans, h_trans])
+            hands_width_min = 0.08
+            hands_width_max = ((box_wt * 0.5) - abs(w_trans)) * 2.0
+            hands_width = hands_width_min + np.random.rand() * (hands_width_max - hands_width_min)
+
+        co.translate([d_trans, 0, h_trans])
+
         left_co = co.copy_worldcoords()
         right_co = co.copy_worldcoords()
 
-        right_co.translate([0.0, -0.06, 0.0])
-        left_co.translate([0.0, 0.06, 0.0])
+        right_co.translate([0.0, -hands_width * 0.5, 0.0])
+        left_co.translate([0.0, hands_width * 0.5, 0.0])
         right_co.rotate(np.deg2rad(90), "x")
         left_co.rotate(np.deg2rad(90), "x")
         return (right_co, left_co)
