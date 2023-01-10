@@ -19,6 +19,7 @@ from skmp.kinematics import (
 from skmp.robot.pr2 import PR2Config
 from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.solver.interface import Problem, ResultProtocol
+from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
@@ -371,7 +372,26 @@ class TabletopBoxTaskBase(
             ompl_solver.setup(problem)
             ret = ompl_solver.solve()
             if ret.traj is not None:
-                return ret
+                # now, smooth out the solution
+
+                # first solve with smaller number of waypoint
+                nlp_conf = SQPBasedSolverConfig(
+                    n_wp=20, n_max_call=20, motion_step_satisfaction="debug_ignore"
+                )
+                nlp_solver = SQPBasedSolver.init(nlp_conf)
+                nlp_solver.setup(problem)
+                nlp_ret = nlp_solver.solve(ret.traj)
+
+                # Then try to find more find-grained solution
+                if nlp_ret.traj is not None:
+                    nlp_conf = SQPBasedSolverConfig(
+                        n_wp=60, n_max_call=20, motion_step_satisfaction="post"
+                    )
+                    nlp_solver = SQPBasedSolver.init(nlp_conf)
+                    nlp_solver.setup(problem)
+                    nlp_ret = nlp_solver.solve(nlp_ret.traj)
+                    if nlp_ret.traj is not None:
+                        return nlp_ret
 
             if ret.terminate_state == TerminateState.FAIL_SATISFACTION:
                 satisfaction_fail_count += 1
