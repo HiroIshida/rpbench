@@ -3,6 +3,7 @@ from hashlib import md5
 from typing import Type
 
 import numpy as np
+import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
@@ -26,7 +27,10 @@ def test_tabletop_samplable():
     TabletopBoxWorldWrap.cast_from(task)
 
 
-def _test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
+@pytest.mark.parametrize(
+    "task_type", [TabletopBoxRightArmReachingTask, TabletopBoxVoxbloxRightArmReachingTask]
+)
+def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     # test standard task's consistency
     # note that, because skrobot link has uuid, we must convert it to table by
     # export_table function beforehand
@@ -90,11 +94,6 @@ def _test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     task = task_type.sample(1, standard=True)
     result = task.solve_default()[0]
     assert result.traj is not None
-
-
-def test_tabletop_task():
-    _test_tabletop_task(TabletopBoxRightArmReachingTask)
-    _test_tabletop_task(TabletopBoxVoxbloxRightArmReachingTask)
 
 
 if __name__ == "__main__":
