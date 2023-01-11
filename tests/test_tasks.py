@@ -5,7 +5,6 @@ from typing import Type
 import numpy as np
 import pytest
 from ompl import set_ompl_random_seed
-from skmp.constraint import SELCOL_FOUND
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.tabletop import (
@@ -42,11 +41,6 @@ def test_tabletop_samplable():
     ],
 )
 def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
-
-    if issubclass(task_type, TabletopBoxDualArmReachingTaskBase):
-        if not SELCOL_FOUND:
-            return
-
     # test standard task's consistency
     # note that, because skrobot link has uuid, we must convert it to table by
     # export_table function beforehand
