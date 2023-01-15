@@ -13,7 +13,9 @@ def test_dataset():
 
     with tempfile.TemporaryDirectory() as td:
         td_path = Path(td).expanduser()
-        dataset = PlanningDataset.create(task_type, 2)
+        n_data = 5
+        dataset = PlanningDataset.create(task_type, n_data, m_process=2)
+        assert len(dataset.pairs) == n_data
         dataset.save(td_path)
 
         dataset_loaded = dataset.load(td_path, task_type)

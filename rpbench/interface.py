@@ -1,3 +1,5 @@
+import multiprocessing
+import os
 import pickle
 import time
 import uuid
@@ -18,6 +20,7 @@ from typing import (
 )
 
 import numpy as np
+import threadpoolctl
 import tqdm
 from skmp.solver.interface import (
     AbstractDataDrivenSolver,
@@ -344,18 +347,46 @@ class PlanningDataset(Generic[TaskT]):
     task_type: Type[TaskT]
     time_stamp: float
 
+    @staticmethod
+    def create_inner(
+        task_type: Type[TaskT], n_data: int, q: multiprocessing.Queue, with_bar: bool
+    ) -> None:
+        # this function is static for the use in multiprocessing
+        unique_id = (uuid.getnode() + os.getpid()) % (2**32 - 1)
+        np.random.seed(unique_id)
+
+        count = 0
+        with threadpoolctl.threadpool_limits(limits=1, user_api="blas"):
+            with tqdm.tqdm(total=n_data, disable=not with_bar) as pbar:
+                while count < n_data:
+                    task = task_type.sample(1, False)
+                    res = task.solve_default()[0]
+                    success = res.traj is not None
+                    if success:
+                        assert res.traj is not None
+                        q.put((task, res.traj))
+                        pbar.update(1)
+                        count += 1
+
     @classmethod
-    def create(cls, task_type: Type[TaskT], n_data: int) -> "PlanningDataset":
-        pairs: List[Tuple[TaskT, Trajectory]] = []
-        with tqdm.tqdm(total=n_data) as pbar:
-            while len(pairs) < n_data:
-                task = task_type.sample(1, False)
-                res = task.solve_default()[0]
-                success = res.traj is not None
-                if success:
-                    assert res.traj is not None
-                    pairs.append((task, res.traj))
-                    pbar.update(1)
+    def create(cls, task_type: Type[TaskT], n_data: int, m_process: int = 1) -> "PlanningDataset":
+        def split_number(num, div):
+            return [num // div + (1 if x < num % div else 0) for x in range(div)]
+
+        process_list = []
+        n_data_list = split_number(n_data, m_process)
+        q = multiprocessing.Queue()  # type: ignore
+        for i, n_data_split in enumerate(n_data_list):
+            args = (task_type, n_data_split, q, i == 0)
+            p = multiprocessing.Process(target=cls.create_inner, args=args)
+            p.start()
+            process_list.append(p)
+
+        pairs: List[Tuple[TaskT, Trajectory]] = [q.get() for _ in range(n_data)]
+
+        for p in process_list:
+            p.join()
+
         return cls(pairs, task_type, time.time())
 
     def save(self, base_path: Path) -> None:

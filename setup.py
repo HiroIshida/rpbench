@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup_requires = []
 
-install_requires = ["numpy", "scikit-motionplan", "voxbloxpy"]
+install_requires = ["numpy", "scikit-motionplan", "voxbloxpy", "threadpoolctl"]
 
 setup(
     name="rpbench",
