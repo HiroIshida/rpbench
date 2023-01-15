@@ -1,15 +1,22 @@
+import pickle
+import time
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Type, TypeVar
 
 import numpy as np
+import tqdm
 from skmp.solver.interface import (
+    AbstractDataDrivenSolver,
     AbstractSolver,
     ConfigT,
     Problem,
     ResultProtocol,
     ResultT,
 )
+from skmp.trajectory import Trajectory
 from skrobot.model import RobotModel
 from voxbloxpy.core import Grid, GridSDF
 
@@ -245,10 +252,10 @@ class TaskBase(SamplableBase[WorldT, DescriptionT]):
     def solve_default(self) -> List[ResultProtocol]:
         """solve the task by using default setting without initial solution
         This solve function is expected to successfully solve
-        the problem if it is feasible. Thus, typically a sampling-based
-        algorithm with large sampling budget would be used. Contrary,
-        nlp-based algrithm, which depends heavily on init solution
-        should be avoided.
+        the problem and get smoother solution if the task is feasible.
+        Thus, typically the implementation would be the combination of
+        sampling-based algorithm with large sampling budget and nlp based
+        smoother.
 
         This method is abstract, because depending on the task type
         sampling budget could be much different.
@@ -297,6 +304,11 @@ class AbstractTaskSolver(ABC, Generic[TaskT, ResultT]):
 
 @dataclass
 class SkmpTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
+    """Task solver for non-datadriven solver such rrt and sqp
+    this class is just a wrapper of skmp non-datadriven solver
+    to fit AbstractTaskSolver interface
+    """
+
     skmp_solver: AbstractSolver
     task_type: Type[TaskT]
 
@@ -305,6 +317,81 @@ class SkmpTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
         cls, skmp_solver: AbstractSolver[ConfigT, ResultT], task_type: Type[TaskT]
     ) -> "SkmpTaskSolver[TaskT, ResultT]":
         return cls(skmp_solver, task_type)
+
+    def setup(self, task: TaskT) -> None:
+        assert task.n_inner_task == 1
+        prob = task.export_problems()[0]
+        self.skmp_solver.setup(prob)
+
+    def solve(self) -> ResultT:
+        return self.skmp_solver.solve()
+
+
+@dataclass
+class PlanningDataset(Generic[TaskT]):
+    trajectories: List[Trajectory]
+    task_type: Type[TaskT]
+    time_stamp: float
+
+    @classmethod
+    def create(cls, task_type: Type[TaskT], n_data: int) -> "PlanningDataset":
+        trajectories: List[Trajectory] = []
+
+        with tqdm.tqdm(total=n_data) as pbar:
+            while len(trajectories) < n_data:
+                task = task_type.sample(1, False)
+                res = task.solve_default()[0]
+                success = res.traj is not None
+                if success:
+                    assert res.traj is not None
+                    trajectories.append(res.traj)
+                    pbar.update(1)
+        return cls(trajectories, task_type, time.time())
+
+    def save(self, base_path: Path) -> None:
+        uuid_str = str(uuid.uuid4())
+        p = base_path / "planning-dataset-{}-{}-{}.pkl".format(
+            self.task_type.__name__, uuid_str, self.time_stamp
+        )
+
+        with p.open(mode="wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, base_path: Path, task_type: Type[TaskT]) -> "PlanningDataset[TaskT]":
+        """load the newest dataset found in the path"""
+        dataset_list: List[PlanningDataset] = []
+        for p in base_path.iterdir():
+
+            if not p.name.startswith("planning-dataset"):
+                continue
+
+            if task_type.__name__ not in p.name:
+                continue
+
+            with p.open(mode="rb") as f:
+                dataset_list.append(pickle.load(f))
+
+        dirs_sorted = sorted(dataset_list, key=lambda x: x.time_stamp)
+        return dirs_sorted[-1]
+
+
+@dataclass
+class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
+    """Task solver for non-datadriven solver such rrt and sqp"""
+
+    skmp_solver: AbstractDataDrivenSolver
+    task_type: Type[TaskT]
+
+    @classmethod
+    def init(
+        cls,
+        skmp_dd_solver_type: Type[AbstractDataDrivenSolver[ConfigT, ResultT]],
+        solver_config: ConfigT,
+        dataset: PlanningDataset[TaskT],
+    ) -> "DatadrivenTaskSolver[TaskT, ResultT]":
+        solver = skmp_dd_solver_type.init(solver_config, dataset.trajectories)
+        return cls(solver, dataset.task_type)
 
     def setup(self, task: TaskT) -> None:
         assert task.n_inner_task == 1
