@@ -1,10 +1,7 @@
-from typing import List
-
-from ompl import LightningDB
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import LightningSolver, OMPLSolver, OMPLSolverConfig
 
-from rpbench.interface import SkmpTaskSolver
+from rpbench.interface import DatadrivenTaskSolver, PlanningDataset, SkmpTaskSolver
 from rpbench.tabletop import TabletopBoxRightArmReachingTask
 
 
@@ -12,15 +9,21 @@ def test_task_sovler():
     task_type = TabletopBoxRightArmReachingTask
     task = task_type.sample(1, standard=True)
 
-    solvers: List[SkmpTaskSolver] = []
+    solvers = []
 
-    rrt_connect = OMPLSolver.init(OMPLSolverConfig(n_max_call=10000))
-    solvers.append(SkmpTaskSolver(rrt_connect, task_type))
+    # create rrtconnect
+    rrt_connect = SkmpTaskSolver(OMPLSolver.init(OMPLSolverConfig(n_max_call=10000)), task_type)  # type: ignore
+    solvers.append(rrt_connect)
 
-    db = LightningDB(task_type.get_dof())
-    lightning = LightningSolver.init(OMPLSolverConfig(n_max_call=10000), db)
-    solvers.append(SkmpTaskSolver(lightning, task_type))
+    # create lightning
+    rrt_connect.setup(task)
+    res = rrt_connect.solve()
+    assert res.traj is not None
+    dataset = PlanningDataset([(task, res.traj)], task_type, 0.0)
+    lightning = DatadrivenTaskSolver.init(LightningSolver, OMPLSolverConfig(), dataset)  # type: ignore
+    solvers.append(lightning)  # type: ignore[arg-type]
 
+    # create sqpbased
     sqpbased = SQPBasedSolver.init(SQPBasedSolverConfig(n_wp=20))
     solvers.append(SkmpTaskSolver.init(sqpbased, task_type))
 

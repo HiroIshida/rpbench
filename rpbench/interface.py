@@ -4,7 +4,18 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Type, TypeVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Type,
+    TypeVar,
+)
 
 import numpy as np
 import tqdm
@@ -329,24 +340,23 @@ class SkmpTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
 
 @dataclass
 class PlanningDataset(Generic[TaskT]):
-    trajectories: List[Trajectory]
+    pairs: List[Tuple[TaskT, Trajectory]]
     task_type: Type[TaskT]
     time_stamp: float
 
     @classmethod
     def create(cls, task_type: Type[TaskT], n_data: int) -> "PlanningDataset":
-        trajectories: List[Trajectory] = []
-
+        pairs: List[Tuple[TaskT, Trajectory]] = []
         with tqdm.tqdm(total=n_data) as pbar:
-            while len(trajectories) < n_data:
+            while len(pairs) < n_data:
                 task = task_type.sample(1, False)
                 res = task.solve_default()[0]
                 success = res.traj is not None
                 if success:
                     assert res.traj is not None
-                    trajectories.append(res.traj)
+                    pairs.append((task, res.traj))
                     pbar.update(1)
-        return cls(trajectories, task_type, time.time())
+        return cls(pairs, task_type, time.time())
 
     def save(self, base_path: Path) -> None:
         uuid_str = str(uuid.uuid4())
@@ -390,7 +400,13 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
         solver_config: ConfigT,
         dataset: PlanningDataset[TaskT],
     ) -> "DatadrivenTaskSolver[TaskT, ResultT]":
-        solver = skmp_dd_solver_type.init(solver_config, dataset.trajectories)
+
+        pairs_modified = []
+        for task, traj in dataset.pairs:
+            pair = (task.export_problems()[0], traj)
+            pairs_modified.append(pair)
+
+        solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
         return cls(solver, dataset.task_type)
 
     def setup(self, task: TaskT) -> None:
