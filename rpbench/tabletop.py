@@ -480,7 +480,6 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
 
         if standard:
             d_trans = -0.1
-            d_trans = 0.0
             w_trans = 0.0
             h_trans = 0.5 * world.box_h
             hands_width = 0.15
