@@ -397,6 +397,9 @@ class TabletopBoxTaskBase(
                 satisfaction_fail_count += 1
             else:
                 planning_fail_count += 1
+
+        # force set traj = None to indicate its failed
+        ret.traj = None
         return ret  # return latest one (failed)
 
     @classmethod
