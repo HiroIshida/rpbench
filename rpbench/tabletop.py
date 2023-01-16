@@ -211,6 +211,7 @@ class CachedPR2ConstProvider(ABC):
         ...
 
     @classmethod
+    @lru_cache
     def get_box_const(cls) -> BoxConst:
         config = cls.get_config()
         return config.get_box_const()
