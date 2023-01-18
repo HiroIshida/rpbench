@@ -188,6 +188,11 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
         world_t = cls.get_world_type()
         world = world_t.sample(standard=standard)
 
+        if with_gridsdf:
+            gridsdf = cls.create_gridsdf(world, robot_model)
+        else:
+            gridsdf = None
+
         # do some bit tricky thing.
         # Naively, we can sample task with multiple description and then check if
         # it satisfies the predicate. However, by this method, as the number of
@@ -202,18 +207,16 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
                 count_trial_before_first_success += 1
 
             desc = cls.sample_descriptions(world, 1, standard)[0]
-            temp_problem = cls(world, [desc], None)
+            temp_problem = cls(world, [desc], gridsdf)
 
+            # note that some predicate may depends on gridsdf
+            # thus, you must be careful if you set with_grisdf=False
             if predicate(temp_problem):
                 descriptions.append(desc)
 
             if count_trial_before_first_success > max_trial_per_desc:
                 return None
 
-        if with_gridsdf:
-            gridsdf = cls.create_gridsdf(world, robot_model)
-        else:
-            gridsdf = None
         return cls(world, descriptions, gridsdf)
 
     @staticmethod
