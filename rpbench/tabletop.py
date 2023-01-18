@@ -360,6 +360,9 @@ class TabletopBoxTaskBase(
         return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        """use rrt-connect and then smooth path by sqp
+        if rrt planning succeeded but, nlp failed return rrt path.
+        """
         n_satisfaction_budget = 1
         n_planning_budget = 4
         solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100, simplify=True)
@@ -371,8 +374,8 @@ class TabletopBoxTaskBase(
             planning_fail_count < n_planning_budget
         ):
             ompl_solver.setup(problem)
-            ret = ompl_solver.solve()
-            if ret.traj is not None:
+            ompl_ret = ompl_solver.solve()
+            if ompl_ret.traj is not None:
                 # now, smooth out the solution
 
                 # first solve with smaller number of waypoint
@@ -381,7 +384,7 @@ class TabletopBoxTaskBase(
                 )
                 nlp_solver = SQPBasedSolver.init(nlp_conf)
                 nlp_solver.setup(problem)
-                nlp_ret = nlp_solver.solve(ret.traj)
+                nlp_ret = nlp_solver.solve(ompl_ret.traj)
 
                 # Then try to find more find-grained solution
                 if nlp_ret.traj is not None:
@@ -393,15 +396,15 @@ class TabletopBoxTaskBase(
                     nlp_ret = nlp_solver.solve(nlp_ret.traj)
                     if nlp_ret.traj is not None:
                         return nlp_ret
+                return ompl_ret
 
-            if ret.terminate_state == TerminateState.FAIL_SATISFACTION:
+            if ompl_ret.terminate_state == TerminateState.FAIL_SATISFACTION:
                 satisfaction_fail_count += 1
             else:
                 planning_fail_count += 1
 
-        # force set traj = None to indicate its failed
-        ret.traj = None
-        return ret  # return latest one (failed)
+        assert ompl_ret.traj is None  # because solve is supposed to be failed
+        return ompl_ret
 
     @classmethod
     def sample_descriptions(
