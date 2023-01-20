@@ -293,7 +293,7 @@ class CachedDualArmPR2ConstProvider(CachedPR2ConstProvider):
 
 
 @dataclass
-class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT]):
+class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT, RobotModel]):
     @staticmethod
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
@@ -335,7 +335,7 @@ class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
 
 
 class TabletopBoxTaskBase(
-    TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...]],
+    TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...], RobotModel],
     TabletopBoxSamplableBase[Tuple[Coordinates, ...]],
 ):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]]

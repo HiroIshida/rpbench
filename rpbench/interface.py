@@ -31,7 +31,6 @@ from skmp.solver.interface import (
     ResultT,
 )
 from skmp.trajectory import Trajectory
-from skrobot.model import RobotModel
 from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
@@ -39,6 +38,7 @@ SamplableT = TypeVar("SamplableT", bound="SamplableBase")
 OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
+RobotModelT = TypeVar("RobotModelT", bound=Any)
 
 
 class SDFProtocol(Protocol):
@@ -137,7 +137,7 @@ class DescriptionTable:
 
 
 @dataclass
-class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
+class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     """Task base class
     Task is composed of world and *descriptions*
 
@@ -226,7 +226,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
 
     @staticmethod
     @abstractmethod
-    def get_robot_model() -> RobotModel:
+    def get_robot_model() -> RobotModelT:
         """get robot model set by initial joint angles
         Because loading the model everytime takes time a lot,
         we assume this function utilize some cache.
@@ -237,7 +237,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
 
     @staticmethod
     @abstractmethod
-    def create_gridsdf(world: WorldT, robot_model: RobotModel) -> GridSDF:
+    def create_gridsdf(world: WorldT, robot_model: RobotModelT) -> GridSDF:
         """create gridsdf of the world given robot state
         The reason why this takes RobotModel as input is that, this method
         may involves vision-simulation using robot model (e.g. synthetic pcloud)
@@ -265,7 +265,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT]):
 
 
 @dataclass
-class TaskBase(SamplableBase[WorldT, DescriptionT]):
+class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
     def solve_default(self) -> List[ResultProtocol]:
         """solve the task by using default setting without initial solution
         This solve function is expected to successfully solve
