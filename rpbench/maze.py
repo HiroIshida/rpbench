@@ -1,21 +1,36 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Tuple, Type, TypeVar
+from typing import List, Tuple, Type, TypeVar
 
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
+from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
+from skmp.solver.interface import Problem, ResultProtocol
+from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
+from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.interface import GridProtocol, SDFProtocol, WorldBase
+from rpbench.interface import DescriptionTable, GridSDFProtocol, TaskBase, WorldBase
 from rpbench.utils import temp_seed
 
 MazeWorldT = TypeVar("MazeWorldT", bound="MazeWorldBase")
 
 
 @dataclass
-class Grid:
+class Grid2d:
     lb: np.ndarray
     ub: np.ndarray
-    sizes: Tuple[int, ...]
+    sizes: Tuple[int, int]
+
+
+@dataclass
+class Grid2dSDF:
+    values: np.ndarray
+    grid: Grid2d
+    itp: RegularGridInterpolator
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        return self.itp(x)
 
 
 @dataclass
@@ -86,18 +101,16 @@ class MazeWorldBase(WorldBase):
         sd_vals = positive_dists + negative_dists
         return sd_vals
 
-    def get_grid(self) -> GridProtocol:
-        return Grid(np.zeros(2), np.ones(2), (100, 100))
+    def get_grid(self) -> Grid2d:
+        return Grid2d(np.zeros(2), np.ones(2), (100, 100))
 
-    def get_exact_sdf(self) -> SDFProtocol:
+    def get_exact_sdf(self) -> Grid2dSDF:
         box_width = np.ones(2) / self.M.shape
         index_pair_list = [np.array(e) for e in zip(*np.where(self.M == 1))]
-        np.ones((100, 100)) * np.inf
 
         N = 100
         b_min = np.zeros(2)
         b_max = np.ones(2)
-        (b_max - b_min) / N
         xlin, ylin = [np.linspace(b_min[i], b_max[i], N) for i in range(2)]
         X, Y = np.meshgrid(xlin, ylin)
         pts = np.array(list(zip(X.flatten(), Y.flatten())))
@@ -110,8 +123,22 @@ class MazeWorldBase(WorldBase):
             vals_cand = MazeWorldBase.compute_box_sdf(pts, pos, box_width)
             vals = np.minimum(vals, vals_cand)
 
-        itp = RegularGridInterpolator(pts, vals.T)
-        return itp
+        itp = RegularGridInterpolator((xlin, ylin), vals.reshape(N, N))
+        return Grid2dSDF(vals, self.get_grid(), itp)
+
+    def visualize(self) -> Tuple:
+        fig, ax = plt.subplots()
+        grid = self.get_grid()
+        xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], 200) for i in range(2)]
+        meshes = np.meshgrid(xlin, ylin)
+        meshes_flatten = [mesh.flatten() for mesh in meshes]
+        pts = np.array([p for p in zip(*meshes_flatten)])
+
+        sdf = self.get_exact_sdf()
+        sdf_mesh = sdf(pts).reshape(200, 200)
+        ax.contourf(xlin, ylin, sdf_mesh, cmap="summer")
+        ax.contour(xlin, ylin, sdf_mesh, cmap="gray", levels=[0.0])
+        return fig, ax
 
 
 @dataclass
@@ -119,3 +146,94 @@ class MazeWorld(MazeWorldBase):
     @classmethod
     def get_param(cls) -> MazeParam:
         return MazeParam(13, 0.1, 0.4)
+
+
+StartAndGoal = Tuple[np.ndarray, np.ndarray]
+
+
+class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
+    @staticmethod
+    def get_world_type() -> Type[MazeWorld]:
+        return MazeWorld
+
+    @staticmethod
+    def get_robot_model() -> None:
+        return None
+
+    @staticmethod
+    def create_gridsdf(world: MazeWorld, robot_model: None) -> GridSDFProtocol:
+        return world.get_exact_sdf()
+
+    @classmethod
+    def sample_descriptions(
+        cls, world: MazeWorld, n_sample: int, standard: bool = False
+    ) -> List[StartAndGoal]:
+
+        maze_param = world.get_param()
+
+        sdf = world.get_exact_sdf()
+
+        if standard:
+            assert n_sample == 1
+            cell_width = 1.0 / maze_param.width
+            start = np.array([cell_width * 1.5, cell_width * 1.5])
+            goal = np.array([1.0 - cell_width * 1.5, 1.0 - cell_width * 1.5])
+            return [(start, goal)]
+        else:
+            descs = []
+            while len(descs) < n_sample:
+                start = np.random.rand(2)
+                goal = np.random.rand(2)
+                if np.all(sdf(np.stack([start, goal])) > 0):
+                    descs.append((start, goal))
+            return descs
+
+    def export_table(self) -> DescriptionTable:
+        assert self._gridsdf is not None
+        wd = {}
+        wd["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+
+        wcd_list = []
+        for desc in self.descriptions:
+            wcd = {}
+            wcd["start"] = desc[0]
+            wcd["goal"] = desc[1]
+            wcd_list.append(wcd)
+        return DescriptionTable(wd, wcd_list)
+
+    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=50000, simplify=True))
+        ompl_sovler.setup(problem)
+        ompl_res = ompl_sovler.solve()
+
+        nlp_solver = SQPBasedSolver.init(SQPBasedSolverConfig(n_wp=100))
+        nlp_solver.setup(problem)
+        res = nlp_solver.solve(ompl_res.traj)
+        return res
+
+    @classmethod
+    def get_dof(cls) -> int:
+        return 2
+
+    def export_problems(self) -> List[Problem]:
+        sdf = self.world.get_exact_sdf()
+        probs = []
+        for desc in self.descriptions:
+            start, goal = desc
+
+            box = BoxConst(np.zeros(self.get_dof()), np.ones(self.get_dof()))
+            goal_const = ConfigPointConst(goal)
+            prob = Problem(
+                start, box, goal_const, PointCollFreeConst(sdf), None, motion_step_box_=0.005
+            )
+            probs.append(prob)
+        return probs
+
+    def visualize(self) -> Tuple:
+        fig, ax = self.world.visualize()
+
+        for desc in self.descriptions:
+            start, goal = desc
+            ax.scatter(start[0], start[1])
+            ax.scatter(goal[0], goal[1])
+        return fig, ax
