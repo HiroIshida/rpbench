@@ -31,7 +31,6 @@ from skmp.solver.interface import (
     ResultT,
 )
 from skmp.trajectory import Trajectory
-from voxbloxpy.core import Grid, GridSDF
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 SamplableT = TypeVar("SamplableT", bound="SamplableBase")
@@ -57,6 +56,23 @@ class SDFProtocol(Protocol):
         ...
 
 
+class GridProtocol(Protocol):
+    lb: np.ndarray
+    ub: np.ndarray
+
+    @property
+    def sizes(self) -> Tuple[int, ...]:
+        ...
+
+
+class GridSDFProtocol(SDFProtocol, Protocol):
+    values: np.ndarray
+
+    @property
+    def grid(self) -> GridProtocol:
+        ...
+
+
 class WorldBase(ABC):
     @classmethod
     @abstractmethod
@@ -69,7 +85,7 @@ class WorldBase(ABC):
         ...
 
     @abstractmethod
-    def get_grid(self) -> Grid:
+    def get_grid(self) -> GridProtocol:
         ...
 
 
@@ -150,7 +166,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     world: WorldT
     descriptions: List[DescriptionT]
-    _gridsdf: Optional[GridSDF]
+    _gridsdf: Optional[GridSDFProtocol]
 
     @property
     def n_inner_task(self) -> int:
@@ -237,7 +253,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @staticmethod
     @abstractmethod
-    def create_gridsdf(world: WorldT, robot_model: RobotModelT) -> GridSDF:
+    def create_gridsdf(world: WorldT, robot_model: RobotModelT) -> GridSDFProtocol:
         """create gridsdf of the world given robot state
         The reason why this takes RobotModel as input is that, this method
         may involves vision-simulation using robot model (e.g. synthetic pcloud)
