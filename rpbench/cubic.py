@@ -1,4 +1,3 @@
-import contextlib
 import copy
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -13,21 +12,9 @@ from skrobot.model import RobotModel
 from voxbloxpy.core import Grid, GridSDF
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
+from rpbench.utils import temp_seed
 
 CubicWorldT = TypeVar("CubicWorldT", bound="CubicWorld")
-
-
-@contextlib.contextmanager
-def temp_seed(seed, use_tempseed):
-    if use_tempseed:
-        state = np.random.get_state()
-        np.random.seed(seed)
-        try:
-            yield
-        finally:
-            np.random.set_state(state)
-    else:
-        yield
 
 
 @dataclass
