@@ -180,7 +180,7 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
             goal = np.array([1.0 - cell_width * 1.5, 1.0 - cell_width * 1.5])
             return [(start, goal)]
         else:
-            descs = []
+            descs: List[StartAndGoal] = []
             while len(descs) < n_sample:
                 start = np.random.rand(2)
                 goal = np.random.rand(2)

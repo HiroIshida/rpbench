@@ -1,14 +1,12 @@
-import copy
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Type, TypeVar
+from typing import List, Tuple, Type, TypeVar
 
 import numpy as np
-from skmp.constraint import AbstractIneqConst, BoxConst, ConfigPointConst
+from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
-from skrobot.model import RobotModel
 from voxbloxpy.core import Grid, GridSDF
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
@@ -117,28 +115,6 @@ class Cubic5SphereWorld(CubicWorld):
     @classmethod
     def get_num_obstacle(cls) -> int:
         return 5
-
-
-class PointCollFreeConst(AbstractIneqConst):
-    sdf: SDFProtocol
-    eps: float = 1e-6
-
-    def __init__(self, sdf: SDFProtocol):
-        self.sdf = sdf
-        self.reflect_skrobot_model(None)
-
-    def _evaluate(self, qs: np.ndarray, with_jacobian: bool) -> Tuple[np.ndarray, np.ndarray]:
-        n_point, n_dim = qs.shape
-        jacs_stacked = np.zeros((n_point, 1, n_dim))
-        fs = self.sdf(qs)
-        for i in range(3):
-            qs1 = copy.deepcopy(qs)
-            qs1[:, i] += self.eps
-            jacs_stacked[:, :, i] = (self.sdf(qs1) - fs) / self.eps
-        return fs.reshape(-1, 1), jacs_stacked
-
-    def _reflect_skrobot_model(self, robot_model: Optional[RobotModel]) -> None:
-        return None
 
 
 class CubicNSpherePlanningTask(TaskBase[CubicWorldT, Tuple[np.ndarray, ...], None]):
