@@ -7,6 +7,7 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
+from rpbench.maze import MazeSolvingTask
 from rpbench.tabletop import (
     TabletopBoxDualArmReachingTask,
     TabletopBoxDualArmReachingTaskBase,
@@ -112,5 +113,26 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     assert result.traj is not None
 
 
+def test_maze_solving_task():
+    n_inner = 10
+    task = MazeSolvingTask.sample(n_inner)
+    desc_table = task.export_table()
+
+    mesh = desc_table.world_desc_dict["world"]
+    assert mesh.ndim == 2
+    assert len(desc_table.wcond_desc_dicts) == n_inner
+
+    dic = desc_table.wcond_desc_dicts[0]
+    start = dic["start"]
+    goal = dic["goal"]
+    assert len(start) == 2
+    assert len(goal) == 2
+
+    task = MazeSolvingTask.sample(1, True)
+    res = task.solve_default()[0]
+    assert res.traj is not None
+
+
 if __name__ == "__main__":
-    test_tabletop_task()
+    # test_tabletop_task()
+    test_maze_solving_task()
