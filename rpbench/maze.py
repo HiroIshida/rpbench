@@ -108,10 +108,9 @@ class MazeWorldBase(WorldBase):
         box_width = np.ones(2) / self.M.shape
         index_pair_list = [np.array(e) for e in zip(*np.where(self.M == 1))]
 
-        N = 100
-        b_min = np.zeros(2)
-        b_max = np.ones(2)
-        xlin, ylin = [np.linspace(b_min[i], b_max[i], N) for i in range(2)]
+        grid = self.get_grid()
+
+        xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
         X, Y = np.meshgrid(xlin, ylin)
         pts = np.array(list(zip(X.flatten(), Y.flatten())))
 
@@ -123,7 +122,7 @@ class MazeWorldBase(WorldBase):
             vals_cand = MazeWorldBase.compute_box_sdf(pts, pos, box_width)
             vals = np.minimum(vals, vals_cand)
 
-        itp = RegularGridInterpolator((xlin, ylin), vals.reshape(N, N))
+        itp = RegularGridInterpolator((xlin, ylin), vals.reshape(grid.sizes))
         return Grid2dSDF(vals, self.get_grid(), itp)
 
     def visualize(self) -> Tuple:
@@ -145,7 +144,7 @@ class MazeWorldBase(WorldBase):
 class MazeWorld(MazeWorldBase):
     @classmethod
     def get_param(cls) -> MazeParam:
-        return MazeParam(13, 0.1, 0.4)
+        return MazeParam(23, 0.9, 0.9)
 
 
 StartAndGoal = Tuple[np.ndarray, np.ndarray]
@@ -224,7 +223,7 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
             box = BoxConst(np.zeros(self.get_dof()), np.ones(self.get_dof()))
             goal_const = ConfigPointConst(goal)
             prob = Problem(
-                start, box, goal_const, PointCollFreeConst(sdf), None, motion_step_box_=0.005
+                start, box, goal_const, PointCollFreeConst(sdf), None, motion_step_box_=0.02
             )
             probs.append(prob)
         return probs
