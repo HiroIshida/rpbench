@@ -125,7 +125,7 @@ class MazeWorldBase(WorldBase):
         itp = RegularGridInterpolator((xlin, ylin), vals.reshape(grid.sizes))
         return Grid2dSDF(vals, self.get_grid(), itp)
 
-    def visualize(self) -> Tuple:
+    def visualize(self, with_contour: bool = False) -> Tuple:
         fig, ax = plt.subplots()
         grid = self.get_grid()
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], 200) for i in range(2)]
@@ -135,7 +135,8 @@ class MazeWorldBase(WorldBase):
 
         sdf = self.get_exact_sdf()
         sdf_mesh = sdf(pts).reshape(200, 200)
-        ax.contourf(xlin, ylin, sdf_mesh, cmap="summer")
+        if with_contour:
+            ax.contourf(xlin, ylin, sdf_mesh, cmap="summer")
         ax.contour(xlin, ylin, sdf_mesh, cmap="gray", levels=[0.0])
         return fig, ax
 
@@ -228,11 +229,11 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
             probs.append(prob)
         return probs
 
-    def visualize(self) -> Tuple:
-        fig, ax = self.world.visualize()
+    def visualize(self, debug: bool = False) -> Tuple:
+        fig, ax = self.world.visualize(debug)
 
         for desc in self.descriptions:
             start, goal = desc
-            ax.scatter(start[0], start[1])
-            ax.scatter(goal[0], goal[1])
+            ax.scatter(start[0], start[1], label="start")
+            ax.scatter(goal[0], goal[1], label="goal")
         return fig, ax
