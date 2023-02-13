@@ -191,7 +191,7 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
     def export_table(self) -> DescriptionTable:
         assert self._gridsdf is not None
         wd = {}
-        wd["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+        wd["world"] = self.world.M.flatten()  # vector description
 
         wcd_list = []
         for desc in self.descriptions:

@@ -118,8 +118,10 @@ def test_maze_solving_task():
     task = MazeSolvingTask.sample(n_inner)
     desc_table = task.export_table()
 
+    assert desc_table.get_mesh() is None
+
     mesh = desc_table.world_desc_dict["world"]
-    assert mesh.ndim == 2
+    assert mesh.ndim == 1
     assert len(desc_table.wcond_desc_dicts) == n_inner
 
     dic = desc_table.wcond_desc_dicts[0]

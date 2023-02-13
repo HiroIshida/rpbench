@@ -101,7 +101,6 @@ class DescriptionTable:
     # currently we assume that world and world-conditioned descriptions follows
     # the following rule.
     # wd refere to world description and wcd refere to world-condtioned descriotion
-    # - wd must have either 2dim or 3dim array and not both
     # - wd has only one key for 2dim or 3dim array
     # - wd may have 1 dim array
     # - wcd does not have 2dim or 3dim array
@@ -110,12 +109,14 @@ class DescriptionTable:
     # to remove the above limitation, create a task class which inherit rpbench Task
     # which is equipped with desc-2-tensor-tuple conversion rule
 
-    def get_mesh(self) -> np.ndarray:
+    def get_mesh(self) -> Optional[np.ndarray]:
         wd_ndim_to_value = {v.ndim: v for v in self.world_desc_dict.values()}
         ndim_set = wd_ndim_to_value.keys()
 
         contains_either_2or3_not_both = (2 in ndim_set) ^ (3 in ndim_set)
-        assert contains_either_2or3_not_both
+        if not contains_either_2or3_not_both:
+            return None
+
         if 2 in ndim_set:
             mesh = wd_ndim_to_value[2]
         elif 3 in ndim_set:
