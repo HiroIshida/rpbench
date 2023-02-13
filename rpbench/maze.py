@@ -122,7 +122,9 @@ class MazeWorldBase(WorldBase):
             vals_cand = MazeWorldBase.compute_box_sdf(pts, pos, box_width)
             vals = np.minimum(vals, vals_cand)
 
-        itp = RegularGridInterpolator((xlin, ylin), vals.reshape(grid.sizes))
+        itp = RegularGridInterpolator(
+            (xlin, ylin), vals.reshape(grid.sizes), bounds_error=False, fill_value=1.0
+        )
         return Grid2dSDF(vals, self.get_grid(), itp)
 
     def visualize(self, with_contour: bool = False) -> Tuple:
