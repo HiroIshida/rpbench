@@ -59,6 +59,7 @@ class TabletopBoxWorld(TabletopWorldBase):
     box_w: float
     box_h: float
     box_t: float
+    _intrinsic_desc: np.ndarray
 
     def get_exact_sdf(self) -> UnionSDF:
         lst = [self.table.sdf]
@@ -66,16 +67,24 @@ class TabletopBoxWorld(TabletopWorldBase):
             lst.append(obstacle.sdf)
         return UnionSDF(lst)
 
+    def export_intrinsic_description(self) -> np.ndarray:
+        return self._intrinsic_desc
+
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
+        intrinsic_desc = []
+
         table = cls.create_standard_table()
         table_depth, table_width, table_height = table._extents
 
         if not standard:
-            x = np.random.rand() * 0.2
-            y = -0.2 + np.random.rand() * 0.4
+            x_rand, y_rand = np.random.rand(2)
+            x = 0.2 * x_rand
+            y = -0.2 + y_rand * 0.4
             z = 0.0
             table.translate([x, y, z])
+
+            intrinsic_desc.extend([x_rand, y_rand])
 
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
@@ -93,9 +102,12 @@ class TabletopBoxWorld(TabletopWorldBase):
             w += 0.15
             h += 0.15
         else:
-            d += np.random.rand() * 0.3
-            w += np.random.rand() * 0.3
-            h += np.random.rand() * 0.3
+            d_rand, w_rand, h_rand = np.random.rand(3)
+            d += d_rand * 0.3
+            w += w_rand * 0.3
+            h += h_rand * 0.3
+            intrinsic_desc.extend([d_rand, w_rand, h_rand])
+
         t = 0.03
 
         if standard:
@@ -104,8 +116,12 @@ class TabletopBoxWorld(TabletopWorldBase):
         else:
             box_center = table_tip.copy_worldcoords()
             box_center.translate([0.5 * d, 0.5 * w, 0.0])
-            pos_from_tip = np.array([table_depth - d, table_width - w, 0]) * np.random.rand(3)
+
+            box_center_rand = np.random.rand(3)
+            pos_from_tip = np.array([table_depth - d, table_width - w, 0]) * box_center_rand
             box_center.translate(pos_from_tip)
+
+            intrinsic_desc.extend(list(box_center_rand))
 
         lower_plate = Box([d, w, t], with_sdf=True, face_colors=color)
         lower_plate.newcoords(box_center.copy_worldcoords())
@@ -132,7 +148,7 @@ class TabletopBoxWorld(TabletopWorldBase):
         opposite_plate.translate([0.5 * d - 0.5 * t, 0.0, 0.5 * h])
         obstacles.append(opposite_plate)
 
-        return cls(table, obstacles, box_center, d, w, h, t)
+        return cls(table, obstacles, box_center, d, w, h, t, np.array(intrinsic_desc))
 
     @staticmethod
     def create_standard_table() -> Box:
@@ -318,6 +334,9 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT, Rob
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
 
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        return [self.world.export_intrinsic_description()] * self.n_inner_task
+
     @classmethod
     def cast_from(cls: Type[TabletopBoxSamplableT], other: SamplableT) -> TabletopBoxSamplableT:
         assert isinstance(other, TabletopBoxSamplableBase)
@@ -432,6 +451,17 @@ class TabletopBoxTaskBase(
         cls, world: TabletopBoxWorld, standard: bool
     ) -> Tuple[Coordinates, ...]:
         ...
+
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        world_vec = self.world.export_intrinsic_description()
+
+        intrinsic_descs = []
+        for desc in self.descriptions:
+            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
+            vecs = [world_vec] + pose_vecs
+            intrinsic_desc = np.hstack(vecs)
+            intrinsic_descs.append(intrinsic_desc)
+        return intrinsic_descs
 
 
 class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
