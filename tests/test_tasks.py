@@ -1,6 +1,6 @@
 import pickle
 from hashlib import md5
-from typing import Type
+from typing import Any, Type
 
 import numpy as np
 import pytest
@@ -24,7 +24,7 @@ set_ompl_random_seed(0)
 
 
 def intrinsic_dimension():
-    task = TabletopBoxWorldWrap.sample(2)
+    task: Any = TabletopBoxWorldWrap.sample(2)
     int_descs = task.export_intrinsic_descriptions()
     assert len(int_descs) == 2
     assert len(int_descs[0]) == 8
