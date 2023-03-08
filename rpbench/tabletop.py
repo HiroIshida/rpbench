@@ -78,9 +78,9 @@ class TabletopBoxWorld(TabletopWorldBase):
         table_depth, table_width, table_height = table._extents
 
         if not standard:
-            x_rand, y_rand = np.random.rand(2)
-            x = 0.2 * x_rand
-            y = -0.2 + y_rand * 0.4
+            x_rand, y_rand = np.random.randn(2)
+            x = 0.1 + 0.05 * x_rand
+            y = 0.1 * y_rand
             z = 0.0
             table.translate([x, y, z])
 
@@ -102,10 +102,10 @@ class TabletopBoxWorld(TabletopWorldBase):
             w += 0.15
             h += 0.15
         else:
-            d_rand, w_rand, h_rand = np.random.rand(3)
-            d += d_rand * 0.3
-            w += w_rand * 0.3
-            h += h_rand * 0.3
+            d_rand, w_rand, h_rand = np.random.randn(3)
+            d += 0.15 + d_rand * 0.05
+            w += 0.15 + w_rand * 0.05
+            h += 0.15 + h_rand * 0.05
             intrinsic_desc.extend([d_rand, w_rand, h_rand])
 
         t = 0.03
@@ -114,14 +114,18 @@ class TabletopBoxWorld(TabletopWorldBase):
             box_center = table.copy_worldcoords()
             box_center.translate([0, 0, 0.5 * table_height])
         else:
-            box_center = table_tip.copy_worldcoords()
-            box_center.translate([0.5 * d, 0.5 * w, 0.0])
+            box_center = table.copy_worldcoords()
+            box_center.translate([0, 0, 0.5 * table_height])
 
-            box_center_rand = np.random.rand(3)
-            pos_from_tip = np.array([table_depth - d, table_width - w, 0]) * box_center_rand
-            box_center.translate(pos_from_tip)
+            margin_x = table_depth - d
+            margin_y = table_width - w
 
-            intrinsic_desc.extend(list(box_center_rand))
+            x_rand, y_rand = np.random.randn(2)
+
+            trans = np.array([0.5 * 0.3 * margin_x * x_rand, 0.5 * 0.3 * margin_y * y_rand, 0.0])
+            box_center.translate(trans)
+
+            intrinsic_desc.extend([x_rand, y_rand])
 
         lower_plate = Box([d, w, t], with_sdf=True, face_colors=color)
         lower_plate.newcoords(box_center.copy_worldcoords())
@@ -474,31 +478,34 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
         table = world.table
         table_depth, table_width, table_height = table._extents
 
-        co = world.box_center.copy_worldcoords()
-        if standard:
-            d_trans = -0.1
-            w_trans = 0.0
-            h_trans = 0.5 * world.box_h
-            theta = 0.0
-        else:
-            margin = 0.03
-            box_dt = world.box_d - 2 * (world.box_t + margin)
-            box_wt = world.box_w - 2 * (world.box_t + margin)
-            box_ht = world.box_h - 2 * (world.box_t + margin)
-            d_trans = -0.5 * box_dt + np.random.rand() * box_dt
-            w_trans = -0.5 * box_wt + np.random.rand() * box_wt
-            h_trans = world.box_t + margin + np.random.rand() * box_ht
-            theta = -np.deg2rad(45) + np.random.rand() * np.deg2rad(90)
+        n_max_trial = 100
+        for _ in range(n_max_trial):
+            co = world.box_center.copy_worldcoords()
+            if standard:
+                d_trans = -0.1
+                w_trans = 0.0
+                h_trans = 0.5 * world.box_h
+                theta = 0.0
+            else:
+                margin = 0.03
+                box_dt = world.box_d - 2 * (world.box_t + margin)
+                box_wt = world.box_w - 2 * (world.box_t + margin)
+                box_ht = world.box_h - 2 * (world.box_t + margin)
+                d_trans = np.random.randn() * box_dt * 0.2
+                w_trans = np.random.randn() * box_wt * 0.2
+                h_trans = 0.5 * world.box_h + np.random.randn() * 0.2 * box_ht
+                theta = np.random.randn() * np.deg2rad(90) * 0.2
 
-        co.translate([d_trans, w_trans, h_trans])
-        co.rotate(theta, "z")
+            co.translate([d_trans, w_trans, h_trans])
+            co.rotate(theta, "z")
 
-        points = np.expand_dims(co.worldpos(), axis=0)
-        sdf = world.get_exact_sdf()
+            points = np.expand_dims(co.worldpos(), axis=0)
+            sdf = world.get_exact_sdf()
 
-        sd_val = sdf(points)[0]
-        assert sd_val > -0.0001
-        return (co,)
+            sd_val = sdf(points)[0]
+            if sd_val > -0.0001:
+                return (co,)
+        assert False
 
 
 class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):

@@ -23,17 +23,17 @@ np.random.seed(0)
 set_ompl_random_seed(0)
 
 
-def intrinsic_dimension():
+def test_intrinsic_dimension():
     task: Any = TabletopBoxWorldWrap.sample(2)
     int_descs = task.export_intrinsic_descriptions()
     assert len(int_descs) == 2
-    assert len(int_descs[0]) == 8
+    assert len(int_descs[0]) == 7
 
     task = TabletopBoxRightArmReachingTask.sample(1)
-    assert len(task.export_intrinsic_descriptions()[0]) == 14
+    assert len(task.export_intrinsic_descriptions()[0]) == 13
 
     task = TabletopBoxDualArmReachingTask.sample(1)
-    assert len(task.export_intrinsic_descriptions()[0]) == 20
+    assert len(task.export_intrinsic_descriptions()[0]) == 19
 
 
 def test_tabletop_samplable():
