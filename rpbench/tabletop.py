@@ -40,7 +40,7 @@ from rpbench.interface import (
     TaskBase,
     WorldBase,
 )
-from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
+from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf
 
 TabletopBoxSamplableT = TypeVar("TabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
@@ -374,7 +374,8 @@ class TabletopBoxTaskBase(
         box_const = provider.get_box_const()
 
         assert self._gridsdf is not None
-        ineq_const = provider.get_collfree_const(self._gridsdf)
+        sdf = create_union_sdf([self._gridsdf, self.world.table.sdf])
+        ineq_const = provider.get_collfree_const(sdf)
 
         problems = []
         for desc in self.descriptions:

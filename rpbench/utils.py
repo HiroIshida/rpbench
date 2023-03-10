@@ -1,12 +1,23 @@
 import collections
 import contextlib
-from typing import Dict
+from typing import Callable, Dict, List
 
 import numpy as np
 import trimesh
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
 from skrobot.model import CascadedLink, Link, RobotModel
+
+
+def create_union_sdf(
+    sdfs: List[Callable[[np.ndarray], np.ndarray]]
+) -> Callable[[np.ndarray], np.ndarray]:
+    def union_sdf(X: np.ndarray) -> np.ndarray:
+        sd_vals_list = np.array([sdf(X) for sdf in sdfs])
+        sd_vals_union = np.min(sd_vals_list, axis=0)
+        return sd_vals_union
+
+    return union_sdf
 
 
 def skcoords_to_pose_vec(co: Coordinates) -> np.ndarray:
