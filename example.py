@@ -4,10 +4,11 @@ from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.tabletop import (
+    InteractiveTaskVisualizer,
+    StaticTaskVisualizer,
     TabletopBoxDualArmReachingTask,
     TabletopBoxRightArmReachingTask,
     TabletopBoxTaskBase,
-    TaskVisualizer,
 )
 
 set_ompl_random_seed(1)
@@ -39,6 +40,9 @@ nlp_result = nlp_solver.solve(ompl_result.traj.resample(n_wp))
 assert nlp_result.traj is not None
 print(nlp_result.time_elapsed)
 
-vis = TaskVisualizer(task)
-vis.show()
-vis.visualize_trajectory(nlp_result.traj.resample(30))
+static_vis = StaticTaskVisualizer(task)
+static_vis.save_image("task.png")
+
+dynamic_vis = InteractiveTaskVisualizer(task)
+dynamic_vis.show()
+dynamic_vis.visualize_trajectory(nlp_result.traj.resample(30))

@@ -2,7 +2,8 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Callable, ClassVar, List, Tuple, Type, TypeVar
+from pathlib import Path
+from typing import Callable, ClassVar, Generic, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from skmp.constraint import (
@@ -39,7 +40,7 @@ from rpbench.interface import (
     TaskBase,
     WorldBase,
 )
-from rpbench.utils import skcoords_to_pose_vec
+from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf
 
 TabletopBoxSamplableT = TypeVar("TabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
@@ -174,7 +175,7 @@ class TabletopBoxWorld(TabletopWorldBase):
         ub = self.table.transform_vector(ub)
         return Grid(lb, ub, grid_sizes)
 
-    def visualize(self, viewer: TrimeshSceneViewer) -> None:
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         viewer.add(self.table)
         for obs in self.obstacles:
             viewer.add(obs)
@@ -559,14 +560,17 @@ class TabletopVoxbloxBoxWorldWrap(VoxbloxGridSDFCreator, TabletopBoxWorldWrapBas
 # fmt: on
 
 
-class TaskVisualizer:
+ViewerT = TypeVar("ViewerT", bound=Union[TrimeshSceneViewer, SceneWrapper])
+
+
+class TaskVisualizerBase(Generic[ViewerT], ABC):
     # TODO: this class actually take any Task if it has config provider
     task: TabletopBoxTaskBase
-    viewer: TrimeshSceneViewer
+    viewer: ViewerT
     _show_called: bool
 
     def __init__(self, task: TabletopBoxTaskBase):
-        viewer = TrimeshSceneViewer()
+        viewer = self.viewer_type()()
 
         robot_config = task.config_provider()
         robot_model = robot_config.get_pr2()
@@ -582,6 +586,13 @@ class TaskVisualizer:
         self.viewer = viewer
         self._show_called = False
 
+    @classmethod
+    @abstractmethod
+    def viewer_type(cls) -> Type[ViewerT]:
+        ...
+
+
+class InteractiveTaskVisualizer(TaskVisualizerBase[TrimeshSceneViewer]):
     def show(self) -> None:
         self.viewer.show()
         time.sleep(1.0)
@@ -603,3 +614,20 @@ class TaskVisualizer:
         while not self.viewer.has_exit:
             time.sleep(0.1)
             self.viewer.redraw()
+
+    @classmethod
+    def viewer_type(cls) -> Type[TrimeshSceneViewer]:
+        return TrimeshSceneViewer
+
+
+class StaticTaskVisualizer(TaskVisualizerBase[SceneWrapper]):
+    @classmethod
+    def viewer_type(cls) -> Type[SceneWrapper]:
+        return SceneWrapper
+
+    def save_image(self, path: Union[Path, str]) -> None:
+        if isinstance(path, str):
+            path = Path(path)
+        png = self.viewer.save_image(resolution=[640, 480], visible=True)
+        with path.open(mode="wb") as f:
+            f.write(png)
