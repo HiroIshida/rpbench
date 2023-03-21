@@ -5,7 +5,7 @@ from typing import Callable, Dict, List
 import numpy as np
 import trimesh
 from skrobot.coordinates import Coordinates
-from skrobot.coordinates.math import rpy_angle
+from skrobot.coordinates.math import rpy_angle, rpy_matrix
 from skrobot.model import CascadedLink, Link, RobotModel
 
 
@@ -26,6 +26,12 @@ def skcoords_to_pose_vec(co: Coordinates) -> np.ndarray:
     ypr = rpy_angle(rot)[0]
     rpy = np.flip(ypr)
     return np.hstack((pos, rpy))
+
+
+def pose_vec_to_skcoords(vec: np.ndarray) -> Coordinates:
+    pos, rot = vec[:3], vec[3:]
+    mat = rpy_matrix(*np.flip(rot))
+    return Coordinates(pos, mat)
 
 
 @contextlib.contextmanager
