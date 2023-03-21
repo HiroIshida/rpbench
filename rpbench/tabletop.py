@@ -73,13 +73,18 @@ class TabletopBoxWorld(TabletopWorldBase):
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
+        params = np.random.randn(7)
+        return cls._sample(params, standard)
+
+    @classmethod
+    def _sample(cls, params: np.ndarray, standard: bool = False) -> "TabletopBoxWorld":
         intrinsic_desc = []
 
         table = cls.create_standard_table()
         table_depth, table_width, table_height = table._extents
 
         if not standard:
-            x_rand, y_rand = np.random.randn(2)
+            x_rand, y_rand = params[0], params[1]
             x = 0.1 + 0.05 * x_rand
             y = 0.1 * y_rand
             z = 0.0
@@ -103,7 +108,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             w += 0.15
             h += 0.15
         else:
-            d_rand, w_rand, h_rand = np.random.randn(3)
+            d_rand, w_rand, h_rand = params[2:5]
             d += 0.15 + d_rand * 0.05
             w += 0.15 + w_rand * 0.05
             h += 0.15 + h_rand * 0.05
@@ -121,7 +126,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             margin_x = table_depth - d
             margin_y = table_width - w
 
-            x_rand, y_rand = np.random.randn(2)
+            x_rand, y_rand = params[5:]
 
             trans = np.array([0.5 * 0.3 * margin_x * x_rand, 0.5 * 0.3 * margin_y * y_rand, 0.0])
             box_center.translate(trans)
@@ -477,6 +482,9 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
     def sample_target_poses(
         cls, world: TabletopBoxWorld, standard: bool
     ) -> Tuple[Coordinates, ...]:
+
+        params = np.random.randn(4)
+
         table = world.table
         table_depth, table_width, table_height = table._extents
 
@@ -493,10 +501,10 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
                 box_dt = world.box_d - 2 * (world.box_t + margin)
                 box_wt = world.box_w - 2 * (world.box_t + margin)
                 box_ht = world.box_h - 2 * (world.box_t + margin)
-                d_trans = np.random.randn() * box_dt * 0.2
-                w_trans = np.random.randn() * box_wt * 0.2
-                h_trans = 0.5 * world.box_h + np.random.randn() * 0.2 * box_ht
-                theta = np.random.randn() * np.deg2rad(90) * 0.2
+                d_trans = params[0] * box_dt * 0.2
+                w_trans = params[1] * box_wt * 0.2
+                h_trans = 0.5 * world.box_h + params[2] * 0.2 * box_ht
+                theta = params[3] * np.deg2rad(90) * 0.2
 
             co.translate([d_trans, w_trans, h_trans])
             co.rotate(theta, "z")
