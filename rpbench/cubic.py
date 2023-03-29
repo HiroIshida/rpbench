@@ -1,16 +1,21 @@
-from abc import abstractmethod
+import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, Type, TypeVar
+from pathlib import Path
+from typing import Generic, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
+from skmp.trajectory import Trajectory
+from skrobot.model.primitives import Box, LineString, Sphere
+from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid, GridSDF
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
-from rpbench.utils import temp_seed
+from rpbench.utils import SceneWrapper, temp_seed
 
 CubicWorldT = TypeVar("CubicWorldT", bound="CubicWorld")
 
@@ -85,6 +90,12 @@ class CubicWorld(WorldBase):
     @classmethod
     def get_packing_ratio(cls) -> float:
         return 0.2
+
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        viewer.add(Box([1, 1, 1], pos=(0.5, 0.5, 0.5), face_colors=[255, 0, 0, 30]))
+        for obs_pos in self.obstacles:
+            obj = Sphere(self.get_radius(), pos=obs_pos)
+            viewer.add(obj)
 
 
 class Cubic1SphereWorld(CubicWorld):
@@ -228,3 +239,61 @@ class Cubic5SpherePlanningTask(ExactGridSDFCreator, CubicNSpherePlanningTask[Cub
     @staticmethod
     def get_world_type() -> Type[Cubic5SphereWorld]:
         return Cubic5SphereWorld
+
+
+ViewerT = TypeVar("ViewerT", bound=Union[TrimeshSceneViewer, SceneWrapper])
+
+
+class TaskVisualizerBase(Generic[ViewerT, CubicWorldT], ABC):
+    # TODO: this class actually take any Task if it has config provider
+    task: CubicNSpherePlanningTask[CubicWorldT]
+    viewer: ViewerT
+    _show_called: bool
+
+    def __init__(self, task: CubicNSpherePlanningTask[CubicWorldT]):
+        viewer = self.viewer_type()()
+        task.world.visualize(viewer)
+
+        for desc in task.descriptions:
+            start, goal = desc
+            start_marker = Sphere(0.02, pos=start)
+            goal_marker = Sphere(0.02, pos=goal)
+            viewer.add(start_marker)
+            viewer.add(goal_marker)
+
+        self.task = task
+        self.viewer = viewer
+        self._show_called = False
+
+    def visualize_trajectory(self, trajectory: Trajectory, t_interval: float = 0.6) -> None:
+        lines = LineString(trajectory.numpy())
+        self.viewer.add(lines)
+
+    @classmethod
+    @abstractmethod
+    def viewer_type(cls) -> Type[ViewerT]:
+        ...
+
+
+class InteractiveTaskVisualizer(TaskVisualizerBase[TrimeshSceneViewer, CubicWorldT]):
+    def show(self) -> None:
+        self.viewer.show()
+        time.sleep(1.0)
+        self._show_called = True
+
+    @classmethod
+    def viewer_type(cls) -> Type[TrimeshSceneViewer]:
+        return TrimeshSceneViewer
+
+
+class StaticTaskVisualizer(TaskVisualizerBase[SceneWrapper, CubicWorldT]):
+    @classmethod
+    def viewer_type(cls) -> Type[SceneWrapper]:
+        return SceneWrapper
+
+    def save_image(self, path: Union[Path, str]) -> None:
+        if isinstance(path, str):
+            path = Path(path)
+        png = self.viewer.save_image(resolution=[640, 480], visible=True)
+        with path.open(mode="wb") as f:
+            f.write(png)
