@@ -10,7 +10,7 @@ from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skmp.trajectory import Trajectory
-from voxbloxpy.core import Grid, GridSDF
+from voxbloxpy.core import Grid
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
 
@@ -153,8 +153,8 @@ class RingNSpherePlanningTask(TaskBase[RingWorldT, Tuple[np.ndarray, ...], None]
         return probs
 
     @staticmethod
-    def create_gridsdf(world: RingWorldBase, robot_model: None) -> GridSDF:
-        raise NotImplementedError("girdsdf currently supports only 3d")  # TODO
+    def create_gridsdf(world: RingWorldBase, robot_model: None) -> None:
+        return None
 
 
 class RingObstacleFreePlanningTask(RingNSpherePlanningTask[RingObstacleFreeWorld]):

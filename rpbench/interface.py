@@ -257,7 +257,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @staticmethod
     @abstractmethod
-    def create_gridsdf(world: WorldT, robot_model: RobotModelT) -> GridSDFProtocol:
+    def create_gridsdf(world: WorldT, robot_model: RobotModelT) -> Optional[GridSDFProtocol]:
         """create gridsdf of the world given robot state
         The reason why this takes RobotModel as input is that, this method
         may involves vision-simulation using robot model (e.g. synthetic pcloud)
