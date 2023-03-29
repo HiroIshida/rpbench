@@ -2,6 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, List, Tuple, Type, TypeVar, Union
 
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Circle
@@ -15,6 +16,20 @@ from voxbloxpy.core import Grid
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
 
 RingWorldT = TypeVar("RingWorldT", bound="RingWorldBase")
+
+
+def square_sdf(points, size) -> np.ndarray:
+    """
+    Computes the signed distance function of a square centered at the origin with a given size.
+    """
+    half_size = size / 2.0
+    distances = np.abs(points) - half_size
+    sdf = np.zeros(points.shape[0])
+    inside_indices = np.where(np.logical_and(distances[:, 0] < 0, distances[:, 1] < 0))[0]
+    outside_indices = np.where(np.logical_or(distances[:, 0] > 0, distances[:, 1] > 0))[0]
+    sdf[inside_indices] = np.max(distances[inside_indices], axis=1)
+    sdf[outside_indices] = np.linalg.norm(np.maximum(distances[outside_indices], 0), axis=1)
+    return sdf
 
 
 @dataclass
@@ -38,6 +53,12 @@ class RingWorldBase(WorldBase):
             dists_to_outer = self.r_outer - radii
             dists_to_inner = radii - self.r_inner
             dists = np.minimum(dists_to_outer, dists_to_inner)
+
+            if self.with_block():
+                pts_translated = pts - np.array([1.0, 0.0])
+                dists_to_block = square_sdf(pts_translated, np.array([0.9, 0.9]))
+                dists = np.minimum(dists, dists_to_block)
+
             return dists
 
         def f(pts: np.ndarray):
@@ -57,6 +78,10 @@ class RingWorldBase(WorldBase):
     def get_grid(self) -> Grid:
         raise NotImplementedError("girdsdf currently supports only 3d")  # TODO
 
+    @classmethod
+    def with_block(cls) -> bool:
+        return False
+
     def visualize(self, fax) -> None:
         fig, ax = fax
 
@@ -64,6 +89,12 @@ class RingWorldBase(WorldBase):
         circle_inner = Circle((0.5, 0.5), self.r_inner, fill=False)
         ax.add_patch(circle_outer)
         ax.add_patch(circle_inner)
+
+        if self.with_block():
+            square = patches.Rectangle(
+                (0.55, -0.45), 0.9, 0.9, linewidth=1, edgecolor="k", facecolor="none"
+            )
+            ax.add_patch(square)
 
         for obs_pos in self.obstacles:
             circle_obs = Circle(obs_pos, self.r_obstacle, fill=True)
@@ -81,6 +112,16 @@ class RingObstacleFreeWorld(RingWorldBase):
     @classmethod
     def get_num_obstacle(cls) -> int:
         return 0
+
+
+class RingObstacleFreeBlockedWorld(RingWorldBase):
+    @classmethod
+    def get_num_obstacle(cls) -> int:
+        return 0
+
+    @classmethod
+    def with_block(cls) -> bool:
+        return True
 
 
 class RingNSpherePlanningTask(TaskBase[RingWorldT, Tuple[np.ndarray, ...], None]):
@@ -156,11 +197,20 @@ class RingNSpherePlanningTask(TaskBase[RingWorldT, Tuple[np.ndarray, ...], None]
     def create_gridsdf(world: RingWorldBase, robot_model: None) -> None:
         return None
 
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        return [self.world.export_intrinsic_description()] * self.n_inner_task
+
 
 class RingObstacleFreePlanningTask(RingNSpherePlanningTask[RingObstacleFreeWorld]):
     @staticmethod
     def get_world_type() -> Type[RingObstacleFreeWorld]:
         return RingObstacleFreeWorld
+
+
+class RingObstacleFreeBlockedPlanningTask(RingNSpherePlanningTask[RingObstacleFreeBlockedWorld]):
+    @staticmethod
+    def get_world_type() -> Type[RingObstacleFreeBlockedWorld]:
+        return RingObstacleFreeBlockedWorld
 
 
 class Taskvisualizer:
@@ -172,6 +222,8 @@ class Taskvisualizer:
         for start, goal in task.descriptions:
             ax.scatter(start[0], start[1], c="k")
             ax.scatter(goal[0], goal[1], c="r")
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
         self.fax = (fig, ax)
 
     def visualize_trajectories(self, trajs: Union[List[Trajectory], Trajectory]) -> None:
