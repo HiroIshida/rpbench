@@ -2,7 +2,7 @@ from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import LightningSolver, OMPLSolver, OMPLSolverConfig
 
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset, SkmpTaskSolver
-from rpbench.tabletop import TabletopBoxRightArmReachingTask
+from rpbench.pr2.tabletop import TabletopBoxRightArmReachingTask
 
 
 def test_task_sovler():

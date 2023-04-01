@@ -107,7 +107,7 @@ class MultipleRoomsWorldBase(WorldBase):
         pts = np.array([p for p in zip(*meshes_flatten)])
         sdf = self.get_exact_sdf()
         sdf_mesh = sdf(pts).reshape(200, 200)
-        if True:
+        if False:
             ax.contourf(xlin, ylin, sdf_mesh, cmap="summer")
         ax.contour(xlin, ylin, sdf_mesh, cmap="gray", levels=[0.0])
         return fig, ax

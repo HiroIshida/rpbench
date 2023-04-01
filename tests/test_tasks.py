@@ -8,7 +8,7 @@ from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.maze import MazeSolvingTask
-from rpbench.tabletop import (
+from rpbench.pr2.tabletop import (
     TabletopBoxDualArmReachingTask,
     TabletopBoxDualArmReachingTaskBase,
     TabletopBoxRightArmReachingTask,

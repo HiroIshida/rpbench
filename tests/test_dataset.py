@@ -4,7 +4,7 @@ from pathlib import Path
 from skmp.solver.ompl_solver import LightningSolver, OMPLSolverConfig
 
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset
-from rpbench.tabletop import TabletopBoxRightArmReachingTask
+from rpbench.pr2.tabletop import TabletopBoxRightArmReachingTask
 
 
 def test_dataset():

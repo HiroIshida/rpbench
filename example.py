@@ -3,9 +3,8 @@ from ompl import Algorithm, set_ompl_random_seed
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.tabletop import (
-    InteractiveTaskVisualizer,
-    StaticTaskVisualizer,
+from rpbench.pr2.common import InteractiveTaskVisualizer, StaticTaskVisualizer
+from rpbench.pr2.tabletop import (
     TabletopBoxDualArmReachingTask,
     TabletopBoxRightArmReachingTask,
     TabletopBoxTaskBase,
@@ -14,7 +13,7 @@ from rpbench.tabletop import (
 set_ompl_random_seed(1)
 np.random.seed(2)
 
-dual = True
+dual = False
 
 task: TabletopBoxTaskBase
 if dual:
@@ -37,7 +36,7 @@ nlp_solver = SQPBasedSolver.init(nlp_solcon)
 nlp_solver.setup(problem)
 nlp_result = nlp_solver.solve(ompl_result.traj.resample(n_wp))
 # nlp_result = nlp_solver.solve()
-assert nlp_result.traj is not None
+# assert nlp_result.traj is not None
 print(nlp_result.time_elapsed)
 
 static_vis = StaticTaskVisualizer(task)
@@ -45,4 +44,4 @@ static_vis.save_image("task.png")
 
 dynamic_vis = InteractiveTaskVisualizer(task)
 dynamic_vis.show()
-dynamic_vis.visualize_trajectory(nlp_result.traj.resample(30))
+dynamic_vis.visualize_trajectory(ompl_result.traj.resample(30))
