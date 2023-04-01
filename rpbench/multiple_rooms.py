@@ -98,7 +98,7 @@ class MultipleRoomsWorldBase(WorldBase):
 
         return f
 
-    def visualize(self, fax) -> None:
+    def visualize(self, fax) -> Tuple:
         fig, ax = fax
 
         xlin, ylin = [np.linspace(-1.1, +1.1, 200) for i in range(2)]
@@ -148,7 +148,7 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
         return descriptions  # type: ignore
 
     def export_table(self) -> DescriptionTable:
-        wd = {}
+        wd = {}  # type: ignore[var-annotated]
         wcd_list = []
         for desc in self.descriptions:
             wcd = {}
@@ -188,7 +188,7 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
         return probs
 
     @staticmethod
-    def create_gridsdf(world: EightRoomsWorld, robot_model: None) -> None:
+    def create_gridsdf(world: EightRoomsWorld, robot_model: None) -> None:  # type: ignore[override]
         return None
 
 
