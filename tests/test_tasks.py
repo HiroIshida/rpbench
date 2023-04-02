@@ -140,6 +140,15 @@ def test_kivapot_planning_task():
     res = task.solve_default()[0]
     assert res.traj is not None
 
+    # check pickle-depickle
+    dumped = pickle.dumps(task)
+    byte_size = len(dumped)
+    assert byte_size < 8 * 10**6
+
+    task_again: KivapodEmptyReachingTask = pickle.loads(dumped)
+    res = task_again.solve_default()[0]
+    assert res.traj is not None
+
 
 def test_maze_solving_task():
     n_inner = 10
@@ -165,4 +174,5 @@ def test_maze_solving_task():
 
 if __name__ == "__main__":
     # test_tabletop_task()
-    test_maze_solving_task()
+    # test_maze_solving_task()
+    test_kivapot_planning_task()

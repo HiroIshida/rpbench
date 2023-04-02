@@ -31,7 +31,7 @@ class KivapodWorldBase(WorldBase):
     obstacles: List[Primitive]
 
     @classmethod
-    def sample(cls: Type[KivapodWorldT], standard: bool = False) -> KivapodWorldT:
+    def _create_kivapod_mesh_if_necessary(cls) -> None:
         global _kivapod_mesh
         if _kivapod_mesh is None:
             current_script_path = Path(__file__).resolve().parent
@@ -43,6 +43,12 @@ class KivapodWorldBase(WorldBase):
                 with_sdf=True,
             )
             _kivapod_mesh.visual_mesh.visual.face_colors = [255, 255, 255, 200]
+
+    @classmethod
+    def sample(cls: Type[KivapodWorldT], standard: bool = False) -> KivapodWorldT:
+        cls._create_kivapod_mesh_if_necessary()
+        global _kivapod_mesh
+        assert _kivapod_mesh is not None
         kivapod = MeshLink(visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True)
         kivapod.rotate(np.pi * 0.5, "x")
         kivapod.rotate(-np.pi * 0.5, "z", wrt="world")
@@ -76,6 +82,25 @@ class KivapodWorldBase(WorldBase):
         viewer.add(kivapod_axis)
         viewer.add(self.target_region)
         viewer.add(self.kivapod_mesh)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+
+        # remove kivapod mesh from the state because it's too heavy
+        state["kivapod_mesh_co"] = state[
+            "kivapod_mesh"
+        ].copy_worldcoords()  # use again in __setstate__
+        state["kivapod_mesh"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+        self._create_kivapod_mesh_if_necessary()
+        global _kivapod_mesh
+        assert _kivapod_mesh is not None
+        self.kivapod_mesh = MeshLink(visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True)
+        self.kivapod_mesh.newcoords(state["kivapod_mesh_co"])
 
 
 class KivapodEmptyWorld(KivapodWorldBase):
