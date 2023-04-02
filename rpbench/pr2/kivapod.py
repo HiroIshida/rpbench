@@ -97,9 +97,9 @@ class KivapodReachingTaskBase(TaskBase[KivapodWorldT, Tuple[Coordinates, ...], R
         return cls.config_provider.get_dof()
 
     def export_table(self) -> DescriptionTable:
-        assert self._gridsdf is not None
         world_dict = {}
         if len(self.world.obstacles) > 0:
+            assert self._gridsdf is not None
             world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
 
         world_dict["kivapod_pose"] = skcoords_to_pose_vec(

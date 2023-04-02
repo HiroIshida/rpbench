@@ -8,6 +8,7 @@ from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.maze import MazeSolvingTask
+from rpbench.pr2.kivapod import KivapodEmptyReachingTask
 from rpbench.pr2.tabletop import (
     TabletopBoxDualArmReachingTask,
     TabletopBoxDualArmReachingTaskBase,
@@ -124,6 +125,20 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     task = task_type.sample(1, standard=True)
     result = task.solve_default()[0]
     assert result.traj is not None
+
+
+def test_kivapot_planning_task():
+    task = KivapodEmptyReachingTask.sample(10, False)
+    desc_table = task.export_table()
+    assert desc_table.get_mesh() is None
+
+    dic = desc_table.wcond_desc_dicts[0]
+    assert dic["target_pose-0"].shape == (6,)
+
+    # check if standard task can be solved
+    task = KivapodEmptyReachingTask.sample(1, True)
+    res = task.solve_default()[0]
+    assert res.traj is not None
 
 
 def test_maze_solving_task():
