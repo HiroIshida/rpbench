@@ -1,3 +1,4 @@
+import copy
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,14 +7,16 @@ from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 import numpy as np
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
+from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.model import RobotModel
-from skrobot.model.primitives import Axis, Box, Coordinates, MeshLink, Sphere
+from skrobot.model.primitives import Axis, Box, Sphere
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
 
 from rpbench.interface import DescriptionTable, TaskBase, WorldBase
 from rpbench.pr2.common import CachedPR2ConstProvider, CachedRArmPR2ConstProvider
+from rpbench.pr2.utils import MeshLink
 from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 
 KivapodWorldT = TypeVar("KivapodWorldT", bound="KivapodWorldBase")
@@ -49,7 +52,9 @@ class KivapodWorldBase(WorldBase):
         cls._create_kivapod_mesh_if_necessary()
         global _kivapod_mesh
         assert _kivapod_mesh is not None
-        kivapod = MeshLink(visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True)
+        sdf = copy.copy(_kivapod_mesh.sdf)
+        sdf.coords = CascadedCoords()
+        kivapod = MeshLink(visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True, forced_sdf=sdf)
         kivapod.rotate(np.pi * 0.5, "x")
         kivapod.rotate(-np.pi * 0.5, "z", wrt="world")
         kivapod.translate([1.0, 0.0, 0.0], wrt="world")
@@ -99,7 +104,11 @@ class KivapodWorldBase(WorldBase):
         self._create_kivapod_mesh_if_necessary()
         global _kivapod_mesh
         assert _kivapod_mesh is not None
-        self.kivapod_mesh = MeshLink(visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True)
+        sdf = copy.copy(_kivapod_mesh.sdf)
+        sdf.coords = CascadedCoords()
+        self.kivapod_mesh = MeshLink(
+            visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True, forced_sdf=sdf
+        )
         self.kivapod_mesh.newcoords(state["kivapod_mesh_co"])
 
 
@@ -179,7 +188,7 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
             co = world.target_region.copy_worldcoords()
             co.rotate(-np.pi * 0.5, "x")
             co.rotate(+np.pi * 0.5, "z")
-            co.translate([0.0, 0.0, 0.12], wrt="local")
+            co.translate([-0.1, 0.0, 0.12], wrt="local")
             return (co,)
 
         sdf = world.get_exact_sdf()
@@ -224,10 +233,11 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
         n_planning_budget = 10
         for _ in range(n_planning_budget):
-            solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=50, simplify=True)
+            solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100, simplify=True)
             ompl_solver = OMPLSolver.init(solcon)
             ompl_solver.setup(problem)
             ompl_ret = ompl_solver.solve()
+            print(ompl_ret)
             if ompl_ret.traj is not None:
                 return ompl_ret
         return ompl_ret

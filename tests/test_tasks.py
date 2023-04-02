@@ -146,6 +146,10 @@ def test_kivapot_planning_task():
     assert byte_size < 8 * 10**6
 
     task_again: KivapodEmptyReachingTask = pickle.loads(dumped)
+
+    # check that sdf object is not copied through pickle-depickle
+    assert task_again.world.kivapod_mesh.sdf.itp is task.world.kivapod_mesh.sdf.itp
+
     res = task_again.solve_default()[0]
     assert res.traj is not None
 
