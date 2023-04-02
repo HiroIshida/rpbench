@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
@@ -33,8 +34,10 @@ class KivapodWorldBase(WorldBase):
     def sample(cls: Type[KivapodWorldT], standard: bool = False) -> KivapodWorldT:
         global _kivapod_mesh
         if _kivapod_mesh is None:
+            current_script_path = Path(__file__).resolve().parent
+            stl_file_path = str(current_script_path / "pod_lowres.stl")
             _kivapod_mesh = MeshLink(
-                "/home/h-ishida/Downloads/kiva_pod/meshes/pod_lowres.stl",
+                stl_file_path,
                 dim_grid=300,
                 padding_grid=10,
                 with_sdf=True,
