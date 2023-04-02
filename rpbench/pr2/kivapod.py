@@ -4,15 +4,16 @@ from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from skmp.solver.interface import Problem, ResultProtocol
+from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skrobot.model import RobotModel
 from skrobot.model.primitives import Axis, Box, Coordinates, MeshLink, Sphere
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
-from voxbloxpy.core import Grid, GridSDF
+from voxbloxpy.core import Grid
 
 from rpbench.interface import DescriptionTable, TaskBase, WorldBase
 from rpbench.pr2.common import CachedPR2ConstProvider, CachedRArmPR2ConstProvider
-from rpbench.utils import SceneWrapper
+from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 
 KivapodWorldT = TypeVar("KivapodWorldT", bound="KivapodWorldBase")
 
@@ -39,14 +40,14 @@ class KivapodWorldBase(WorldBase):
                 with_sdf=True,
             )
             _kivapod_mesh.visual_mesh.visual.face_colors = [255, 255, 255, 200]
-        kivapod = _kivapod_mesh
+        kivapod = MeshLink(visual_mesh=_kivapod_mesh.visual_mesh, with_sdf=True)
         kivapod.rotate(np.pi * 0.5, "x")
         kivapod.rotate(-np.pi * 0.5, "z", wrt="world")
         kivapod.translate([1.0, 0.0, 0.0], wrt="world")
 
-        target_region = Box([0.8, 0.72, 0.4])
+        target_region = Box([0.8, 0.52, 0.3])
         target_region.newcoords(kivapod.copy_worldcoords())
-        target_region.translate([-0.2, 0, 1.45], wrt="world")
+        target_region.translate([-0.25, 0, 1.05], wrt="world")
         target_region.visual_mesh.visual.face_colors = [255, 0, 255, 30]
 
         return cls(kivapod, target_region, [])
@@ -63,7 +64,7 @@ class KivapodWorldBase(WorldBase):
         return UnionSDF(lst)
 
     def get_grid(self) -> Grid:
-        ...
+        raise NotImplementedError("girdsdf is not used")
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         # add origin
@@ -93,7 +94,24 @@ class KivapodReachingTaskBase(TaskBase[KivapodWorldT, Tuple[Coordinates, ...], R
         return cls.config_provider.get_dof()
 
     def export_table(self) -> DescriptionTable:
-        ...
+        assert self._gridsdf is not None
+        world_dict = {}
+        if len(self.world.obstacles) > 0:
+            world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+
+        world_dict["kivapod_pose"] = skcoords_to_pose_vec(
+            self.world.kivapod_mesh.copy_worldcoords()
+        )
+
+        desc_dicts = []
+        for desc in self.descriptions:
+            desc_dict = {}
+            for idx, co in enumerate(desc):
+                pose = skcoords_to_pose_vec(co)
+                name = "target_pose-{}".format(idx)
+                desc_dict[name] = pose
+            desc_dicts.append(desc_dict)
+        return DescriptionTable(world_dict, desc_dicts)
 
     @classmethod
     def sample_descriptions(
@@ -128,11 +146,18 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
 
     @classmethod
     def sample_target_poses(cls, world: KivapodEmptyWorld, standard: bool) -> Tuple[Coordinates]:
+        ext = np.array(world.target_region._extents)
+        if standard:
+            co = world.target_region.copy_worldcoords()
+            co.rotate(-np.pi * 0.5, "x")
+            co.rotate(+np.pi * 0.5, "z")
+            co.translate([0.0, 0.0, 0.03], wrt="local")
+            return (co,)
+
         sdf = world.get_exact_sdf()
 
         n_max_trial = 100
         for _ in range(n_max_trial):
-            ext = np.array(world.target_region._extents)
             p_local = -0.5 * ext + np.random.rand(3) * ext
             co = world.target_region.copy_worldcoords()
             co.translate(p_local)
@@ -145,11 +170,36 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
         assert False
 
     @staticmethod
-    def create_gridsdf(world: KivapodEmptyWorld, robot_model: RobotModel) -> GridSDF:
-        ...
+    def create_gridsdf(world: KivapodEmptyWorld, robot_model: RobotModel) -> None:
+        return None
 
     def export_problems(self) -> List[Problem]:
-        ...
+        provider = self.config_provider
+        q_start = provider.get_start_config()
+        box_const = provider.get_box_const()
+
+        if len(self.world.obstacles) > 0:
+            assert self._gridsdf is not None
+            sdf = create_union_sdf([self._gridsdf, self.world.kivapod_mesh.sdf])
+        else:
+            sdf = self.world.kivapod_mesh.sdf
+
+        ineq_const = provider.get_collfree_const(sdf)
+
+        problems = []
+        for desc in self.descriptions:
+            pose_const = provider.get_pose_const(list(desc))
+            problem = Problem(q_start, box_const, pose_const, ineq_const, None)
+            problems.append(problem)
+        return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ...
+        n_planning_budget = 1
+        for _ in range(n_planning_budget):
+            solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100, simplify=True)
+            ompl_solver = OMPLSolver.init(solcon)
+            ompl_solver.setup(problem)
+            ompl_ret = ompl_solver.solve()
+            if ompl_ret.traj is not None:
+                return ompl_ret
+        return ompl_ret

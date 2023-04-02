@@ -109,6 +109,17 @@ class CachedPR2ConstProvider(ABC):
         return dof
 
 
+class CachedRArmFixedPR2ConstProvider(CachedPR2ConstProvider):
+    @classmethod
+    def get_config(cls) -> PR2Config:
+        return PR2Config(with_base=False)
+
+    @classmethod
+    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
+        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
+        return colfree
+
+
 class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
