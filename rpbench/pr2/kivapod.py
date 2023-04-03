@@ -231,7 +231,7 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
         return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        n_planning_budget = 10
+        n_planning_budget = 30
         for _ in range(n_planning_budget):
             solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100, simplify=True)
             ompl_solver = OMPLSolver.init(solcon)
