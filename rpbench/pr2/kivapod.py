@@ -187,7 +187,7 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
             co = world.target_region.copy_worldcoords()
             co.rotate(-np.pi * 0.5, "x")
             co.rotate(+np.pi * 0.5, "z")
-            co.translate([-0.1, 0.0, 0.12], wrt="local")
+            co.translate([0.0, 0.0, 0.12], wrt="local")
             return (co,)
 
         sdf = world.get_exact_sdf()
@@ -230,7 +230,7 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
         return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        n_planning_budget = 30
+        n_planning_budget = 10
         for _ in range(n_planning_budget):
             solcon = OMPLSolverConfig(n_max_call=20000, n_max_satisfaction_trial=100, simplify=True)
             ompl_solver = OMPLSolver.init(solcon)
