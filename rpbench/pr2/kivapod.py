@@ -10,6 +10,7 @@ from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.model import RobotModel
 from skrobot.model.primitives import Axis, Box, Sphere
+from skrobot.sdf import GridSDF as SkrobotGridSDF
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
@@ -39,12 +40,10 @@ class KivapodWorldBase(WorldBase):
         if _kivapod_mesh is None:
             current_script_path = Path(__file__).resolve().parent
             stl_file_path = str(current_script_path / "pod_lowres.stl")
-            _kivapod_mesh = MeshLink(
-                stl_file_path,
-                dim_grid=300,
-                padding_grid=10,
-                with_sdf=True,
+            sdf = SkrobotGridSDF.from_objfile(
+                stl_file_path, dim_grid=300, padding_grid=10, fill_value=2.0
             )
+            _kivapod_mesh = MeshLink(stl_file_path, with_sdf=True, forced_sdf=sdf)
             _kivapod_mesh.visual_mesh.visual.face_colors = [255, 255, 255, 200]
 
     @classmethod
