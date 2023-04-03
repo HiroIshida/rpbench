@@ -27,9 +27,15 @@ jobs:
               uses: actions/setup-python@v1
               with:
                 python-version: ${{ matrix.python-version }}
-            - name: install this skmp
+            - name: install newest skrobot
               run: |
                   sudo apt-get install libspatialindex-dev freeglut3-dev libsuitesparse-dev libblas-dev liblapack-dev
+                  cd /tmp
+                  git clone git@github.com:iory/scikit-robot.git
+                  cd scikit-robot
+                  pip3 install -e .
+            - name: install skmp
+              run: |
                   sudo apt-get update && sudo apt install libunwind-dev && sudo apt-get install libgoogle-glog-dev
                   git clone git@github.com:HiroIshida/scikit-motionplan.git && cd scikit-motionplan && pip3 install . && rm -rf *
 
