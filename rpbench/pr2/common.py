@@ -33,6 +33,7 @@ from skrobot.coordinates import Coordinates
 from skrobot.model.primitives import Axis
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import TrimeshSceneViewer
+from tinyfk import BaseType
 
 from rpbench.utils import SceneWrapper
 
@@ -68,7 +69,7 @@ class CachedPR2ConstProvider(ABC):
     def get_start_config(cls) -> np.ndarray:
         config = cls.get_config()
         pr2 = cls.get_pr2()
-        angles = get_robot_state(pr2, config._get_control_joint_names(), config.with_base)
+        angles = get_robot_state(pr2, config._get_control_joint_names(), base_type=config.base_type)
         return angles
 
     @classmethod
@@ -104,15 +105,19 @@ class CachedPR2ConstProvider(ABC):
         config = cls.get_config()
         names = config._get_control_joint_names()
         dof = len(names)
-        if config.with_base:
+        if config.base_type == BaseType.PLANER:
             dof += 3
+        elif config.base_type == BaseType.FLOATING:
+            dof += 6
+        else:
+            assert False
         return dof
 
 
 class CachedRArmFixedPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
-        return PR2Config(with_base=False)
+        return PR2Config(base_type=BaseType.FIXED)
 
     @classmethod
     def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
@@ -123,7 +128,7 @@ class CachedRArmFixedPR2ConstProvider(CachedPR2ConstProvider):
 class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
-        return PR2Config(with_base=True)
+        return PR2Config(base_type=BaseType.PLANER)
 
     @classmethod
     def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
@@ -134,7 +139,7 @@ class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
 class CachedDualArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
-        return PR2Config(with_base=True, control_arm="dual")
+        return PR2Config(base_type=BaseType.PLANER, control_arm="dual")
 
     @classmethod
     def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> IneqCompositeConst:
@@ -205,7 +210,7 @@ class InteractiveTaskVisualizer(TaskVisualizerBase[TrimeshSceneViewer]):
         config = robot_config_provider.get_config()
 
         for q in trajectory:
-            set_robot_state(robot_model, config._get_control_joint_names(), q, config.with_base)
+            set_robot_state(robot_model, config._get_control_joint_names(), q, config.base_type)
             self.viewer.redraw()
             time.sleep(t_interval)
 
