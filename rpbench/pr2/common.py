@@ -1,3 +1,4 @@
+import copy
 import time
 from abc import ABC, abstractmethod
 from functools import lru_cache
@@ -30,6 +31,7 @@ from skmp.robot.pr2 import PR2Config
 from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
+from skrobot.model import RobotModel
 from skrobot.model.primitives import Axis
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import TrimeshSceneViewer
@@ -171,6 +173,7 @@ class TaskVisualizerBase(Generic[ViewerT], ABC):
     # TODO: this class actually take any Task if it has config provider
     task: VisualizableTask
     viewer: ViewerT
+    robot_model: RobotModel
     _show_called: bool
 
     def __init__(self, task: VisualizableTask):
@@ -188,7 +191,13 @@ class TaskVisualizerBase(Generic[ViewerT], ABC):
 
         self.task = task
         self.viewer = viewer
+        self.robot_model = robot_model
         self._show_called = False
+
+    def update_robot_state(self, q: np.ndarray) -> None:
+        robot_config_provider = self.task.config_provider()
+        config = robot_config_provider.get_config()
+        set_robot_state(self.robot_model, config._get_control_joint_names(), q, config.base_type)
 
     @classmethod
     @abstractmethod
@@ -205,11 +214,14 @@ class InteractiveTaskVisualizer(TaskVisualizerBase[TrimeshSceneViewer]):
     def visualize_trajectory(self, trajectory: Trajectory, t_interval: float = 0.6) -> None:
         assert self._show_called
         robot_config_provider = self.task.config_provider()
-        robot_model = robot_config_provider.get_pr2()
 
+        q_end = trajectory.numpy()[-1]
+        self.update_robot_state(q_end)
+
+        robot_model = robot_config_provider.get_pr2()
         config = robot_config_provider.get_config()
 
-        for q in trajectory:
+        for q in trajectory.numpy()[:-1]:
             set_robot_state(robot_model, config._get_control_joint_names(), q, config.base_type)
             self.viewer.redraw()
             time.sleep(t_interval)
@@ -235,3 +247,45 @@ class StaticTaskVisualizer(TaskVisualizerBase[SceneWrapper]):
         png = self.viewer.save_image(resolution=[640, 480], visible=True)
         with path.open(mode="wb") as f:
             f.write(png)
+
+    def save_trajectory_image(self, trajectory: Trajectory, path: Union[Path, str]) -> None:
+        # self.set_robot_alpha(self.robot_model, 30)
+
+        robot_config_provider = self.task.config_provider()
+        robot_model = robot_config_provider.get_pr2()
+
+        config = robot_config_provider.get_config()
+
+        for q in trajectory.numpy():
+            robot_model_copied = copy.deepcopy(robot_model)
+            set_robot_state(
+                robot_model_copied, config._get_control_joint_names(), q, config.base_type
+            )
+            self.set_robot_alpha(robot_model_copied, 30)
+            self.viewer.add(robot_model_copied)
+
+        robot_model_copied = copy.deepcopy(robot_model)
+        set_robot_state(
+            robot_model_copied,
+            config._get_control_joint_names(),
+            trajectory.numpy()[-1],
+            config.base_type,
+        )
+        self.viewer.add(robot_model_copied)
+
+        if isinstance(path, str):
+            path = Path(path)
+        png = self.viewer.save_image(resolution=[640, 480], visible=True)
+        with path.open(mode="wb") as f:
+            f.write(png)
+
+    @staticmethod
+    def set_robot_alpha(robot: RobotModel, alpha: int):
+        assert alpha < 256
+        for link in robot.link_list:
+            visual_mesh = link.visual_mesh
+            if isinstance(visual_mesh, list):
+                for mesh in visual_mesh:
+                    mesh.visual.face_colors[:, 3] = alpha
+            else:
+                visual_mesh.visual.face_colors[:, 3] = alpha
