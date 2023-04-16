@@ -98,7 +98,7 @@ class LadderWorld:
         for step in self.steps:
             viewer.add(step)
 
-    def initial_jaxon_axes(self) -> List[Axis]:
+    def first_axes(self) -> List[Axis]:
         step = self.steps[0]
         depth, _, height = step._extents
 
@@ -124,3 +124,47 @@ class LadderWorld:
         larm_pose.rotate(-np.pi * 0.3, "y", wrt="local")
         ax4 = Axis.from_coords(larm_pose)
         return [ax1, ax2, ax3, ax4]
+
+    def post_first_axes(self) -> List[Axis]:
+        ax_rleg, ax_lleg, ax_rarm, ax_larm = self.first_axes()
+        pose_rleg = ax_rleg.copy_worldcoords()
+        pose_rleg.translate([0, 0, 0.05])
+        return [Axis.from_coords(pose_rleg), ax_lleg, ax_rarm, ax_larm]
+
+    def second_axes(self) -> List[Axis]:
+        desired_trans = self.desired_translation_by_step()
+        ax_rleg, ax_lleg, ax_rarm, ax_larm = self.first_axes()
+        pose_rleg = ax_rleg.copy_worldcoords()
+        pose_rleg.translate(desired_trans)
+        return [Axis.from_coords(pose_rleg), ax_lleg, ax_rarm, ax_larm]
+
+    def pre_second_axes(self) -> List[Axis]:
+        ax_rleg, ax_lleg, ax_rarm, ax_larm = self.second_axes()
+        pose_rleg = ax_rleg.copy_worldcoords()
+        pose_rleg.translate([0, 0, 0.05])
+        return [Axis.from_coords(pose_rleg), ax_lleg, ax_rarm, ax_larm]
+
+    def post_second_axes(self) -> List[Axis]:
+        ax_rleg, ax_lleg, ax_rarm, ax_larm = self.second_axes()
+        pose_lleg = ax_lleg.copy_worldcoords()
+        pose_lleg.translate([0, 0, 0.05])
+        return [ax_rleg, Axis.from_coords(pose_lleg), ax_rarm, ax_larm]
+
+    def third_axes(self) -> List[Axis]:
+        ax_rleg, ax_lleg, ax_rarm, ax_larm = self.second_axes()
+        pose_lleg = ax_lleg.copy_worldcoords()
+        desired_trans = self.desired_translation_by_step()
+        pose_lleg.translate(desired_trans)
+        return [ax_rleg, Axis.from_coords(pose_lleg), ax_rarm, ax_larm]
+
+    def pre_third_axes(self) -> List[Axis]:
+        ax_rleg, ax_lleg, ax_rarm, ax_larm = self.third_axes()
+        pose_lleg = ax_lleg.copy_worldcoords()
+        pose_lleg.translate([0, 0, 0.05])
+        return [ax_rleg, Axis.from_coords(pose_lleg), ax_rarm, ax_larm]
+
+    def desired_translation_by_step(self) -> np.ndarray:
+        step0 = self.steps[0]
+        step1 = self.steps[1]
+        diff = step1.worldpos() - step0.worldpos()
+        return diff

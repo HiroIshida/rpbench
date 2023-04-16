@@ -12,7 +12,7 @@ from rpbench.jaxon.ladder import LadderWorld
 
 if __name__ == "__main__":
     world = LadderWorld.sample(standard=True)
-    axes = world.initial_jaxon_axes()
+    axes = world.third_axes()
 
     with mesh_simplify_factor(0.2):
         jaxon = Jaxon()
