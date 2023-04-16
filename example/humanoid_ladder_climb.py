@@ -1,20 +1,21 @@
 import pickle
 import time
 
-import numpy as np
 from skmp.constraint import ConfigPointConst
 from skmp.robot.jaxon import Jaxon, JaxonConfig
 from skmp.robot.utils import set_robot_state
 from skmp.satisfy import satisfy_by_optimization_with_budget
 from skmp.solver.interface import Problem
 from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
+from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
+from skmp.visualization import CollisionSphereVisualizationManager
 from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
 from rpbench.jaxon.ladder import ConstraintSequence, LadderWorld
 
-np.random.seed(0)
+# np.random.seed(0)
 
 if __name__ == "__main__":
     world = LadderWorld.sample(standard=True)
@@ -25,14 +26,19 @@ if __name__ == "__main__":
 
     modes = ["first", "post_first", "pre_second", "second", "post_second", "pre_third", "third"]
 
-    use_cache: bool = True
+    use_cache: bool = False
 
     if not use_cache:
         q_pre = None
         qs = {}
         for mode in modes:
             eq_const, ineq_const = cons_seq.get_constraint(jaxon, "satisfy", mode)  # type: ignore
-            bounds = jaxon_config.get_close_box_const(q_pre, base_pos_margin=0.5)
+            if mode in ["post_first", "second", "post_second", "third"]:
+                bounds = jaxon_config.get_close_box_const(
+                    q_pre, joint_margin=0.1, base_pos_margin=0.1, base_rot_margin=0.1
+                )
+            else:
+                bounds = jaxon_config.get_close_box_const(q_pre, base_pos_margin=0.5)
             print("start solving {}".format(mode))
             result = satisfy_by_optimization_with_budget(
                 eq_const, bounds, ineq_const, q_pre, n_trial_budget=300
@@ -67,26 +73,47 @@ if __name__ == "__main__":
         solver = MyRRTConnectSolver.init(conf)
         solver.setup(problem)
         res = solver.solve()
+        print(res.time_elapsed)
         assert res.traj is not None
+
+        print("start smoothing")
+        smoother = SQPBasedSolver.init(
+            SQPBasedSolverConfig(
+                40,
+                motion_step_satisfaction="debug_ignore",
+                ineq_tighten_coef=0.0,
+                verbose=True,
+                ctol_eq=1e-3,
+            )
+        )
+        smoother.setup(problem)
+        res = smoother.solve(res.traj)
+        assert res.traj is not None
+        print("time to smooth: {}".format(res.time_elapsed))
+
         trajs.append(res.traj)
 
     q_whole = []
     q_whole.append(qs["first"])
     q_whole.append(qs["post_first"])
-    q_whole.extend(list(trajs[0].numpy()))
+    q_whole.extend(list(trajs[0].resample(12).numpy()))
     q_whole.append(qs["second"])
-    q_whole.extend(list(trajs[1].numpy()))
+    q_whole.extend(list(trajs[1].resample(12).numpy()))
     q_whole.append(qs["third"])
 
     vis = TrimeshSceneViewer()
     vis.add(jaxon)
+    colkin = jaxon_config.get_collision_kin()
+    colvis = CollisionSphereVisualizationManager(colkin, vis)
     world.visualize(vis)
     vis.show()
 
-    time.sleep(5)
+    time.sleep(10)
     for q in q_whole:
         set_robot_state(
             jaxon, jaxon_config._get_control_joint_names(), q, base_type=BaseType.FLOATING
         )
+        colvis.update(jaxon)
         vis.redraw()
         time.sleep(0.5)
+    time.sleep(10)
