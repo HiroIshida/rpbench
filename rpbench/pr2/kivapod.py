@@ -44,7 +44,7 @@ class KivapodWorldBase(WorldBase):
                 stl_file_path, dim_grid=300, padding_grid=10, fill_value=2.0
             )
             _kivapod_mesh = MeshLink(stl_file_path, with_sdf=True, forced_sdf=sdf)
-            _kivapod_mesh.visual_mesh.visual.face_colors = [255, 255, 255, 200]
+            _kivapod_mesh.visual_mesh.visual.face_colors = [255, 255, 255, 120]
 
     @classmethod
     def sample(cls: Type[KivapodWorldT], standard: bool = False) -> KivapodWorldT:
@@ -61,7 +61,7 @@ class KivapodWorldBase(WorldBase):
         target_region = Box([0.8, 0.52, 0.3])
         target_region.newcoords(kivapod.copy_worldcoords())
         target_region.translate([-0.25, 0, 1.05], wrt="world")
-        target_region.visual_mesh.visual.face_colors = [255, 0, 255, 30]
+        target_region.visual_mesh.visual.face_colors = [255, 0, 255, 10]
 
         return cls(kivapod, target_region, [])
 
@@ -82,9 +82,10 @@ class KivapodWorldBase(WorldBase):
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         # add origin
         viewer.add(Axis())
-        kivapod_axis = Axis.from_coords(self.kivapod_mesh.copy_worldcoords())
-        viewer.add(kivapod_axis)
-        viewer.add(self.target_region)
+        Axis.from_coords(self.kivapod_mesh.copy_worldcoords())
+        # just for debug
+        # viewer.add(kivapod_axis)
+        # viewer.add(self.target_region)
         viewer.add(self.kivapod_mesh)
 
     def __getstate__(self):
