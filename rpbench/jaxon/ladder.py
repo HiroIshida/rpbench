@@ -140,10 +140,12 @@ class ConstraintSequence:
                     efkin = jaxon_config.get_endeffector_kin(
                         rleg=False, lleg=True, rarm=True, larm=True
                     )
+                    axes = axes[1:]
                 elif phase == "pre_third":
                     efkin = jaxon_config.get_endeffector_kin(
                         rleg=True, lleg=False, rarm=True, larm=True
                     )
+                    axes = [axes[0], axes[2], axes[3]]
                 else:
                     assert False
             pose_const = PoseConstraint.from_skrobot_coords(axes, efkin, jaxon)

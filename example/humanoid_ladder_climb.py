@@ -1,13 +1,20 @@
+import pickle
 import time
 
+import numpy as np
+from skmp.constraint import ConfigPointConst
 from skmp.robot.jaxon import Jaxon, JaxonConfig
 from skmp.robot.utils import set_robot_state
 from skmp.satisfy import satisfy_by_optimization_with_budget
+from skmp.solver.interface import Problem
+from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
 from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
 from rpbench.jaxon.ladder import ConstraintSequence, LadderWorld
+
+np.random.seed(0)
 
 if __name__ == "__main__":
     world = LadderWorld.sample(standard=True)
@@ -16,31 +23,70 @@ if __name__ == "__main__":
     jaxon_config = JaxonConfig()
     cons_seq = ConstraintSequence(world)
 
-    q_pre = None
-    for mode in [
-        "first",
-        "post_first",
-        "pre_second",
-        "second",
-        "pre_third",
-        "third",
-    ]:
-        eq_const, ineq_const = cons_seq.get_constraint(jaxon, "satisfy", mode)  # type: ignore
-        bounds = jaxon_config.get_close_box_const(q_pre)
-        print("start solving")
-        result = satisfy_by_optimization_with_budget(
-            eq_const, bounds, ineq_const, q_pre, n_trial_budget=300
-        )
-        print(result)
-        q_pre = result.q
-        assert result.success
+    modes = ["first", "post_first", "pre_second", "second", "post_second", "pre_third", "third"]
 
-    set_robot_state(
-        jaxon, jaxon_config._get_control_joint_names(), result.q, base_type=BaseType.FLOATING
-    )
+    use_cache: bool = True
+
+    if not use_cache:
+        q_pre = None
+        qs = {}
+        for mode in modes:
+            eq_const, ineq_const = cons_seq.get_constraint(jaxon, "satisfy", mode)  # type: ignore
+            bounds = jaxon_config.get_close_box_const(q_pre, base_pos_margin=0.5)
+            print("start solving {}".format(mode))
+            result = satisfy_by_optimization_with_budget(
+                eq_const, bounds, ineq_const, q_pre, n_trial_budget=300
+            )
+            q_pre = result.q
+            assert result.success
+            qs[mode] = result.q
+
+        with open("/tmp/tmp.pkl", "wb") as f:
+            pickle.dump(qs, f)
+
+    with open("/tmp/tmp.pkl", "rb") as f:
+        qs = pickle.load(f)
+
+    tup1 = (qs["post_first"], qs["pre_second"], "pre_second")
+    tup2 = (qs["post_second"], qs["pre_third"], "pre_third")
+    trajs = []
+    for q_start, q_goal, mode in [tup1, tup2]:
+        eq_const, ineq_const = cons_seq.get_constraint(jaxon, "motion_planning", mode)  # type: ignore
+        bounds = jaxon_config.get_box_const()
+
+        problem = Problem(
+            q_start,
+            bounds,
+            ConfigPointConst(q_goal),
+            ineq_const,
+            eq_const,
+            motion_step_box_=0.1,
+        )
+        print("start solving rrt to mode {}".format(mode))
+        conf = MyRRTConfig(10000)
+        solver = MyRRTConnectSolver.init(conf)
+        solver.setup(problem)
+        res = solver.solve()
+        assert res.traj is not None
+        trajs.append(res.traj)
+
+    q_whole = []
+    q_whole.append(qs["first"])
+    q_whole.append(qs["post_first"])
+    q_whole.extend(list(trajs[0].numpy()))
+    q_whole.append(qs["second"])
+    q_whole.extend(list(trajs[1].numpy()))
+    q_whole.append(qs["third"])
 
     vis = TrimeshSceneViewer()
     vis.add(jaxon)
     world.visualize(vis)
     vis.show()
-    time.sleep(100)
+
+    time.sleep(5)
+    for q in q_whole:
+        set_robot_state(
+            jaxon, jaxon_config._get_control_joint_names(), q, base_type=BaseType.FLOATING
+        )
+        vis.redraw()
+        time.sleep(0.5)
