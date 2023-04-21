@@ -29,6 +29,7 @@ jobs:
                 python-version: ${{ matrix.python-version }}
             - name: install newest skrobot
               run: |
+                  pip3 install scikit-build
                   sudo apt-get install libspatialindex-dev freeglut3-dev libsuitesparse-dev libblas-dev liblapack-dev
                   cd /tmp
                   git clone git@github.com:iory/scikit-robot.git
