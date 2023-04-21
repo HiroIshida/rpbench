@@ -114,7 +114,7 @@ class ConstraintSequence:
 
     def __getitem__(self, index):
         modes = ["first", "post_first", "pre_second", "second", "post_second", "pre_third", "third"]
-        return self.get_constraint(modes[index])
+        return self.get_constraint(modes[index])  # type: ignore
 
     def get_constraint(
         self,

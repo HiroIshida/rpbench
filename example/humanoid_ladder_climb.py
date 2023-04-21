@@ -38,7 +38,7 @@ if __name__ == "__main__":
                     q_pre, joint_margin=0.1, base_pos_margin=0.1, base_rot_margin=0.1
                 )
             else:
-                bounds = jaxon_config.get_close_box_const(q_pre, base_pos_margin=0.5)
+                bounds = jaxon_config.get_box_const()
             print("start solving {}".format(mode))
             result = satisfy_by_optimization_with_budget(
                 eq_const, bounds, ineq_const, q_pre, n_trial_budget=300
@@ -87,11 +87,11 @@ if __name__ == "__main__":
             )
         )
         smoother.setup(problem)
-        res = smoother.solve(res.traj)
-        assert res.traj is not None
-        print("time to smooth: {}".format(res.time_elapsed))
+        smooth_res = smoother.solve(res.traj)
+        assert smooth_res.traj is not None
+        print("time to smooth: {}".format(smooth_res.time_elapsed))
 
-        trajs.append(res.traj)
+        trajs.append(smooth_res.traj)
 
     q_whole = []
     q_whole.append(qs["first"])
