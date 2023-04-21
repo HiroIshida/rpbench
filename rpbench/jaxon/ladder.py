@@ -153,11 +153,17 @@ class ConstraintSequence:
 
             # determine ineq const
             if phase in ["first", "second", "third"]:
-                colkin = jaxon_config.get_collision_kin(rsole=False, lsole=False)
+                colkin = jaxon_config.get_collision_kin(
+                    rsole=False, lsole=False, rgripper=False, lgripper=False
+                )
             elif phase in ["post_first", "pre_second"]:
-                colkin = jaxon_config.get_collision_kin(rsole=True, lsole=False)
+                colkin = jaxon_config.get_collision_kin(
+                    rsole=True, lsole=False, rgripper=False, lgripper=False
+                )
             elif phase in ["post_second", "pre_third"]:
-                colkin = jaxon_config.get_collision_kin(rsole=False, lsole=True)
+                colkin = jaxon_config.get_collision_kin(
+                    rsole=False, lsole=True, rgripper=False, lgripper=False
+                )
             else:
                 assert False
             col_const = CollFreeConst(colkin, self.world.get_exact_sdf(), jaxon)
