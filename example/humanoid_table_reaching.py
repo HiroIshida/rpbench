@@ -1,3 +1,4 @@
+import pickle
 import time
 
 import numpy as np
@@ -14,7 +15,9 @@ from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
-from rpbench.jaxon.below_table import TableWorld
+from rpbench.jaxon.below_table import CachedJaxonConstProvider, TableWorld
+
+prov = CachedJaxonConstProvider()
 
 world = TableWorld.sample(standard=True)
 
@@ -25,20 +28,19 @@ with mesh_simplify_factor(0.3):
 
     jaxon_config = JaxonConfig()
     colkin = jaxon_config.get_collision_kin()
-    colfree_const = CollFreeConst(colkin, world.get_exact_sdf(), jaxon)
-    selcol_const = jaxon_config.get_neural_selcol_const(jaxon)
+    colfree_const = CollFreeConst(colkin, world.get_exact_sdf(), jaxon, only_closest_feature=True)
 
     com_box = Box([0.25, 0.4, 5.0], with_sdf=True)
     com_box.visual_mesh.visual.face_colors = [255, 0, 100, 100]
-    com_const = jaxon_config.get_com_stability_const(jaxon, lambda x: -com_box.sdf(x))
+    com_const = jaxon_config.get_com_stability_const(jaxon, com_box)
 
-    ineq_const = IneqCompositeConst([colfree_const, selcol_const, com_const])
+    ineq_const = IneqCompositeConst([colfree_const, com_const])
 
     leg_coords_list = [jaxon.rleg_end_coords, jaxon.lleg_end_coords]
     efkin_legs = jaxon_config.get_endeffector_kin(rarm=False, larm=False)
     global_eq_const = PoseConstraint.from_skrobot_coords(leg_coords_list, efkin_legs, jaxon)  # type: ignore
 
-    goal_rarm_co = Coordinates([0.7, -0.6, 0.5], rot=[0, -0.5 * np.pi, 0])
+    goal_rarm_co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
     leg_coords_list = [jaxon.rleg_end_coords, jaxon.lleg_end_coords, goal_rarm_co]
     efkin_legs_rarm = jaxon_config.get_endeffector_kin(rarm=True, larm=False)
     goal_eq_const = PoseConstraint.from_skrobot_coords(leg_coords_list, efkin_legs_rarm, jaxon)
@@ -52,19 +54,20 @@ problem = Problem(
     global_eq_const,
     motion_step_box_=jaxon_config.get_motion_step_box(),
 )
+problem = pickle.loads(pickle.dumps(problem))
 
 rrt_conf = MyRRTConfig(500, satisfaction_conf=SatisfactionConfig(n_max_eval=50))
 rrt = MyRRTConnectSolver.init(rrt_conf)
 rrt.setup(problem)
 print("start solving rrt")
-result = rrt.solve()
+result = rrt.parallel_solve(10)
 assert result.traj is not None
 print("time to plan: {}".format(result.time_elapsed))
 
 print("smooth out the result")
 solver = SQPBasedSolver.init(
     SQPBasedSolverConfig(
-        n_wp=60,
+        n_wp=40,
         n_max_call=200,
         motion_step_satisfaction="explicit",
         verbose=True,
@@ -86,13 +89,13 @@ world.visualize(vis)
 axis = Axis.from_coords(goal_rarm_co)
 vis.add(jaxon)
 vis.add(axis)
-vis.add(com_box)
+vis.add(world.target_region)
 vis.show()
 
 time.sleep(4)
 assert result.traj is not None
-for q in result.traj.resample(20):
+for q in result.traj:
     set_robot_state(jaxon, jaxon_config._get_control_joint_names(), q, base_type=BaseType.FLOATING)
     vis.redraw()
-    time.sleep(1.0)
+    time.sleep(0.5)
 time.sleep(10)
