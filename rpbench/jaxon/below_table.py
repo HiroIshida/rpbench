@@ -2,7 +2,7 @@ import copy
 from abc import ABC
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import ClassVar, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 from skmp.constraint import (
@@ -47,7 +47,7 @@ class TableWorld(WorldBase):
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TableWorld":
-        intrinsic_desc = {}
+        intrinsic_desc: Dict[str, Any] = {}
         if standard:
             table_position = np.array([0.8, 0.0, 0.8])
             intrinsic_desc["table_pos_diff"] = [0, 0]
