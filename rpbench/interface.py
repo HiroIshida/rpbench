@@ -88,7 +88,7 @@ class WorldBase(ABC):
     def get_grid(self) -> GridProtocol:
         ...
 
-    def export_intrinsic_description(self) -> np.ndarray:
+    def export_intrinsic_description(self) -> Dict:
         raise NotImplementedError()
 
 
@@ -275,7 +275,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def export_table(self) -> DescriptionTable:
         ...
 
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+    def export_intrinsic_descriptions(self) -> List[Dict]:
         raise NotImplementedError()
 
     def __len__(self) -> int:

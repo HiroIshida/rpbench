@@ -197,9 +197,6 @@ class RingNSpherePlanningTask(TaskBase[RingWorldT, Tuple[np.ndarray, ...], None]
     def create_gridsdf(world: RingWorldBase, robot_model: None) -> None:
         return None
 
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        return [self.world.export_intrinsic_description()] * self.n_inner_task
-
 
 class RingObstacleFreePlanningTask(RingNSpherePlanningTask[RingObstacleFreeWorld]):
     @staticmethod

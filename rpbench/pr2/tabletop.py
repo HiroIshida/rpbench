@@ -1,6 +1,7 @@
+import copy
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, List, Tuple, Type, TypeVar, Union
+from typing import ClassVar, Dict, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from skmp.solver.interface import Problem, ResultProtocol
@@ -47,7 +48,7 @@ class TabletopBoxWorld(TabletopWorldBase):
     box_w: float
     box_h: float
     box_t: float
-    _intrinsic_desc: np.ndarray
+    _intrinsic_desc: Dict
 
     def get_exact_sdf(self) -> UnionSDF:
         lst = [self.table.sdf]
@@ -55,12 +56,12 @@ class TabletopBoxWorld(TabletopWorldBase):
             lst.append(obstacle.sdf)
         return UnionSDF(lst)
 
-    def export_intrinsic_description(self) -> np.ndarray:
+    def export_intrinsic_description(self) -> Dict:
         return self._intrinsic_desc
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
-        intrinsic_desc = []
+        intrinsic_desc = {}
 
         table = cls.create_standard_table()
         table_depth, table_width, table_height = table._extents
@@ -71,8 +72,9 @@ class TabletopBoxWorld(TabletopWorldBase):
             y = 0.1 * y_rand
             z = 0.0
             table.translate([x, y, z])
-
-            intrinsic_desc.extend([x_rand, y_rand])
+            intrinsic_desc["table_pos_diff"] = [x_rand, y_rand]
+        else:
+            intrinsic_desc["table_pos_diff"] = [0.0, 0.0]
 
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
@@ -89,18 +91,20 @@ class TabletopBoxWorld(TabletopWorldBase):
             d += 0.15
             w += 0.15
             h += 0.15
+            intrinsic_desc["table_dim_diff"] = [0.0, 0.0, 0.0]
         else:
             d_rand, w_rand, h_rand = np.random.randn(3)
             d += 0.15 + d_rand * 0.05
             w += 0.15 + w_rand * 0.05
             h += 0.15 + h_rand * 0.05
-            intrinsic_desc.extend([d_rand, w_rand, h_rand])
+            intrinsic_desc["table_dim_diff"] = [d_rand, w_rand, h_rand]
 
         t = 0.03
 
         if standard:
             box_center = table.copy_worldcoords()
             box_center.translate([0, 0, 0.5 * table_height])
+            intrinsic_desc["box_center_diff"] = [0.0, 0.0]
         else:
             box_center = table.copy_worldcoords()
             box_center.translate([0, 0, 0.5 * table_height])
@@ -113,7 +117,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             trans = np.array([0.5 * 0.3 * margin_x * x_rand, 0.5 * 0.3 * margin_y * y_rand, 0.0])
             box_center.translate(trans)
 
-            intrinsic_desc.extend([x_rand, y_rand])
+            intrinsic_desc["box_center_diff"] = [x_rand, y_rand]
 
         lower_plate = Box([d, w, t], with_sdf=True, face_colors=color)
         lower_plate.newcoords(box_center.copy_worldcoords())
@@ -140,7 +144,7 @@ class TabletopBoxWorld(TabletopWorldBase):
         opposite_plate.translate([0.5 * d - 0.5 * t, 0.0, 0.5 * h])
         obstacles.append(opposite_plate)
 
-        return cls(table, obstacles, box_center, d, w, h, t, np.array(intrinsic_desc))
+        return cls(table, obstacles, box_center, d, w, h, t, intrinsic_desc)
 
     @staticmethod
     def create_standard_table() -> Box:
@@ -231,7 +235,7 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT, Rob
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
 
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+    def export_intrinsic_descriptions(self) -> List[Dict]:
         return [self.world.export_intrinsic_description()] * self.n_inner_task
 
     @classmethod
@@ -350,14 +354,15 @@ class TabletopBoxTaskBase(
     ) -> Tuple[Coordinates, ...]:
         ...
 
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        world_vec = self.world.export_intrinsic_description()
+    def export_intrinsic_descriptions(self) -> List[Dict]:
+        world_intrinsic_desc = self.world.export_intrinsic_description()
 
         intrinsic_descs = []
         for desc in self.descriptions:
-            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
-            vecs = [world_vec] + pose_vecs
-            intrinsic_desc = np.hstack(vecs)
+            intrinsic_desc = copy.deepcopy(world_intrinsic_desc)
+
+            for i, pose in enumerate(desc):
+                intrinsic_desc["pose{}".format(i)] = skcoords_to_pose_vec(pose)
             intrinsic_descs.append(intrinsic_desc)
         return intrinsic_descs
 
