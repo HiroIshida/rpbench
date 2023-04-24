@@ -7,6 +7,7 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
+from rpbench.jaxon.below_table import HumanoidTableReachingTask
 from rpbench.maze import MazeSolvingTask
 from rpbench.pr2.kivapod import KivapodEmptyReachingTask
 from rpbench.pr2.tabletop import (
@@ -28,6 +29,7 @@ def test_intrinsic_dimension():
     def intrinsic_dimension(dic) -> int:
         return sum(len(e) for e in dic.values())
 
+    # pr2 tabletop
     task: Any = TabletopBoxWorldWrap.sample(2)
     int_descs = task.export_intrinsic_descriptions()
     assert len(int_descs) == 2
@@ -38,6 +40,14 @@ def test_intrinsic_dimension():
 
     task = TabletopBoxDualArmReachingTask.sample(1)
     assert intrinsic_dimension(task.export_intrinsic_descriptions()[0]) == 19
+
+    # pr2 kivapod
+    task = KivapodEmptyReachingTask.sample(1)
+    assert intrinsic_dimension(task.export_intrinsic_descriptions()[0]) == 3
+
+    # jaxon table
+    task = HumanoidTableReachingTask.sample(1)
+    assert intrinsic_dimension(task.export_intrinsic_descriptions()[0]) == 5
 
 
 def test_tabletop_samplable():

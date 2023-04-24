@@ -2,7 +2,7 @@ import copy
 from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from skmp.solver.interface import Problem, ResultProtocol
@@ -64,6 +64,9 @@ class KivapodWorldBase(WorldBase):
         target_region.visual_mesh.visual.face_colors = [255, 0, 255, 10]
 
         return cls(kivapod, target_region, [])
+
+    def export_intrinsic_description(self) -> Dict:
+        return {}
 
     @classmethod
     @abstractmethod
@@ -205,6 +208,18 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
                 co.rotate(+np.pi * 0.5, "z")
                 return (co,)
         assert False
+
+    def export_intrinsic_descriptions(self) -> List[Dict]:
+        world_intrinsic_desc = self.world.export_intrinsic_description()
+
+        intrinsic_descs = []
+        for desc in self.descriptions:
+            intrinsic_desc = copy.deepcopy(world_intrinsic_desc)
+
+            for i, pose in enumerate(desc):
+                intrinsic_desc["position{}".format(i)] = skcoords_to_pose_vec(pose)[:3]
+            intrinsic_descs.append(intrinsic_desc)
+        return intrinsic_descs
 
     @staticmethod
     def create_gridsdf(world: KivapodEmptyWorld, robot_model: RobotModel) -> None:

@@ -1,7 +1,8 @@
+import copy
 from abc import ABC
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import ClassVar, List, Optional, Tuple, Type, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 from skmp.constraint import (
@@ -42,16 +43,21 @@ from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 class TableWorld(WorldBase):
     target_region: Box
     table: Box
-    desc: np.ndarray
+    _intrinsic_desc: Dict
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TableWorld":
+        intrinsic_desc = {}
         if standard:
             table_position = np.array([0.8, 0.0, 0.8])
+            intrinsic_desc["table_pos_diff"] = [0, 0]
         else:
-            table_position = np.array([0.7, 0.0, 0.6]) + np.random.rand(3) * np.array(
-                [0.5, 0.0, 0.4]
-            )
+            diff_x = np.random.rand() * 0.5
+            diff_z = np.random.rand() * 0.4
+            diff = np.random.rand(3) * np.array([diff_x, 0.0, diff_z])
+            table_position = np.array([0.7, 0.0, 0.6]) + diff
+            intrinsic_desc["table_pos_diff"] = [diff_x, diff_z]
+
         table = Box([1.0, 3.0, 0.1], with_sdf=True)
         table.translate(table_position)
 
@@ -59,7 +65,7 @@ class TableWorld(WorldBase):
         target_region = Box([0.8, 0.8, table_height], with_sdf=True)
         target_region.visual_mesh.visual.face_colors = [0, 255, 100, 100]
         target_region.translate([0.6, -0.7, 0.5 * table_height])
-        return cls(target_region, table, table_position)
+        return cls(target_region, table, intrinsic_desc)
 
     def get_exact_sdf(self) -> UnionSDF:
         return UnionSDF([self.table.sdf])
@@ -69,6 +75,9 @@ class TableWorld(WorldBase):
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         viewer.add(self.table)
+
+    def export_intrinsic_description(self) -> Dict:
+        return self._intrinsic_desc
 
 
 class CachedJaxonConstProvider(ABC):
@@ -262,3 +271,15 @@ class HumanoidTableReachingTask(TaskBase[TableWorld, Tuple[Coordinates, ...], Ja
                     return sqp_result
 
         return SQPBasedSolverResult.abnormal(np.inf)
+
+    def export_intrinsic_descriptions(self) -> List[Dict]:
+        world_intrinsic_desc = self.world.export_intrinsic_description()
+
+        intrinsic_descs = []
+        for desc in self.descriptions:
+            intrinsic_desc = copy.deepcopy(world_intrinsic_desc)
+
+            for i, pose in enumerate(desc):
+                intrinsic_desc["position{}".format(i)] = skcoords_to_pose_vec(pose)[:3]
+            intrinsic_descs.append(intrinsic_desc)
+        return intrinsic_descs
