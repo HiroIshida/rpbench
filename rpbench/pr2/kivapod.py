@@ -221,6 +221,13 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
             intrinsic_descs.append(intrinsic_desc)
         return intrinsic_descs
 
+    def get_intrinsic_description_bound(self) -> Tuple[np.ndarray, np.ndarray]:
+        pos = self.world.target_region.worldpos()
+        ext = np.array(self.world.target_region._extents)
+        lb = pos - 0.5 * ext
+        ub = pos + 0.5 * ext
+        return lb, ub
+
     @staticmethod
     def create_gridsdf(world: KivapodEmptyWorld, robot_model: RobotModel) -> None:
         return None
