@@ -8,7 +8,7 @@ from skmp.satisfy import satisfy_by_optimization_with_budget
 from skmp.solver.interface import Problem
 from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
-from skmp.visualization import CollisionSphereVisualizationManager
+from skmp.visualization.collision_visualizer import CollisionSphereVisualizationManager
 from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType

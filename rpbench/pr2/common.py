@@ -160,8 +160,8 @@ class PR2SolutionViewerBase(SolutionVisualizerBase):
         for co in task.descriptions[0]:
             geometries.append(Axis.from_coords(co))
 
-        config: PR2Config = task.config_provider.get_config()
-        pr2 = task.config_provider.get_pr2()
+        config: PR2Config = task.config_provider.get_config()  # type: ignore[attr-defined]
+        pr2 = task.config_provider.get_pr2()  # type: ignore[attr-defined]
 
         def robot_updator(robot, q):
             set_robot_state(pr2, config._get_control_joint_names(), q, config.base_type)
