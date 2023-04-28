@@ -415,7 +415,16 @@ class PlanningDataset(Generic[TaskT]):
 
         return cls(pairs, task_type, time.time())
 
-    def save(self, base_path: Path) -> None:
+    @staticmethod
+    def default_base_path() -> Path:
+        base_path = Path("~/.rpbench/dataset").expanduser()
+        base_path.mkdir(exist_ok=True, parents=True)
+        return base_path
+
+    def save(self, base_path: Optional[Path] = None) -> None:
+        if base_path is None:
+            base_path = self.default_base_path()
+
         uuid_str = str(uuid.uuid4())
         p = base_path / "planning-dataset-{}-{}-{}.pkl".format(
             self.task_type.__name__, uuid_str, self.time_stamp
@@ -425,8 +434,14 @@ class PlanningDataset(Generic[TaskT]):
             pickle.dump(self, f)
 
     @classmethod
-    def load(cls, base_path: Path, task_type: Type[TaskT]) -> "PlanningDataset[TaskT]":
+    def load(
+        cls, task_type: Type[TaskT], base_path: Optional[Path] = None
+    ) -> "PlanningDataset[TaskT]":
         """load the newest dataset found in the path"""
+
+        if base_path is None:
+            base_path = cls.default_base_path()
+
         dataset_list: List[PlanningDataset] = []
         for p in base_path.iterdir():
 

@@ -18,7 +18,7 @@ def test_dataset():
         assert len(dataset.pairs) == n_data
         dataset.save(td_path)
 
-        dataset_loaded = dataset.load(td_path, task_type)
+        dataset_loaded = dataset.load(task_type, td_path)
 
         ddsolver = DatadrivenTaskSolver.init(LightningSolver, solcon, dataset_loaded)
 
