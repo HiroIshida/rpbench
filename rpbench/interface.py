@@ -458,6 +458,10 @@ class PlanningDataset(Generic[TaskT]):
         return dirs_sorted[-1]
 
 
+class NotEnoughDataException(Exception):
+    pass
+
+
 @dataclass
 class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
     """Task solver for non-datadriven solver such rrt and sqp"""
@@ -471,6 +475,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
         skmp_dd_solver_type: Type[AbstractDataDrivenSolver[ConfigT, ResultT]],
         solver_config: ConfigT,
         dataset: PlanningDataset[TaskT],
+        n_data_use: Optional[int] = None,
     ) -> "DatadrivenTaskSolver[TaskT, ResultT]":
 
         pairs_modified = []
@@ -478,7 +483,14 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
             pair = (task.export_problems()[0], traj)
             pairs_modified.append(pair)
 
-        solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
+        if n_data_use is None:
+            solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
+        else:
+            if n_data_use > len(pairs_modified):
+                message = "request: {}, available {}".format(n_data_use, len(pairs_modified))
+                raise NotEnoughDataException(message)
+
+            solver = skmp_dd_solver_type.init(solver_config, pairs_modified[:n_data_use])
         return cls(solver, dataset.task_type)
 
     def setup(self, task: TaskT) -> None:
