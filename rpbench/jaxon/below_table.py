@@ -211,7 +211,9 @@ class HumanoidTableReachingTask(TaskBase[TableWorld, Tuple[Coordinates, ...], Ja
         colfree_const = CollFreeConst(
             colkin, self.world.get_exact_sdf(), jaxon, only_closest_feature=True
         )
-        ineq_const = IneqCompositeConst([colfree_const, com_const])
+
+        # the order of ineq const is important here. see comment in IneqCompositeConst
+        ineq_const = IneqCompositeConst([com_const, colfree_const])
 
         q_start = get_robot_state(jaxon, jaxon_config._get_control_joint_names(), BaseType.FLOATING)
         box_const = provider.get_box_const()
