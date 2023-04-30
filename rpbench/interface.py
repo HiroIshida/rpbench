@@ -478,19 +478,19 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
         n_data_use: Optional[int] = None,
     ) -> "DatadrivenTaskSolver[TaskT, ResultT]":
 
+        if n_data_use is None:
+            n_data_use = len(dataset.pairs)
+        if n_data_use > len(dataset.pairs):
+            message = "request: {}, available {}".format(n_data_use, len(dataset.pairs))
+            raise NotEnoughDataException(message)
+
         pairs_modified = []
-        for task, traj in dataset.pairs:
+        for i in range(n_data_use):
+            task, traj = dataset.pairs[i]
             pair = (task.export_problems()[0], traj)
             pairs_modified.append(pair)
 
-        if n_data_use is None:
-            solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
-        else:
-            if n_data_use > len(pairs_modified):
-                message = "request: {}, available {}".format(n_data_use, len(pairs_modified))
-                raise NotEnoughDataException(message)
-
-            solver = skmp_dd_solver_type.init(solver_config, pairs_modified[:n_data_use])
+        solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
         return cls(solver, dataset.task_type)
 
     def setup(self, task: TaskT) -> None:
