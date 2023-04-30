@@ -204,13 +204,16 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
         return DescriptionTable(wd, wcd_list)
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=50000, simplify=True))
-        ompl_sovler.setup(problem)
-        ompl_res = ompl_sovler.solve()
-
-        nlp_solver = SQPBasedSolver.init(SQPBasedSolverConfig(n_wp=100))
-        nlp_solver.setup(problem)
-        res = nlp_solver.solve(ompl_res.traj)
+        for _ in range(4):
+            ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=50000, simplify=True))
+            ompl_sovler.setup(problem)
+            ompl_res = ompl_sovler.solve()
+            if ompl_res.traj is not None:
+                nlp_solver = SQPBasedSolver.init(SQPBasedSolverConfig(n_wp=100))
+                nlp_solver.setup(problem)
+                res = nlp_solver.solve(ompl_res.traj)
+                if res.traj is not None:
+                    return res
         return res
 
     @classmethod
