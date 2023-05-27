@@ -17,6 +17,7 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
 )
 
 import numpy as np
@@ -24,8 +25,9 @@ import threadpoolctl
 import tqdm
 from skmp.solver.interface import (
     AbstractDataDrivenSolver,
-    AbstractSolver,
+    AbstractScratchSolver,
     ConfigT,
+    ParallelSolver,
     Problem,
     ResultProtocol,
     ResultT,
@@ -317,7 +319,7 @@ class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
         ...
 
 
-class AbstractTaskSolver(ABC, Generic[TaskT, ResultT]):
+class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):
     """TaskSolver interface
 
     Unlike AbstractSolver in skmp, this solver is task-specific.
@@ -343,19 +345,25 @@ class AbstractTaskSolver(ABC, Generic[TaskT, ResultT]):
 
 
 @dataclass
-class SkmpTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
+class SkmpTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
     """Task solver for non-datadriven solver such rrt and sqp
     this class is just a wrapper of skmp non-datadriven solver
     to fit AbstractTaskSolver interface
     """
 
-    skmp_solver: AbstractSolver
+    skmp_solver: Union[
+        AbstractScratchSolver[ConfigT, ResultT], ParallelSolver[ConfigT, ResultT, Trajectory]
+    ]
     task_type: Type[TaskT]
 
     @classmethod
     def init(
-        cls, skmp_solver: AbstractSolver[ConfigT, ResultT], task_type: Type[TaskT]
-    ) -> "SkmpTaskSolver[TaskT, ResultT]":
+        cls,
+        skmp_solver: Union[
+            AbstractScratchSolver[ConfigT, ResultT], ParallelSolver[ConfigT, ResultT, Trajectory]
+        ],
+        task_type: Type[TaskT],
+    ) -> "SkmpTaskSolver[TaskT, ConfigT, ResultT]":
         return cls(skmp_solver, task_type)
 
     def setup(self, task: TaskT) -> None:
@@ -463,10 +471,9 @@ class NotEnoughDataException(Exception):
 
 
 @dataclass
-class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
-    """Task solver for non-datadriven solver such rrt and sqp"""
-
+class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
     skmp_solver: AbstractDataDrivenSolver
+    query_desc: Optional[np.ndarray]
     task_type: Type[TaskT]
 
     @classmethod
@@ -476,7 +483,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
         solver_config: ConfigT,
         dataset: PlanningDataset[TaskT],
         n_data_use: Optional[int] = None,
-    ) -> "DatadrivenTaskSolver[TaskT, ResultT]":
+    ) -> "DatadrivenTaskSolver[TaskT, ConfigT, ResultT]":
 
         if n_data_use is None:
             n_data_use = len(dataset.pairs)
@@ -487,16 +494,21 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ResultT]):
         pairs_modified = []
         for i in range(n_data_use):
             task, traj = dataset.pairs[i]
-            pair = (task.export_problems()[0], traj)
+            desc = task.export_intrinsic_descriptions()[0]
+            pair = (desc, traj)
             pairs_modified.append(pair)
 
         solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
-        return cls(solver, dataset.task_type)
+        return cls(solver, None, dataset.task_type)
 
     def setup(self, task: TaskT) -> None:
         assert task.n_inner_task == 1
         prob = task.export_problems()[0]
         self.skmp_solver.setup(prob)
+        self.query_desc = task.export_intrinsic_descriptions()[0]
 
     def solve(self) -> ResultT:
-        return self.skmp_solver.solve()
+        assert self.query_desc is not None
+        result = self.skmp_solver.solve(self.query_desc)
+        self.query_desc = None
+        return result

@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-from skmp.solver.ompl_solver import LightningSolver, OMPLSolverConfig
+from skmp.solver.ompl_solver import OMPLDataDrivenSolver, OMPLSolverConfig
 
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset
 from rpbench.pr2.tabletop import TabletopBoxRightArmReachingTask
@@ -20,7 +20,7 @@ def test_dataset():
 
         dataset_loaded = dataset.load(task_type, td_path)
 
-        ddsolver = DatadrivenTaskSolver.init(LightningSolver, solcon, dataset_loaded)
+        ddsolver = DatadrivenTaskSolver.init(OMPLDataDrivenSolver, solcon, dataset_loaded)
 
     task = task_type.sample(1, True)
     ddsolver.setup(task)

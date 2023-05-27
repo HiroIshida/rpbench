@@ -4,7 +4,7 @@ from skmp.satisfy import SatisfactionConfig
 from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
 from skmp.solver.nlp_solver.memmo import NnMemmoSolver
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolverConfig
-from skmp.solver.ompl_solver import LightningSolver, OMPLSolver, OMPLSolverConfig
+from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.interface import (
     AbstractTaskSolver,
@@ -37,11 +37,6 @@ class CompatibleSolvers:
 
         # rrtconnect
         compat_solvers["rrtconnect"] = SkmpTaskSolver.init(OMPLSolver.init(ompl_config), task_type)
-
-        # lightning
-        compat_solvers["lightning"] = DatadrivenTaskSolver.init(
-            LightningSolver, ompl_config, trajlib_dataset
-        )
 
         # memmo
         compat_solvers["memmo_nn"] = DatadrivenTaskSolver.init(
