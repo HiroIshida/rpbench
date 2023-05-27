@@ -42,7 +42,7 @@ from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 class TableWorld(WorldBase):
     target_region: Box
     table: Box
-    desc: np.ndarray
+    _intrinsic_desc: np.ndarray
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TableWorld":
@@ -63,6 +63,9 @@ class TableWorld(WorldBase):
 
     def get_exact_sdf(self) -> UnionSDF:
         return UnionSDF([self.table.sdf])
+
+    def export_intrinsic_description(self) -> np.ndarray:
+        return self._intrinsic_desc
 
     def get_grid(self) -> Grid:
         raise NotImplementedError("girdsdf is not used")
@@ -264,3 +267,14 @@ class HumanoidTableReachingTask(TaskBase[TableWorld, Tuple[Coordinates, ...], Ja
                     return sqp_result
 
         return SQPBasedSolverResult.abnormal(np.inf)
+
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        world_vec = self.world.export_intrinsic_description()
+
+        intrinsic_descs = []
+        for desc in self.descriptions:
+            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
+            vecs = [world_vec] + pose_vecs
+            intrinsic_desc = np.hstack(vecs)
+            intrinsic_descs.append(intrinsic_desc)
+        return intrinsic_descs
