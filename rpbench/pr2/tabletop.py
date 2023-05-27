@@ -73,6 +73,8 @@ class TabletopBoxWorld(TabletopWorldBase):
             table.translate([x, y, z])
 
             intrinsic_desc.extend([x_rand, y_rand])
+        else:
+            intrinsic_desc.extend([0.0, 0.0])
 
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
@@ -89,6 +91,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             d += 0.15
             w += 0.15
             h += 0.15
+            intrinsic_desc.extend([0.0, 0.0, 0.0])
         else:
             d_rand, w_rand, h_rand = np.random.randn(3)
             d += 0.15 + d_rand * 0.05
@@ -101,6 +104,7 @@ class TabletopBoxWorld(TabletopWorldBase):
         if standard:
             box_center = table.copy_worldcoords()
             box_center.translate([0, 0, 0.5 * table_height])
+            intrinsic_desc.extend([0.0, 0.0])
         else:
             box_center = table.copy_worldcoords()
             box_center.translate([0, 0, 0.5 * table_height])

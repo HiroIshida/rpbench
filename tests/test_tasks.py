@@ -25,16 +25,17 @@ set_ompl_random_seed(0)
 
 
 def test_intrinsic_dimension():
-    task: Any = TabletopBoxWorldWrap.sample(2)
-    int_descs = task.export_intrinsic_descriptions()
-    assert len(int_descs) == 2
-    assert len(int_descs[0]) == 7
+    for standard in [False, True]:
+        task: Any = TabletopBoxWorldWrap.sample(2, standard=standard)
+        int_descs = task.export_intrinsic_descriptions()
+        assert len(int_descs) == 2
+        assert len(int_descs[0]) == 7
 
-    task = TabletopBoxRightArmReachingTask.sample(1)
-    assert len(task.export_intrinsic_descriptions()[0]) == 13
+        task = TabletopBoxRightArmReachingTask.sample(1)
+        assert len(task.export_intrinsic_descriptions()[0]) == 13
 
-    task = TabletopBoxDualArmReachingTask.sample(1)
-    assert len(task.export_intrinsic_descriptions()[0]) == 19
+        task = TabletopBoxDualArmReachingTask.sample(1)
+        assert len(task.export_intrinsic_descriptions()[0]) == 19
 
 
 def test_tabletop_samplable():
