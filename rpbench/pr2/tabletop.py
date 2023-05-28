@@ -17,9 +17,9 @@ from voxbloxpy.core import Grid, GridSDF, IntegratorType
 from rpbench.interface import (
     DescriptionT,
     DescriptionTable,
+    ReachingTaskBase,
     SamplableBase,
     SamplableT,
-    TaskBase,
     WorldBase,
 )
 from rpbench.pr2.common import (
@@ -255,7 +255,7 @@ class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
 
 
 class TabletopBoxTaskBase(
-    TaskBase[TabletopBoxWorld, Tuple[Coordinates, ...], RobotModel],
+    ReachingTaskBase[TabletopBoxWorld, RobotModel],
     TabletopBoxSamplableBase[Tuple[Coordinates, ...]],
 ):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]]
@@ -353,17 +353,6 @@ class TabletopBoxTaskBase(
         cls, world: TabletopBoxWorld, standard: bool
     ) -> Tuple[Coordinates, ...]:
         ...
-
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        world_vec = self.world.export_intrinsic_description()
-
-        intrinsic_descs = []
-        for desc in self.descriptions:
-            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
-            vecs = [world_vec] + pose_vecs
-            intrinsic_desc = np.hstack(vecs)
-            intrinsic_descs.append(intrinsic_desc)
-        return intrinsic_descs
 
 
 class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):

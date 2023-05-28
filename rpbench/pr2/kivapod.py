@@ -15,7 +15,7 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
 
-from rpbench.interface import DescriptionTable, TaskBase, WorldBase
+from rpbench.interface import DescriptionTable, ReachingTaskBase, WorldBase
 from rpbench.pr2.common import CachedPR2ConstProvider, CachedRArmPR2ConstProvider
 from rpbench.pr2.utils import MeshLink
 from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
@@ -119,7 +119,7 @@ class KivapodEmptyWorld(KivapodWorldBase):
 
 
 @dataclass
-class KivapodReachingTaskBase(TaskBase[KivapodWorldT, Tuple[Coordinates, ...], RobotModel]):
+class KivapodReachingTaskBase(ReachingTaskBase[KivapodWorldT, RobotModel]):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
 
     @staticmethod

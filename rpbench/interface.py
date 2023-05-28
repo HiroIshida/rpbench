@@ -33,6 +33,9 @@ from skmp.solver.interface import (
     ResultT,
 )
 from skmp.trajectory import Trajectory
+from skrobot.coordinates import Coordinates
+
+from rpbench.utils import skcoords_to_pose_vec
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 SamplableT = TypeVar("SamplableT", bound="SamplableBase")
@@ -317,6 +320,19 @@ class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
     @abstractmethod
     def export_problems(self) -> List[Problem]:
         ...
+
+
+class ReachingTaskBase(TaskBase[WorldT, Tuple[Coordinates, ...], RobotModelT]):
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        world_vec = self.world.export_intrinsic_description()
+
+        intrinsic_descs = []
+        for desc in self.descriptions:
+            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
+            vecs = [world_vec] + pose_vecs
+            intrinsic_desc = np.hstack(vecs)
+            intrinsic_descs.append(intrinsic_desc)
+        return intrinsic_descs
 
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):

@@ -31,8 +31,8 @@ from voxbloxpy.core import Grid
 from rpbench.interface import (
     DescriptionTable,
     Problem,
+    ReachingTaskBase,
     ResultProtocol,
-    TaskBase,
     WorldBase,
 )
 from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
@@ -128,7 +128,7 @@ class CachedJaxonConstProvider(ABC):
         return config.get_com_stability_const(jaxon, com_box)
 
 
-class HumanoidTableReachingTask(TaskBase[TableWorld, Tuple[Coordinates, ...], Jaxon]):
+class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
     @staticmethod
