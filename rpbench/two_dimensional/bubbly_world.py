@@ -11,24 +11,8 @@ from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skmp.trajectory import Trajectory
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
+from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
-
-
-@dataclass
-class Grid2d:
-    lb: np.ndarray
-    ub: np.ndarray
-    sizes: Tuple[int, int]
-
-
-@dataclass
-class Grid2dSDF:
-    values: np.ndarray
-    grid: Grid2d
-    itp: RegularGridInterpolator
-
-    def __call__(self, x: np.ndarray) -> np.ndarray:
-        return self.itp(x)
 
 
 @dataclass
