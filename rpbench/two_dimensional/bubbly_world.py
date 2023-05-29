@@ -38,14 +38,14 @@ class BubblyWorld(WorldBase):
 
     @classmethod
     def get_margin(self) -> float:
-        return 0.02
+        return 0.01
 
     @classmethod
     def sample(cls, standard: bool = False) -> "BubblyWorld":
         n_obs = 40
 
         obstacles = []
-        start_pos = np.ones(2) * 0.5
+        start_pos = np.ones(2) * 0.1
         standard_goal_pos = np.ones(2) * 0.95
 
         with temp_seed(1, standard):
@@ -112,7 +112,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], N
 
         descriptions = []
 
-        start = np.ones(2) * 0.5
+        start = np.ones(2) * 0.1
         for _ in range(n_sample):
             if standard:
                 goal = np.ones(2) * 0.95
