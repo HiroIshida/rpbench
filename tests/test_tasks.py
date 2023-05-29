@@ -7,8 +7,6 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.bubbly_world import BubblyMeshPointConnectTask, BubblyPointConnectTask
-from rpbench.maze import MazeSolvingTask
 from rpbench.pr2.kivapod import KivapodEmptyReachingTask
 from rpbench.pr2.tabletop import (
     TabletopBoxDualArmReachingTask,
@@ -20,6 +18,11 @@ from rpbench.pr2.tabletop import (
     TabletopBoxWorldWrap,
     VoxbloxGridSDFCreator,
 )
+from rpbench.two_dimensional.bubbly_world import (
+    BubblyMeshPointConnectTask,
+    BubblyPointConnectTask,
+)
+from rpbench.two_dimensional.maze import MazeSolvingTask
 
 np.random.seed(0)
 set_ompl_random_seed(0)

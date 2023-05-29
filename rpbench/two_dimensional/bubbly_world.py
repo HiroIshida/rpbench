@@ -147,9 +147,9 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], N
     def export_table(self) -> DescriptionTable:
         wd = {}
         if self._gridsdf is None:
-            wd["obstacle"] = self.world.export_intrinsic_description()
+            wd["world"] = self.world.export_intrinsic_description()
         else:
-            wd["world_mesh"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+            wd["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
 
         wcd_list = []
         for desc in self.descriptions:
