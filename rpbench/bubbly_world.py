@@ -3,15 +3,32 @@ from typing import List, Tuple, Type, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skmp.trajectory import Trajectory
-from voxbloxpy.core import Grid
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
 from rpbench.utils import temp_seed
+
+
+@dataclass
+class Grid2d:
+    lb: np.ndarray
+    ub: np.ndarray
+    sizes: Tuple[int, int]
+
+
+@dataclass
+class Grid2dSDF:
+    values: np.ndarray
+    grid: Grid2d
+    itp: RegularGridInterpolator
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        return self.itp(x)
 
 
 @dataclass
@@ -65,8 +82,8 @@ class BubblyWorld(WorldBase):
     def export_intrinsic_description(self) -> np.ndarray:
         return np.hstack([obs.as_vector() for obs in self.obstacles])
 
-    def get_grid(self) -> Grid:
-        return Grid(np.zeros(2), np.ones(2), (56, 56, 56))
+    def get_grid(self) -> Grid2d:
+        return Grid2d(np.zeros(2), np.ones(2), (112, 112))
 
     def get_exact_sdf(self, for_visualize: bool = False) -> SDFProtocol:
         margin = 0.0 if for_visualize else self.get_margin()
@@ -95,7 +112,7 @@ class BubblyWorld(WorldBase):
         ax.contour(xlin, ylin, sdf_mesh, cmap="gray", levels=[0.0])
 
 
-class BubblyPointConnectTask(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], None]):
+class BubblyPointConnectTaskBase(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], None]):
     @staticmethod
     def get_robot_model() -> None:
         return None
@@ -129,7 +146,10 @@ class BubblyPointConnectTask(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], None]
 
     def export_table(self) -> DescriptionTable:
         wd = {}
-        wd["obstacle"] = self.world.export_intrinsic_description()
+        if self._gridsdf is None:
+            wd["obstacle"] = self.world.export_intrinsic_description()
+        else:
+            wd["world_mesh"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
 
         wcd_list = []
         for desc in self.descriptions:
@@ -156,7 +176,11 @@ class BubblyPointConnectTask(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], None]
         return 2
 
     def export_problems(self) -> List[Problem]:
-        sdf = self.world.get_exact_sdf()
+        if self._gridsdf is None:
+            sdf = self.world.get_exact_sdf()
+        else:
+            sdf = self._gridsdf
+
         probs = []
         for desc in self.descriptions:
             start, goal = desc
@@ -169,12 +193,32 @@ class BubblyPointConnectTask(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], None]
             probs.append(prob)
         return probs
 
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        return [self.world.export_intrinsic_description()] * self.n_inner_task
+
+
+class BubblyPointConnectTask(BubblyPointConnectTaskBase):
     @staticmethod
     def create_gridsdf(world: BubblyWorld, robot_model: None) -> None:
         return None
 
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        return [self.world.export_intrinsic_description()] * self.n_inner_task
+
+class BubblyMeshPointConnectTask(BubblyPointConnectTaskBase):
+    @staticmethod
+    def create_gridsdf(world: BubblyWorld, robot_model: None) -> Grid2dSDF:
+        grid = world.get_grid()
+
+        xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
+        X, Y = np.meshgrid(xlin, ylin)
+        pts = np.array(list(zip(X.flatten(), Y.flatten())))
+
+        sdf = world.get_exact_sdf()
+        vals = sdf.__call__(pts)
+
+        itp = RegularGridInterpolator(
+            (xlin, ylin), vals.reshape(grid.sizes).T, bounds_error=False, fill_value=10.0
+        )
+        return Grid2dSDF(vals, world.get_grid(), itp)
 
 
 class Taskvisualizer:
