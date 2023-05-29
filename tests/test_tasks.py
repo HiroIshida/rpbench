@@ -7,6 +7,7 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
+from rpbench.bubbly_world import BubblyMeshPointConnectTask, BubblyPointConnectTask
 from rpbench.maze import MazeSolvingTask
 from rpbench.pr2.kivapod import KivapodEmptyReachingTask
 from rpbench.pr2.tabletop import (
@@ -175,6 +176,15 @@ def test_maze_solving_task():
     task = MazeSolvingTask.sample(1, True)
     res = task.solve_default()[0]
     assert res.traj is not None
+
+
+def test_bubbly_world_point_connecting_task():
+
+    # check solvability of standard problem
+    for task_type in [BubblyPointConnectTask, BubblyMeshPointConnectTask]:
+        task = task_type.sample(1, True)
+        result = task.solve_default()[0]
+        assert result.traj is not None
 
 
 if __name__ == "__main__":
