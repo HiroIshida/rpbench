@@ -1,10 +1,10 @@
-from typing import Dict, Type
+from typing import Dict
 
 from skmp.satisfy import SatisfactionConfig
 from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
 from skmp.solver.nlp_solver.memmo import NnMemmoSolver
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolverConfig
-from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
+from skmp.solver.ompl_solver import OMPLDataDrivenSolver, OMPLSolver, OMPLSolverConfig
 
 from rpbench.interface import (
     AbstractTaskSolver,
@@ -14,14 +14,13 @@ from rpbench.interface import (
 )
 from rpbench.jaxon.below_table import HumanoidTableReachingTask
 from rpbench.pr2.kivapod import KivapodEmptyReachingTask
+from rpbench.two_dimensional.bubbly_world import BubblyMeshPointConnectTask
 
 
 class CompatibleSolvers:
     @classmethod
-    def get_compatible_solvers(
-        cls, task_type: Type[SkmpTaskSolver]
-    ) -> Dict[str, AbstractTaskSolver]:
-        method_name = "_" + task_type.__name__
+    def get_compatible_solvers(cls, task_name: str) -> Dict[str, AbstractTaskSolver]:
+        method_name = "_{}".format(task_name)
         return getattr(cls, method_name)()
 
     @staticmethod
@@ -82,6 +81,28 @@ class CompatibleSolvers:
             NnMemmoSolver,
             sqp_config,
             trajlib_dataset,
-            n_data_use=10000,
+            n_data_use=300,
+        )
+        return compat_solvers
+
+    @staticmethod
+    def _BubblyMeshPointConnectTask() -> Dict[str, AbstractTaskSolver]:
+        task_type = BubblyMeshPointConnectTask
+
+        compat_solvers: Dict[str, AbstractTaskSolver] = {}
+
+        trajlib_dataset = PlanningDataset.load(task_type)
+
+        rrt_config = OMPLSolverConfig(
+            2000,
+            n_max_satisfaction_trial=1,
+            expbased_planner_backend="ertconnect",
+            ertconnect_eps=0.5,
+        )
+        rrt = OMPLSolver.init(rrt_config)
+        compat_solvers["rrtconnect"] = SkmpTaskSolver.init(rrt, task_type)
+
+        compat_solvers["ertconnect"] = DatadrivenTaskSolver.init(
+            OMPLDataDrivenSolver, rrt_config, trajlib_dataset, n_data_use=300
         )
         return compat_solvers
