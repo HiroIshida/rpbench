@@ -1,5 +1,6 @@
+from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, Type, Union
+from typing import List, Tuple, Type, TypeVar, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,17 +33,35 @@ class CircleObstacle:
         return np.hstack([self.center, self.radius])
 
 
+BubblyWorldT = TypeVar("BubblyWorldT", bound="BubblyWorldBase")
+
+
 @dataclass
-class BubblyWorld(WorldBase):
+class BubblyMetaParameter:
+    n_obs: int
+    circle_r_min: float
+    circle_r_max: float
+
+
+@dataclass
+class BubblyWorldBase(WorldBase):
     obstacles: List[CircleObstacle]
 
     @classmethod
-    def get_margin(self) -> float:
+    @abstractmethod
+    def get_meta_parameter(cls) -> BubblyMetaParameter:
+        ...
+
+    @classmethod
+    def get_margin(cls) -> float:
         return 0.01
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "BubblyWorld":
-        n_obs = 40
+    def sample(cls: Type[BubblyWorldT], standard: bool = False) -> BubblyWorldT:
+        meta_param = cls.get_meta_parameter()
+        n_obs = meta_param.n_obs
+        r_min = meta_param.circle_r_min
+        r_max = meta_param.circle_r_max
 
         obstacles = []
         start_pos = np.ones(2) * 0.1
@@ -51,7 +70,7 @@ class BubblyWorld(WorldBase):
         with temp_seed(1, standard):
             while True:
                 center = np.random.rand(2)
-                radius = 0.04 + np.random.rand() * 0.04
+                radius = r_min + np.random.rand() * (r_max - r_min)
                 obstacle = CircleObstacle(center, radius)
 
                 if obstacle.is_colliding(start_pos, cls.get_margin()):
@@ -96,18 +115,28 @@ class BubblyWorld(WorldBase):
         ax.contour(xlin, ylin, sdf_mesh, cmap="gray", levels=[0.0])
 
 
-class BubblyPointConnectTaskBase(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], None]):
+@dataclass
+class BubblyWorldSimple(BubblyWorldBase):
+    @classmethod
+    def get_meta_parameter(cls) -> BubblyMetaParameter:
+        return BubblyMetaParameter(10, 0.05, 0.2)
+
+
+@dataclass
+class BubblyWorldComplex(BubblyWorldBase):
+    @classmethod
+    def get_meta_parameter(cls) -> BubblyMetaParameter:
+        return BubblyMetaParameter(40, 0.04, 0.08)
+
+
+class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], None]):
     @staticmethod
     def get_robot_model() -> None:
         return None
 
-    @staticmethod
-    def get_world_type() -> Type[BubblyWorld]:
-        return BubblyWorld
-
     @classmethod
     def sample_descriptions(
-        cls, world: BubblyWorld, n_sample: int, standard: bool = False
+        cls, world: BubblyWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[np.ndarray, ...]]:
 
         descriptions = []
@@ -121,7 +150,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], N
 
                 while True:
                     goal = np.random.rand(2)
-                    if np.linalg.norm(goal - start) > 0.2:
+                    if np.linalg.norm(goal - start) > 0.4:
                         val = sdf(np.expand_dims(goal, axis=0))[0]
                         if val > 0.0:
                             break
@@ -181,15 +210,15 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorld, Tuple[np.ndarray, ...], N
         return [self.world.export_intrinsic_description()] * self.n_inner_task
 
 
-class BubblyPointConnectTask(BubblyPointConnectTaskBase):
+class WithoutGridSDFMixin:
     @staticmethod
-    def create_gridsdf(world: BubblyWorld, robot_model: None) -> None:
+    def create_gridsdf(world: BubblyWorldBase, robot_model: None) -> None:
         return None
 
 
-class BubblyMeshPointConnectTask(BubblyPointConnectTaskBase):
+class WithGridSDFMixin:
     @staticmethod
-    def create_gridsdf(world: BubblyWorld, robot_model: None) -> Grid2dSDF:
+    def create_gridsdf(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
         grid = world.get_grid()
 
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
@@ -205,10 +234,46 @@ class BubblyMeshPointConnectTask(BubblyPointConnectTaskBase):
         return Grid2dSDF(vals, world.get_grid(), itp)
 
 
+class SimpleWorldProviderMixin:
+    @staticmethod
+    def get_world_type() -> Type[BubblyWorldSimple]:
+        return BubblyWorldSimple
+
+
+class ComplexWorldProviderMixin:
+    @staticmethod
+    def get_world_type() -> Type[BubblyWorldComplex]:
+        return BubblyWorldComplex
+
+
+class BubblySimplePointConnectTask(
+    SimpleWorldProviderMixin, WithoutGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldSimple]
+):
+    ...
+
+
+class BubblySimpleMeshPointConnectTask(
+    SimpleWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldSimple]
+):
+    ...
+
+
+class BubblyComplexPointConnectTask(
+    ComplexWorldProviderMixin, WithoutGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
+):
+    ...
+
+
+class BubblyComplexMeshPointConnectTask(
+    ComplexWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
+):
+    ...
+
+
 class Taskvisualizer:
     fax: Tuple
 
-    def __init__(self, task: BubblyPointConnectTask):
+    def __init__(self, task: BubblyPointConnectTaskBase):
         fig, ax = plt.subplots()
         task.world.visualize((fig, ax))
         for start, goal in task.descriptions:

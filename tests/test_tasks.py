@@ -19,8 +19,8 @@ from rpbench.pr2.tabletop import (
     VoxbloxGridSDFCreator,
 )
 from rpbench.two_dimensional.bubbly_world import (
-    BubblyMeshPointConnectTask,
-    BubblyPointConnectTask,
+    BubblyComplexMeshPointConnectTask,
+    BubblyComplexPointConnectTask,
 )
 from rpbench.two_dimensional.maze import MazeSolvingTask
 
@@ -184,7 +184,7 @@ def test_maze_solving_task():
 def test_bubbly_world_point_connecting_task():
 
     # check solvability of standard problem
-    for task_type in [BubblyPointConnectTask, BubblyMeshPointConnectTask]:
+    for task_type in [BubblyComplexPointConnectTask, BubblyComplexMeshPointConnectTask]:
         task = task_type.sample(1, True)
         result = task.solve_default()[0]
         assert result.traj is not None

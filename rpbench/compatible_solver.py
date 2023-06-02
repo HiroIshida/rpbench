@@ -14,7 +14,7 @@ from rpbench.interface import (
 )
 from rpbench.jaxon.below_table import HumanoidTableReachingTask
 from rpbench.pr2.kivapod import KivapodEmptyReachingTask
-from rpbench.two_dimensional.bubbly_world import BubblyMeshPointConnectTask
+from rpbench.two_dimensional.bubbly_world import BubblyComplexMeshPointConnectTask
 
 
 class CompatibleSolvers:
@@ -86,8 +86,8 @@ class CompatibleSolvers:
         return compat_solvers
 
     @staticmethod
-    def _BubblyMeshPointConnectTask() -> Dict[str, AbstractTaskSolver]:
-        task_type = BubblyMeshPointConnectTask
+    def _BubblyComplexMeshPointConnectTask() -> Dict[str, AbstractTaskSolver]:
+        task_type = BubblyComplexMeshPointConnectTask
 
         compat_solvers: Dict[str, AbstractTaskSolver] = {}
 
