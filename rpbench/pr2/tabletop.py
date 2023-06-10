@@ -22,6 +22,7 @@ from rpbench.interface import (
     SamplableT,
     WorldBase,
 )
+from rpbench.planer_box_utils import sample_box
 from rpbench.pr2.common import (
     CachedDualArmPR2ConstProvider,
     CachedPR2ConstProvider,
@@ -39,6 +40,97 @@ class TabletopWorldBase(WorldBase):
     table: Box
     obstacles: List[Link]
 
+    def get_exact_sdf(self) -> UnionSDF:
+        lst = [self.table.sdf]
+        for obstacle in self.obstacles:
+            lst.append(obstacle.sdf)
+        return UnionSDF(lst)
+
+    @staticmethod
+    def create_standard_table() -> Box:
+        # create jsk-lab 73b2 table
+        table_depth = 0.5
+        table_width = 0.75
+        table_height = 0.7
+        pos = [0.5 + table_depth * 0.5, 0.0, table_height * 0.5]
+        table = Box(extents=[table_depth, table_width, table_height], pos=pos, with_sdf=True)
+        return table
+
+    def get_grid(self) -> Grid:
+        grid_sizes = (56, 56, 28)
+        mesh_height = 0.5
+        depth, width, height = self.table._extents
+        lb = np.array([-0.5 * depth, -0.5 * width, 0.5 * height - 0.1])
+        ub = np.array([+0.5 * depth, +0.5 * width, 0.5 * height + mesh_height])
+        lb = self.table.transform_vector(lb)
+        ub = self.table.transform_vector(ub)
+        return Grid(lb, ub, grid_sizes)
+
+
+@dataclass
+class ClutteredTabletopBoxWorld(TabletopWorldBase):
+    box: Box
+
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        viewer.add(self.table)
+        for obs in self.obstacles:
+            viewer.add(obs)
+        viewer.add(self.box)
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "ClutteredTabletopBoxWorld":
+        intrinsic_desc = []
+
+        table = cls.create_standard_table()
+        table_depth, table_width, table_height = table._extents
+
+        if not standard:
+            x_rand, y_rand = np.random.randn(2)
+            x = 0.1 + 0.05 * x_rand
+            y = 0.1 * y_rand
+            z = 0.0
+            table.translate([x, y, z])
+
+            intrinsic_desc.extend([x_rand, y_rand])
+        else:
+            intrinsic_desc.extend([0.0, 0.0])
+
+        table_tip = table.copy_worldcoords()
+        table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
+
+        while True:
+            if standard:
+                box_extent = np.ones(3) * 0.15
+            else:
+                box_extent = np.ones(3) * 0.1 + np.random.rand(3) * np.array([0.2, 0.2, 0.05])
+            table_extent = np.array([table_depth, table_width])
+            box2d = sample_box(table_extent, box_extent[:2], [])
+            if box2d is not None:
+                break
+        box = Box(box_extent)
+        box.newcoords(table.copy_worldcoords())
+        box.translate(np.hstack([box2d.coords.pos, 0.5 * (box_extent[-1] + table._extents[-1])]))
+        box.rotate(-box2d.coords.angle, "z")
+        box.visual_mesh.visual.face_colors = [255, 0, 0, 200]
+
+        n_obs = 1 + np.random.randint(9)
+        obstacles = []
+        for _ in range(n_obs):
+            obs_extent = np.ones(3) * 0.05 + np.random.rand(3) * np.array([0.15, 0.15, 0.25])
+            obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
+            if obs2d is None:
+                break
+
+            obs = Box(obs_extent)
+            obs.newcoords(table.copy_worldcoords())
+            obs.translate(
+                np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
+            )
+            obs.rotate(-obs2d.coords.angle, "z")
+            obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
+            obstacles.append(obs)
+        return cls(table, obstacles, box)
+
 
 @dataclass
 class TabletopBoxWorld(TabletopWorldBase):
@@ -49,11 +141,10 @@ class TabletopBoxWorld(TabletopWorldBase):
     box_t: float
     _intrinsic_desc: np.ndarray
 
-    def get_exact_sdf(self) -> UnionSDF:
-        lst = [self.table.sdf]
-        for obstacle in self.obstacles:
-            lst.append(obstacle.sdf)
-        return UnionSDF(lst)
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        viewer.add(self.table)
+        for obs in self.obstacles:
+            viewer.add(obs)
 
     def export_intrinsic_description(self) -> np.ndarray:
         return self._intrinsic_desc
@@ -145,31 +236,6 @@ class TabletopBoxWorld(TabletopWorldBase):
         obstacles.append(opposite_plate)
 
         return cls(table, obstacles, box_center, d, w, h, t, np.array(intrinsic_desc))
-
-    @staticmethod
-    def create_standard_table() -> Box:
-        # create jsk-lab 73b2 table
-        table_depth = 0.5
-        table_width = 0.75
-        table_height = 0.7
-        pos = [0.5 + table_depth * 0.5, 0.0, table_height * 0.5]
-        table = Box(extents=[table_depth, table_width, table_height], pos=pos, with_sdf=True)
-        return table
-
-    def get_grid(self) -> Grid:
-        grid_sizes = (56, 56, 28)
-        mesh_height = 0.5
-        depth, width, height = self.table._extents
-        lb = np.array([-0.5 * depth, -0.5 * width, 0.5 * height - 0.1])
-        ub = np.array([+0.5 * depth, +0.5 * width, 0.5 * height + mesh_height])
-        lb = self.table.transform_vector(lb)
-        ub = self.table.transform_vector(ub)
-        return Grid(lb, ub, grid_sizes)
-
-    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        viewer.add(self.table)
-        for obs in self.obstacles:
-            viewer.add(obs)
 
 
 class ExactGridSDFCreator:
