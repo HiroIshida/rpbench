@@ -2,6 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, List, Tuple, Type, TypeVar, Union
 
+import matplotlib.pyplot as plt
 import numpy as np
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
@@ -107,7 +108,7 @@ class ClutteredTabletopBoxWorld(TabletopWorldBase):
             box2d = sample_box(table_extent, box_extent[:2], [])
             if box2d is not None:
                 break
-        box = Box(box_extent)
+        box = Box(box_extent, with_sdf=True)
         box.newcoords(table.copy_worldcoords())
         box.translate(np.hstack([box2d.coords.pos, 0.5 * (box_extent[-1] + table._extents[-1])]))
         box.rotate(-box2d.coords.angle, "z")
@@ -115,13 +116,15 @@ class ClutteredTabletopBoxWorld(TabletopWorldBase):
 
         n_obs = 1 + np.random.randint(9)
         obstacles = []
+        obstacles_2ds = []
         for _ in range(n_obs):
             obs_extent = np.ones(3) * 0.05 + np.random.rand(3) * np.array([0.15, 0.15, 0.25])
             obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
             if obs2d is None:
                 break
+            obstacles_2ds.append(obs2d)
 
-            obs = Box(obs_extent)
+            obs = Box(obs_extent, with_sdf=True)
             obs.newcoords(table.copy_worldcoords())
             obs.translate(
                 np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
@@ -129,6 +132,17 @@ class ClutteredTabletopBoxWorld(TabletopWorldBase):
             obs.rotate(-obs2d.coords.angle, "z")
             obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
             obstacles.append(obs)
+
+        # check if all obstacle dont collide each other
+
+        debug_matplotlib = False
+        if debug_matplotlib:
+            fig, ax = plt.subplots()
+            box2d.visualize((fig, ax), "red")
+            for obs in obstacles_2ds:
+                obs.visualize((fig, ax), "green")
+            ax.set_aspect("equal", adjustable="box")
+
         return cls(table, obstacles, box)
 
 
