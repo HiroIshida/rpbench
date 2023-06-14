@@ -22,7 +22,7 @@ class PlanerCoords:
 def rotation_matrix_2d(angle: float) -> np.ndarray:
     c = math.cos(angle)
     s = math.sin(angle)
-    rotmat = np.array([[c, s], [-s, c]])
+    rotmat = np.array([[c, -s], [s, c]])
     return rotmat
 
 
