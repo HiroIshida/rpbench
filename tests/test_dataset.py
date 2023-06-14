@@ -4,11 +4,11 @@ from pathlib import Path
 from skmp.solver.ompl_solver import OMPLDataDrivenSolver, OMPLSolverConfig
 
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset
-from rpbench.pr2.tabletop import TabletopBoxRightArmReachingTask
+from rpbench.pr2.tabletop import TabletopOvenRightArmReachingTask
 
 
 def test_dataset():
-    task_type = TabletopBoxRightArmReachingTask
+    task_type = TabletopOvenRightArmReachingTask
     solcon = OMPLSolverConfig()
 
     with tempfile.TemporaryDirectory() as td:

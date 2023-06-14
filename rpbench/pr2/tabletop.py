@@ -32,8 +32,9 @@ from rpbench.pr2.common import (
 from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf
 
-TabletopBoxSamplableT = TypeVar("TabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
-OtherTabletopBoxSamplableT = TypeVar("OtherTabletopBoxSamplableT", bound="TabletopBoxSamplableBase")
+TabletopWorldT = TypeVar("TabletopWorldT", bound="TabletopWorldBase")
+TabletopSamplableT = TypeVar("TabletopSamplableT", bound="TabletopSamplableBase")
+OtherTabletopBoxSamplableT = TypeVar("OtherTabletopBoxSamplableT", bound="TabletopSamplableBase")
 
 
 @dataclass
@@ -69,7 +70,7 @@ class TabletopWorldBase(WorldBase):
 
 
 @dataclass
-class ClutteredTabletopBoxWorld(TabletopWorldBase):
+class TabletopBoxWorld(TabletopWorldBase):
     box: Box
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -79,7 +80,7 @@ class ClutteredTabletopBoxWorld(TabletopWorldBase):
         viewer.add(self.box)
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "ClutteredTabletopBoxWorld":
+    def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
         intrinsic_desc = []
 
         table = cls.create_standard_table()
@@ -147,7 +148,7 @@ class ClutteredTabletopBoxWorld(TabletopWorldBase):
 
 
 @dataclass
-class TabletopBoxWorld(TabletopWorldBase):
+class TabletopOvenWorld(TabletopWorldBase):
     box_center: Coordinates
     box_d: float
     box_w: float
@@ -164,7 +165,7 @@ class TabletopBoxWorld(TabletopWorldBase):
         return self._intrinsic_desc
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
+    def sample(cls, standard: bool = False) -> "TabletopOvenWorld":
         intrinsic_desc = []
 
         table = cls.create_standard_table()
@@ -254,7 +255,7 @@ class TabletopBoxWorld(TabletopWorldBase):
 
 class ExactGridSDFCreator:
     @staticmethod
-    def create_gridsdf(world: TabletopBoxWorld, robot_model: RobotModel) -> GridSDF:
+    def create_gridsdf(world: TabletopOvenWorld, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -276,7 +277,7 @@ class VoxbloxGridSDFCreator:
         return camera
 
     @staticmethod
-    def create_gridsdf(world: TabletopBoxWorld, robot_model: RobotModel) -> GridSDF:
+    def create_gridsdf(world: TabletopOvenWorld, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -289,12 +290,20 @@ class VoxbloxGridSDFCreator:
         return grid_sdf
 
 
-@dataclass
-class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT, RobotModel]):
+class TabletopOvenWorldMixin:
+    @staticmethod
+    def get_world_type() -> Type[TabletopOvenWorld]:
+        return TabletopOvenWorld
+
+
+class TabletopBoxWorldMixin:
     @staticmethod
     def get_world_type() -> Type[TabletopBoxWorld]:
         return TabletopBoxWorld
 
+
+@dataclass
+class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotModel]):
     @staticmethod
     def get_robot_model() -> RobotModel:
         return CachedPR2ConstProvider.get_pr2()
@@ -319,14 +328,14 @@ class TabletopBoxSamplableBase(SamplableBase[TabletopBoxWorld, DescriptionT, Rob
         return [self.world.export_intrinsic_description()] * self.n_inner_task
 
     @classmethod
-    def cast_from(cls: Type[TabletopBoxSamplableT], other: SamplableT) -> TabletopBoxSamplableT:
-        assert isinstance(other, TabletopBoxSamplableBase)
+    def cast_from(cls: Type[TabletopSamplableT], other: SamplableT) -> TabletopSamplableT:
+        assert isinstance(other, TabletopSamplableBase)
         is_compatible_meshgen = cls.create_gridsdf == other.create_gridsdf
         assert is_compatible_meshgen
         return cls(other.world, [], other._gridsdf)
 
 
-class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
+class TabletopWorldWrapBase(TabletopSamplableBase[TabletopWorldT, None]):
     @classmethod
     def sample_descriptions(
         cls, world: TabletopWorldBase, n_sample: int, standard: bool = False
@@ -334,9 +343,17 @@ class TabletopBoxWorldWrapBase(TabletopBoxSamplableBase[None]):
         return [None for _ in range(n_sample)]
 
 
-class TabletopBoxTaskBase(
-    ReachingTaskBase[TabletopBoxWorld, RobotModel],
-    TabletopBoxSamplableBase[Tuple[Coordinates, ...]],
+class TabletopOvenWorldWrapBase(TabletopOvenWorldMixin, TabletopWorldWrapBase[TabletopOvenWorld]):
+    ...
+
+
+class TabletopBoxWorldWrapBase(TabletopBoxWorldMixin, TabletopWorldWrapBase[TabletopBoxWorld]):
+    ...
+
+
+class TabletopTaskBase(
+    ReachingTaskBase[TabletopWorldT, RobotModel],
+    TabletopSamplableBase[TabletopWorldT, Tuple[Coordinates, ...]],
 ):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]]
 
@@ -409,7 +426,7 @@ class TabletopBoxTaskBase(
 
     @classmethod
     def sample_descriptions(
-        cls, world: TabletopBoxWorld, n_sample: int, standard: bool = False
+        cls, world: TabletopWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, ...]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
@@ -429,18 +446,18 @@ class TabletopBoxTaskBase(
 
     @classmethod
     @abstractmethod
-    def sample_target_poses(
-        cls, world: TabletopBoxWorld, standard: bool
-    ) -> Tuple[Coordinates, ...]:
+    def sample_target_poses(cls, world: TabletopWorldT, standard: bool) -> Tuple[Coordinates, ...]:
         ...
 
 
-class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
+class TabletopOvenRightArmReachingTaskBase(
+    TabletopOvenWorldMixin, TabletopTaskBase[TabletopOvenWorld]
+):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
 
     @classmethod
     def sample_target_poses(
-        cls, world: TabletopBoxWorld, standard: bool
+        cls, world: TabletopOvenWorld, standard: bool
     ) -> Tuple[Coordinates, ...]:
         table = world.table
         table_depth, table_width, table_height = table._extents
@@ -475,12 +492,14 @@ class TabletopBoxRightArmReachingTaskBase(TabletopBoxTaskBase):
         assert False
 
 
-class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
+class TabletopOvenDualArmReachingTaskBase(
+    TabletopOvenWorldMixin, TabletopTaskBase[TabletopOvenWorld]
+):
     config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
 
     @classmethod
     def sample_target_poses(
-        cls, world: TabletopBoxWorld, standard: bool
+        cls, world: TabletopOvenWorld, standard: bool
     ) -> Tuple[Coordinates, ...]:
         table = world.table
         table_depth, table_width, table_height = table._extents
@@ -517,10 +536,10 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxTaskBase):
 
 
 # fmt: off
-class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
-class TabletopBoxVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
-class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
-class TabletopBoxVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
-class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
-class TabletopVoxbloxBoxWorldWrap(VoxbloxGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
+class TabletopOvenRightArmReachingTask(ExactGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
+class TabletopOvenVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
+class TabletopOvenDualArmReachingTask(ExactGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
+class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
+class TabletopOvenWorldWrap(ExactGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
+class TabletopOvenVoxbloxWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
 # fmt: on

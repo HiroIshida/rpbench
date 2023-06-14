@@ -9,13 +9,13 @@ from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.pr2.kivapod import KivapodEmptyReachingTask
 from rpbench.pr2.tabletop import (
-    TabletopBoxDualArmReachingTask,
-    TabletopBoxDualArmReachingTaskBase,
-    TabletopBoxRightArmReachingTask,
-    TabletopBoxTaskBase,
-    TabletopBoxVoxbloxDualArmReachingTask,
-    TabletopBoxVoxbloxRightArmReachingTask,
-    TabletopBoxWorldWrap,
+    TabletopOvenDualArmReachingTask,
+    TabletopOvenDualArmReachingTaskBase,
+    TabletopOvenRightArmReachingTask,
+    TabletopOvenVoxbloxDualArmReachingTask,
+    TabletopOvenVoxbloxRightArmReachingTask,
+    TabletopOvenWorldWrap,
+    TabletopTaskBase,
     VoxbloxGridSDFCreator,
 )
 from rpbench.two_dimensional.bubbly_world import (
@@ -30,37 +30,37 @@ set_ompl_random_seed(0)
 
 def test_intrinsic_dimension():
     for standard in [False, True]:
-        task: Any = TabletopBoxWorldWrap.sample(2, standard=standard)
+        task: Any = TabletopOvenWorldWrap.sample(2, standard=standard)
         int_descs = task.export_intrinsic_descriptions()
         assert len(int_descs) == 2
         assert len(int_descs[0]) == 7
 
-        task = TabletopBoxRightArmReachingTask.sample(1)
+        task = TabletopOvenRightArmReachingTask.sample(1)
         assert len(task.export_intrinsic_descriptions()[0]) == 13
 
-        task = TabletopBoxDualArmReachingTask.sample(1)
+        task = TabletopOvenDualArmReachingTask.sample(1)
         assert len(task.export_intrinsic_descriptions()[0]) == 19
 
 
 def test_tabletop_samplable():
-    ww = TabletopBoxWorldWrap.sample(10)
+    ww = TabletopOvenWorldWrap.sample(10)
     assert ww.n_inner_task == 10
     # cast
-    task = TabletopBoxRightArmReachingTask.cast_from(ww)
+    task = TabletopOvenRightArmReachingTask.cast_from(ww)
     assert task.n_inner_task == 0
-    TabletopBoxWorldWrap.cast_from(task)
+    TabletopOvenWorldWrap.cast_from(task)
 
 
 @pytest.mark.parametrize(
     "task_type",
     [
-        TabletopBoxRightArmReachingTask,
-        TabletopBoxVoxbloxRightArmReachingTask,
-        TabletopBoxDualArmReachingTask,
-        TabletopBoxVoxbloxDualArmReachingTask,
+        TabletopOvenRightArmReachingTask,
+        TabletopOvenVoxbloxRightArmReachingTask,
+        TabletopOvenDualArmReachingTask,
+        TabletopOvenVoxbloxDualArmReachingTask,
     ],
 )
-def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
+def test_tabletop_task(task_type: Type[TabletopTaskBase]):
     # test standard task's consistency
     # note that, because skrobot link has uuid, we must convert it to table by
     # export_table function beforehand
@@ -81,7 +81,7 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     assert task.n_inner_task == n_desc
 
     # test dof
-    if isinstance(task, TabletopBoxDualArmReachingTaskBase):
+    if isinstance(task, TabletopOvenDualArmReachingTaskBase):
         assert task.get_dof() == 17
     else:
         assert task.get_dof() == 10
@@ -95,7 +95,7 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     desc_dict = desc_table.wcond_desc_dicts[0]
     assert desc_dict["target_pose-0"].shape == (6,)
 
-    if isinstance(task, TabletopBoxDualArmReachingTaskBase):
+    if isinstance(task, TabletopOvenDualArmReachingTaskBase):
         assert desc_dict["target_pose-1"].shape == (6,)
 
     # test conversion to problem format
@@ -113,7 +113,7 @@ def test_tabletop_task(task_type: Type[TabletopBoxTaskBase]):
     assert res.traj is not None
 
     # test predicated sampling
-    def predicate(task: TabletopBoxTaskBase):
+    def predicate(task: TabletopTaskBase):
         assert len(task.descriptions) == 1
         for desc in task.descriptions:
             pose = desc[0]
