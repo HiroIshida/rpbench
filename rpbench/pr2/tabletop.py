@@ -4,6 +4,7 @@ from typing import ClassVar, List, Tuple, Type, TypeVar, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import lognorm
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
@@ -23,7 +24,7 @@ from rpbench.interface import (
     SamplableT,
     WorldBase,
 )
-from rpbench.planer_box_utils import sample_box
+from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
 from rpbench.pr2.common import (
     CachedDualArmPR2ConstProvider,
     CachedPR2ConstProvider,
@@ -92,7 +93,6 @@ class TabletopBoxWorld(TabletopWorldBase):
             y = 0.1 * y_rand
             z = 0.0
             table.translate([x, y, z])
-
             intrinsic_desc.extend([x_rand, y_rand])
         else:
             intrinsic_desc.extend([0.0, 0.0])
@@ -100,26 +100,28 @@ class TabletopBoxWorld(TabletopWorldBase):
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
 
+        table_extent = np.array([table_depth, table_width])
         while True:
             if standard:
                 box_extent = np.ones(3) * 0.15
+                box2d = Box2d(box_extent[:2], PlanerCoords(np.zeros(2), 0.0 * np.pi))
             else:
                 box_extent = np.ones(3) * 0.1 + np.random.rand(3) * np.array([0.2, 0.2, 0.05])
-            table_extent = np.array([table_depth, table_width])
-            box2d = sample_box(table_extent, box_extent[:2], [])
+                box2d = sample_box(table_extent, box_extent[:2], [])
             if box2d is not None:
                 break
+
         box = Box(box_extent, with_sdf=True)
         box.newcoords(table.copy_worldcoords())
         box.translate(np.hstack([box2d.coords.pos, 0.5 * (box_extent[-1] + table._extents[-1])]))
-        box.rotate(-box2d.coords.angle, "z")
+        box.rotate(box2d.coords.angle, "z")
         box.visual_mesh.visual.face_colors = [255, 0, 0, 200]
 
-        n_obs = 1 + np.random.randint(9)
+        n_obs = 1 + np.random.randint(8)
         obstacles = []
         obstacles_2ds = []
         for _ in range(n_obs):
-            obs_extent = np.ones(3) * 0.05 + np.random.rand(3) * np.array([0.15, 0.15, 0.25])
+            obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.06, 0.06, 0.1])
             obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
             if obs2d is None:
                 break
@@ -130,7 +132,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             obs.translate(
                 np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
             )
-            obs.rotate(-obs2d.coords.angle, "z")
+            obs.rotate(obs2d.coords.angle, "z")
             obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
             obstacles.append(obs)
 
@@ -430,10 +432,13 @@ class TabletopTaskBase(
     ) -> List[Tuple[Coordinates, ...]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
+
         if standard:
             assert n_sample == 1
+
         pose_list: List[Tuple[Coordinates, ...]] = []
-        while len(pose_list) < n_sample:
+        n_budget = 100 * n_sample
+        for _ in range(n_budget):
             poses = cls.sample_target_poses(world, standard)
             is_valid_poses = True
             for pose in poses:
@@ -442,7 +447,9 @@ class TabletopTaskBase(
                     is_valid_poses = False
             if is_valid_poses:
                 pose_list.append(poses)
-        return pose_list
+            if len(pose_list) == n_sample:
+                return pose_list
+        assert False
 
     @classmethod
     @abstractmethod

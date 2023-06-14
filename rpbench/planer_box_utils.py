@@ -88,7 +88,7 @@ def sample_box(
 
     for _ in range(n_budget):
         box_pos_cand = -0.5 * table_extent + table_extent * np.random.rand(2)
-        angle_cand = np.random.rand() * np.pi
+        angle_cand = -0.5 * np.pi + np.random.rand() * np.pi
         box_cand = Box2d(box_extent, PlanerCoords(box_pos_cand, angle_cand))
 
         def is_valid(box_cand):
