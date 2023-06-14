@@ -547,6 +547,55 @@ class TabletopOvenDualArmReachingTaskBase(
         return (right_co, left_co)
 
 
+class TabletopBoxDualArmReachingTaskBase(TabletopBoxWorldMixin, TabletopTaskBase[TabletopBoxWorld]):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedDualArmPR2ConstProvider
+
+    @classmethod
+    def sample_target_poses(
+        cls, world: TabletopBoxWorld, standard: bool
+    ) -> Tuple[Coordinates, ...]:
+
+        table_rot = world.table.copy_worldcoords().rotation
+        table_ex, table_ey = table_rot[:, 0], table_rot[:, 1]
+
+        box_rot = world.box.copy_worldcoords().rotation
+        box_ex, box_ey = box_rot[:, 0], box_rot[:, 1]
+
+        margin = 0.05
+        if table_ex.dot(box_ex) < 1 / np.sqrt(2):
+            x_half_width = 0.5 * world.box._extents[0]
+            co_box = world.box.copy_worldcoords()
+            pos_target1 = co_box.worldpos() + box_ex * (x_half_width + margin)
+            pos_target2 = co_box.worldpos() - box_ex * (x_half_width + margin)
+            right_co = Coordinates(pos=pos_target1, rot=world.box.copy_worldcoords().rotation)
+            left_co = Coordinates(pos=pos_target2, rot=world.box.copy_worldcoords().rotation)
+            right_co.rotate(np.pi * 0.5, "z")
+            left_co.rotate(np.pi * 0.5, "z")
+        else:
+            y_half_width = 0.5 * world.box._extents[1]
+            co_box = world.box.copy_worldcoords()
+            pos_target1 = co_box.worldpos() + box_ey * (y_half_width + margin)
+            pos_target2 = co_box.worldpos() - box_ey * (y_half_width + margin)
+            right_co = Coordinates(pos=pos_target1, rot=world.box.copy_worldcoords().rotation)
+            left_co = Coordinates(pos=pos_target2, rot=world.box.copy_worldcoords().rotation)
+
+        # use the same height for all boxes
+        reach_height = world.table._extents[2] + 0.1
+        h_translate = reach_height - world.box.worldpos()[2]
+        d_translate = 0.05
+
+        right_co.translate([d_translate, 0, h_translate])
+        left_co.translate([d_translate, 0, h_translate])
+
+        right_co.rotate(np.pi * 0.5, "x")
+        left_co.rotate(np.pi * 0.5, "x")
+
+        if right_co.worldpos()[1] < left_co.worldpos()[1]:
+            return (right_co, left_co)
+        else:
+            return (left_co, right_co)
+
+
 # fmt: off
 class TabletopOvenRightArmReachingTask(ExactGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
 class TabletopOvenVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
@@ -554,4 +603,6 @@ class TabletopOvenDualArmReachingTask(ExactGridSDFCreator, TabletopOvenDualArmRe
 class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
 class TabletopOvenWorldWrap(ExactGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
 class TabletopOvenVoxbloxWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
+class TabletopVoxbloxOvenWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
+class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
 # fmt: on
