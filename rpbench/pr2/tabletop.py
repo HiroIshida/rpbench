@@ -117,9 +117,14 @@ class TabletopBoxWorld(TabletopWorldBase):
         box.rotate(box2d.coords.angle, "z")
         box.visual_mesh.visual.face_colors = [255, 0, 0, 200]
 
-        n_obs = 1 + np.random.randint(8)
-        obstacles = []
+        obstacles = [box]  # reaching box is also an obstacle in planning context
         obstacles_2ds = []
+
+        if standard:
+            n_obs = 0
+        else:
+            n_obs = 1 + np.random.randint(8)
+
         for _ in range(n_obs):
             obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.06, 0.06, 0.1])
             obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
