@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, List, Tuple, Type, TypeVar, Union
+from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -102,6 +102,7 @@ class TabletopBoxWorld(TabletopWorldBase):
 
         table_extent = np.array([table_depth, table_width])
         while True:
+            box2d: Optional[Box2d]
             if standard:
                 box_extent = np.ones(3) * 0.15
                 box2d = Box2d(box_extent[:2], PlanerCoords(np.zeros(2), 0.0 * np.pi))
@@ -604,9 +605,10 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxWorldMixin, TabletopTaskBase
 class TabletopOvenRightArmReachingTask(ExactGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
 class TabletopOvenVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
 class TabletopOvenDualArmReachingTask(ExactGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
-class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
 class TabletopOvenWorldWrap(ExactGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
 class TabletopOvenVoxbloxWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
 class TabletopVoxbloxOvenWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
-class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
+class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
+
+class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # type: ignore[misc]  # noqa
 # fmt: on
