@@ -106,7 +106,7 @@ class TabletopBoxWorld(TabletopWorldBase):
                 box_extent = np.ones(3) * 0.15
                 box2d = Box2d(box_extent[:2], PlanerCoords(np.zeros(2), 0.0 * np.pi))
             else:
-                box_extent = np.ones(3) * 0.1 + np.random.rand(3) * np.array([0.2, 0.2, 0.05])
+                box_extent = np.ones(3) * 0.1 + np.random.rand(3) * np.array([0.1, 0.1, 0.05])
                 box2d = sample_box(table_extent, box_extent[:2], [])
             if box2d is not None:
                 break
@@ -126,7 +126,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             n_obs = 1 + np.random.randint(8)
 
         for _ in range(n_obs):
-            obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.06, 0.06, 0.1])
+            obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.04, 0.04, 0.2])
             obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
             if obs2d is None:
                 break
@@ -441,7 +441,7 @@ class TabletopTaskBase(
         if standard:
             assert n_sample == 1
 
-        pose_list: List[Tuple[Coordinates, ...]] = []
+        poses_list: List[Tuple[Coordinates, ...]] = []
         n_budget = 100 * n_sample
         for _ in range(n_budget):
             poses = cls.sample_target_poses(world, standard)
@@ -451,9 +451,9 @@ class TabletopTaskBase(
                 if world.get_exact_sdf()(position)[0] < 1e-3:
                     is_valid_poses = False
             if is_valid_poses:
-                pose_list.append(poses)
-            if len(pose_list) == n_sample:
-                return pose_list
+                poses_list.append(poses)
+            if len(poses_list) == n_sample:
+                return poses_list
         assert False
 
     @classmethod
@@ -569,8 +569,12 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxWorldMixin, TabletopTaskBase
             pos_target2 = co_box.worldpos() - box_ex * (x_half_width + margin)
             right_co = Coordinates(pos=pos_target1, rot=world.box.copy_worldcoords().rotation)
             left_co = Coordinates(pos=pos_target2, rot=world.box.copy_worldcoords().rotation)
-            right_co.rotate(np.pi * 0.5, "z")
-            left_co.rotate(np.pi * 0.5, "z")
+            if table_ey.dot(box_ex) < 0.0:
+                right_co.rotate(+np.pi * 0.5, "z")
+                left_co.rotate(+np.pi * 0.5, "z")
+            else:
+                right_co.rotate(-np.pi * 0.5, "z")
+                left_co.rotate(-np.pi * 0.5, "z")
         else:
             y_half_width = 0.5 * world.box._extents[1]
             co_box = world.box.copy_worldcoords()
