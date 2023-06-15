@@ -610,5 +610,6 @@ class TabletopOvenVoxbloxWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapB
 class TabletopVoxbloxOvenWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
 class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
 
+class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # type: ignore[misc]  # noqa
 class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # type: ignore[misc]  # noqa
 # fmt: on
