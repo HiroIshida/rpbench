@@ -435,7 +435,7 @@ class TabletopTaskBase(
     @classmethod
     def sample_descriptions(
         cls, world: TabletopWorldT, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates, ...]]:
+    ) -> Optional[List[Tuple[Coordinates, ...]]]:
         # using single element Tuple looks bit cumbsersome but
         # for generality
 
@@ -455,7 +455,7 @@ class TabletopTaskBase(
                 poses_list.append(poses)
             if len(poses_list) == n_sample:
                 return poses_list
-        assert False
+        return None
 
     @classmethod
     @abstractmethod
