@@ -35,6 +35,7 @@ from skmp.solver.interface import (
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
 
+from rpbench.timeout_decorator import timeout
 from rpbench.utils import skcoords_to_pose_vec
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
@@ -43,6 +44,9 @@ OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
+
+
+_SEC_SAMPLE_TIMEOUT = 10.0
 
 
 class SDFProtocol(Protocol):
@@ -81,7 +85,7 @@ class GridSDFProtocol(SDFProtocol, Protocol):
 class WorldBase(ABC):
     @classmethod
     @abstractmethod
-    def sample(cls: Type[WorldT], standard: bool = False) -> WorldT:
+    def sample(cls: Type[WorldT], standard: bool = False) -> Optional[WorldT]:
         ...
 
     @abstractmethod
@@ -182,21 +186,33 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         return len(self.descriptions)
 
     @classmethod
+    @timeout(_SEC_SAMPLE_TIMEOUT)
     def sample(
         cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
     ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
         robot_model = cls.get_robot_model()
         world_t = cls.get_world_type()
-        world = world_t.sample(standard=standard)
-        descriptions = cls.sample_descriptions(world, n_wcond_desc, standard)
-        if with_gridsdf:
-            gridsdf = cls.create_gridsdf(world, robot_model)
-        else:
-            gridsdf = None
-        return cls(world, descriptions, gridsdf)
+
+        while True:
+
+            world = world_t.sample(standard=standard)
+            if world is None:
+                continue
+
+            descriptions = cls.sample_descriptions(world, n_wcond_desc, standard)
+            if descriptions is None:
+                continue
+
+            if with_gridsdf:
+                gridsdf = cls.create_gridsdf(world, robot_model)
+            else:
+                gridsdf = None
+
+            return cls(world, descriptions, gridsdf)
 
     @classmethod
+    @timeout(_SEC_SAMPLE_TIMEOUT)
     def predicated_sample(
         cls: Type[SamplableT],
         n_wcond_desc: int,
@@ -211,38 +227,45 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
         robot_model = cls.get_robot_model()
         world_t = cls.get_world_type()
-        world = world_t.sample(standard=standard)
 
-        if with_gridsdf:
-            gridsdf = cls.create_gridsdf(world, robot_model)
-        else:
-            gridsdf = None
+        while True:
+            world = world_t.sample(standard=standard)
+            if world is None:
+                continue
 
-        # do some bit tricky thing.
-        # Naively, we can sample task with multiple description and then check if
-        # it satisfies the predicate. However, by this method, as the number of
-        # sample descriptions increase, satisfying the predicate becomes exponentially
-        # difficult. Thus, we sample the description one by one, and then concatanate
-        # and marge into a task.
-        descriptions: List[DescriptionT] = []
-        count_trial_before_first_success = 0
-        while len(descriptions) < n_wcond_desc:
+            if with_gridsdf:
+                gridsdf = cls.create_gridsdf(world, robot_model)
+            else:
+                gridsdf = None
 
-            if len(descriptions) == 0:
-                count_trial_before_first_success += 1
+            # do some bit tricky thing.
+            # Naively, we can sample task with multiple description and then check if
+            # it satisfies the predicate. However, by this method, as the number of
+            # sample descriptions increase, satisfying the predicate becomes exponentially
+            # difficult. Thus, we sample the description one by one, and then concatanate
+            # and marge into a task.
+            descriptions: List[DescriptionT] = []
+            count_trial_before_first_success = 0
+            while len(descriptions) < n_wcond_desc:
 
-            desc = cls.sample_descriptions(world, 1, standard)[0]
-            temp_problem = cls(world, [desc], gridsdf)
+                if len(descriptions) == 0:
+                    count_trial_before_first_success += 1
 
-            # note that some predicate may depends on gridsdf
-            # thus, you must be careful if you set with_grisdf=False
-            if predicate(temp_problem):
-                descriptions.append(desc)
+                descs = cls.sample_descriptions(world, 1, standard)
 
-            if count_trial_before_first_success > max_trial_per_desc:
-                return None
+                if descs is not None:
+                    desc = descs[0]
+                    temp_problem = cls(world, [desc], gridsdf)
 
-        return cls(world, descriptions, gridsdf)
+                    # note that some predicate may depends on gridsdf
+                    # thus, you must be careful if you set with_grisdf=False
+                    if predicate(temp_problem):
+                        descriptions.append(desc)
+
+                if count_trial_before_first_success > max_trial_per_desc:
+                    return None
+
+            return cls(world, descriptions, gridsdf)
 
     @staticmethod
     @abstractmethod
@@ -273,7 +296,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     @abstractmethod
     def sample_descriptions(
         cls, world: WorldT, n_sample: int, standard: bool = False
-    ) -> List[DescriptionT]:
+    ) -> Optional[List[DescriptionT]]:
         ...
 
     @abstractmethod
