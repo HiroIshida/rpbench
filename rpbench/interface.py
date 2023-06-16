@@ -46,7 +46,7 @@ DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
 
 
-_SEC_SAMPLE_TIMEOUT = 10.0
+_SEC_SAMPLE_TIMEOUT = 100.0
 
 
 class SDFProtocol(Protocol):
