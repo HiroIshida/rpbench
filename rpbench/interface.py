@@ -35,7 +35,6 @@ from skmp.solver.interface import (
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
 
-from rpbench.timeout_decorator import timeout
 from rpbench.utils import skcoords_to_pose_vec
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
@@ -44,9 +43,6 @@ OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
-
-
-_SEC_SAMPLE_TIMEOUT = 100.0
 
 
 class SDFProtocol(Protocol):
@@ -186,7 +182,10 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         return len(self.descriptions)
 
     @classmethod
-    @timeout(_SEC_SAMPLE_TIMEOUT)
+    def acceptable_time_admissible(self) -> float:
+        return np.inf  # override this method in subclass
+
+    @classmethod
     def sample(
         cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
     ) -> SamplableT:
@@ -194,7 +193,14 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         robot_model = cls.get_robot_model()
         world_t = cls.get_world_type()
 
+        t_start = time.time()
         while True:
+            t_elapsed = time.time() - t_start
+            t_admissible = cls.acceptable_time_admissible()
+            if t_elapsed > t_admissible:
+                assert False, "elapsed time {} sec exceeds limit {} sec".format(
+                    t_elapsed, t_admissible
+                )
 
             world = world_t.sample(standard=standard)
             if world is None:
@@ -212,7 +218,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             return cls(world, descriptions, gridsdf)
 
     @classmethod
-    @timeout(_SEC_SAMPLE_TIMEOUT)
     def predicated_sample(
         cls: Type[SamplableT],
         n_wcond_desc: int,
@@ -228,7 +233,15 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         robot_model = cls.get_robot_model()
         world_t = cls.get_world_type()
 
+        t_start = time.time()
         while True:
+            t_elapsed = time.time() - t_start
+            t_admissible = cls.acceptable_time_admissible()
+            if t_elapsed > t_admissible:
+                assert False, "elapsed time {} sec exceeds limit {} sec".format(
+                    t_elapsed, t_admissible
+                )
+
             world = world_t.sample(standard=standard)
             if world is None:
                 continue
