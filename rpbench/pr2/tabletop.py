@@ -263,7 +263,7 @@ class TabletopOvenWorld(TabletopWorldBase):
 
 class ExactGridSDFCreator:
     @staticmethod
-    def create_gridsdf(world: TabletopOvenWorld, robot_model: RobotModel) -> GridSDF:
+    def create_gridsdf(world: TabletopWorldBase, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -285,7 +285,7 @@ class VoxbloxGridSDFCreator:
         return camera
 
     @staticmethod
-    def create_gridsdf(world: TabletopOvenWorld, robot_model: RobotModel) -> GridSDF:
+    def create_gridsdf(world: TabletopWorldBase, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -616,6 +616,6 @@ class TabletopOvenVoxbloxWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapB
 class TabletopVoxbloxOvenWorldWrap(VoxbloxGridSDFCreator, TabletopOvenWorldWrapBase): ...  # noqa
 class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenDualArmReachingTaskBase): ...  # noqa
 
-class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # type: ignore[misc]  # noqa
-class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # type: ignore[misc]  # noqa
+class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
+class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
 # fmt: on
