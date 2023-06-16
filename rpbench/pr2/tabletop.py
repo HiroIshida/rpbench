@@ -356,7 +356,9 @@ class TabletopOvenWorldWrapBase(TabletopOvenWorldMixin, TabletopWorldWrapBase[Ta
 
 
 class TabletopBoxWorldWrapBase(TabletopBoxWorldMixin, TabletopWorldWrapBase[TabletopBoxWorld]):
-    ...
+    @classmethod
+    def acceptable_time_admissible(cls) -> float:
+        return 100.0
 
 
 class TabletopTaskBase(
@@ -599,6 +601,10 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxWorldMixin, TabletopTaskBase
             return (right_co, left_co)
         else:
             return (left_co, right_co)
+
+    @classmethod
+    def acceptable_time_admissible(cls) -> float:
+        return 100.0
 
 
 # fmt: off
