@@ -34,12 +34,19 @@ def box_sdf(points: np.ndarray, width: np.ndarray, origin: np.ndarray):
     return sd_vals
 
 
+def rotation_matrix(angle: float) -> np.ndarray:
+    cos_theta = np.cos(angle)
+    sin_theta = np.sin(angle)
+
+    return np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
+
+
 @dataclass
 class MultipleRoomsWorldBase(WorldBase):
     angles: List[float]
     r_main_room: ClassVar[float] = 0.25
     r_side_room: ClassVar[float] = 0.25
-    w_bridge: ClassVar[float] = 0.08
+    w_bridge: ClassVar[float] = 0.05
 
     @classmethod
     @abstractmethod
@@ -67,29 +74,41 @@ class MultipleRoomsWorldBase(WorldBase):
         return cls(angles)
 
     def get_exact_sdf(self) -> SDFProtocol:
-
-        self.get_n_room()
-
         def f(pts: np.ndarray):
+            def norm_batch(pts, center) -> np.ndarray:
+                dists = np.sqrt(np.sum((pts - center) ** 2, axis=1))
+                return dists
 
-            # side circles
             dists_list = []
+            theta_bridge = 1.0
             for angle in self.angles:
+                # sdf of room center
                 room_center = np.array([math.cos(angle), math.sin(angle)]) * (1 - self.r_side_room)
-                dists = np.sqrt(np.sum((pts - room_center) ** 2, axis=1)) - self.r_side_room
+                dists = norm_batch(pts, room_center) - self.r_side_room
                 dists_list.append(dists)
 
-            # bridge square
-            for angle in self.angles:
-                coss = math.cos(angle)
-                sinn = math.sin(angle)
-                rot = np.array([[coss, -sinn], [sinn, coss]])
+                # sdf of bridge
+                L = np.linalg.norm(room_center)
+                R = L * 0.5 / np.cos(-0.5 * np.pi + theta_bridge)
+                bridge_circle_center = (
+                    rotation_matrix(-0.5 * np.pi + theta_bridge).dot(room_center) * R / L
+                )
+                R_outer = R + 0.5 * self.w_bridge
+                R_inner = R - 0.5 * self.w_bridge
 
-                pts_rotated = pts.dot(rot.T)
-                center = np.array([1, 0]) * 0.5 * (self.r_main_room + (1 - self.r_side_room * 2))
-                size = np.array([0.25 * 1.1, self.w_bridge])
-                dists = box_sdf(pts_rotated, size, center)
-                dists_list.append(dists)
+                dists_outer = norm_batch(pts, bridge_circle_center) - R_outer
+                dists_inner = norm_batch(pts, bridge_circle_center) - R_inner
+                dists_subtract = np.maximum(dists_outer, -dists_inner)
+
+                n1 = np.array([np.cos(angle + theta_bridge), np.sin(angle + theta_bridge)])
+                dists_block1 = np.dot(pts, +n1)
+                dists_subtract = np.maximum(dists_subtract, -dists_block1)
+
+                n2 = np.array([np.cos(angle - theta_bridge), np.sin(angle - theta_bridge)])
+                dists_block2 = np.dot(pts - room_center, -n2)
+                dists_subtract = np.maximum(dists_subtract, -dists_block2)
+
+                dists_list.append(dists_subtract)
 
             dists = np.sqrt(np.sum((pts) ** 2, axis=1)) - self.r_main_room
             dists_list.append(dists)
@@ -158,7 +177,7 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
         return DescriptionTable(wd, wcd_list)
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=10000))
+        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=10000, algorithm_range=0.5))
         ompl_sovler.setup(problem)
         ompl_res = ompl_sovler.solve()
         if ompl_res.traj is None:
@@ -175,6 +194,11 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
 
     def export_problems(self) -> List[Problem]:
         sdf = self.world.get_exact_sdf()
+
+        def sdf_modified(x):
+            val = sdf(x) - self.world.get_margin()
+            return val
+
         probs = []
         for desc in self.descriptions:
             start, goal = desc
@@ -182,7 +206,12 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
             box = BoxConst(-np.ones(self.get_dof()), np.ones(self.get_dof()))
             goal_const = ConfigPointConst(goal)
             prob = Problem(
-                start, box, goal_const, PointCollFreeConst(sdf), None, motion_step_box_=0.03
+                start,
+                box,
+                goal_const,
+                PointCollFreeConst(sdf_modified),
+                None,
+                motion_step_box_=0.05,
             )
             probs.append(prob)
         return probs
@@ -218,4 +247,4 @@ class Taskvisualizer:
 
         for traj in trajs:
             arr = traj.numpy()
-            ax.plot(arr[:, 0], arr[:, 1])
+            ax.plot(arr[:, 0], arr[:, 1], ".-")
