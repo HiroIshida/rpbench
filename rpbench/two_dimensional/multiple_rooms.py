@@ -177,7 +177,7 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
         return DescriptionTable(wd, wcd_list)
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=10000, algorithm_range=0.5))
+        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=10000, algorithm_range=0.1))
         ompl_sovler.setup(problem)
         ompl_res = ompl_sovler.solve()
         if ompl_res.traj is None:
