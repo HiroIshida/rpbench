@@ -72,10 +72,10 @@ class TabletopWorldBase(WorldBase):
 
     def get_grid2d(self) -> Grid2d:
         grid3d = self.get_grid()
-        size = (grid3d.sizes[0], grid3d.sizes[1])
+        size = (112, 112)
         return Grid2d(grid3d.lb[:2], grid3d.ub[:2], size)
 
-    def create_exact_heightmap(self) -> np.ndarray:
+    def create_exact_heightmap(self, invalid_subs: float = -1.0) -> np.ndarray:
         grid2d = self.get_grid2d()
         depth, width, height = self.table._extents
 
@@ -91,18 +91,28 @@ class TabletopWorldBase(WorldBase):
             - width * 0.5
         )
         X, Y = np.meshgrid(xlin, ylin)
-        Z = np.zeros_like(X) - height * 0.5 + height_from_table
+        Z = np.zeros_like(X) + height * 0.5 + height_from_table
         points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
         points = self.table.transform_vector(points)
         dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
 
         conf = RayMarchingConfig()
         dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
-        is_valid = dists < height_from_table
-        dists[~is_valid] = np.inf
+        is_valid = dists < height_from_table + 1e-2
+        dists_flip = height_from_table - dists
+        dists_flip[~is_valid] = invalid_subs
+        mesh = np.reshape(dists_flip, (grid2d.sizes[0], grid2d.sizes[1]))
         # debug point cloud
         # return points[is_valid] + dists[is_valid, None] * dirs[is_valid, :]
-        return np.reshape(dists, (grid2d.sizes[0], grid2d.sizes[1]))
+
+        # import matplotlib.pyplot as plt
+        # from mpl_toolkits.mplot3d import Axes3D
+        # fig, ax = plt.subplots()
+        # ax = fig.add_subplot(111, projection='3d')
+        # X, Y = np.meshgrid(np.arange(112), np.arange(112))
+        # ax.plot_surface(X, Y, mesh, cmap='terrain')
+        # plt.show()
+        return mesh
 
 
 @dataclass
@@ -354,7 +364,8 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
     def export_table(self) -> DescriptionTable:
         assert self._gridsdf is not None
         world_dict = {}
-        world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+        # world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+        world_dict["world"] = self.world.create_exact_heightmap()
         world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.worldcoords())
 
         desc_dicts = []
