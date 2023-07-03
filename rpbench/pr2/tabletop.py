@@ -30,6 +30,7 @@ from rpbench.pr2.common import (
     CachedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
+from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf
 
@@ -68,6 +69,40 @@ class TabletopWorldBase(WorldBase):
         lb = self.table.transform_vector(lb)
         ub = self.table.transform_vector(ub)
         return Grid(lb, ub, grid_sizes)
+
+    def get_grid2d(self) -> Grid2d:
+        grid3d = self.get_grid()
+        size = (grid3d.sizes[0], grid3d.sizes[1])
+        return Grid2d(grid3d.lb[:2], grid3d.ub[:2], size)
+
+    def create_exact_heightmap(self) -> np.ndarray:
+        grid2d = self.get_grid2d()
+        depth, width, height = self.table._extents
+
+        height_from_table = 1.0
+
+        step = self.table._extents[:2] / np.array(grid2d.sizes)
+        xlin = (
+            np.linspace(step[0] * 0.5, step[0] * (grid2d.sizes[0] - 0.5), grid2d.sizes[0])
+            - depth * 0.5
+        )
+        ylin = (
+            np.linspace(step[1] * 0.5, step[1] * (grid2d.sizes[1] - 0.5), grid2d.sizes[1])
+            - width * 0.5
+        )
+        X, Y = np.meshgrid(xlin, ylin)
+        Z = np.zeros_like(X) - height * 0.5 + height_from_table
+        points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
+        points = self.table.transform_vector(points)
+        dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
+
+        conf = RayMarchingConfig()
+        dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
+        is_valid = dists < height_from_table
+        dists[~is_valid] = np.inf
+        # debug point cloud
+        # return points[is_valid] + dists[is_valid, None] * dirs[is_valid, :]
+        return np.reshape(dists, (grid2d.sizes[0], grid2d.sizes[1]))
 
 
 @dataclass
