@@ -359,6 +359,12 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
 
         desc_dicts = []
         for desc in self.descriptions:
+            if desc is None:
+                # TODO: idealy speaking, such conditioning should be avoided
+                # and instead, part of "export_table" should be implemented
+                # class-wise
+                continue
+
             desc_dict = {}
             for idx, co in enumerate(desc):
                 pose = skcoords_to_pose_vec(co)
