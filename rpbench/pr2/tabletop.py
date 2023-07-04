@@ -1,3 +1,4 @@
+import copy
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
@@ -187,8 +188,11 @@ class TabletopBoxWorld(TabletopWorldBase):
             obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
             obstacles.append(obs)
 
-        # check if all obstacle dont collide each other
+        # create an union sdf then raycast
+        sdfs = [table.sdf, box.sdf] + [obs.sdf for obs in obstacles]
+        UnionSDF(sdfs)
 
+        # check if all obstacle dont collide each other
         debug_matplotlib = False
         if debug_matplotlib:
             fig, ax = plt.subplots()
@@ -196,6 +200,32 @@ class TabletopBoxWorld(TabletopWorldBase):
             for obs in obstacles_2ds:
                 obs.visualize((fig, ax), "green")
             ax.set_aspect("equal", adjustable="box")
+
+        # tmp: delete this later
+        board_extent = copy.deepcopy(table._extents)
+        board_extent[2] = 0.05
+        board = Box(extents=board_extent, with_sdf=True)
+        board.newcoords(table.copy_worldcoords())
+        board.translate([0, 0, 0.7])
+        obstacles.append(board)
+
+        # wall1
+        board_extent = copy.deepcopy(table._extents)
+        board_extent[1] = 0.05
+        board_extent[2] = 2.0
+        board = Box(extents=board_extent, with_sdf=True)
+        board.newcoords(table.copy_worldcoords())
+        board.translate([0, table._extents[1] * 0.5, 0.7])
+        obstacles.append(board)
+
+        # wall1
+        board_extent = copy.deepcopy(table._extents)
+        board_extent[1] = 0.05
+        board_extent[2] = 2.0
+        board = Box(extents=board_extent, with_sdf=True)
+        board.newcoords(table.copy_worldcoords())
+        board.translate([0, table._extents[1] * -0.5, 0.7])
+        obstacles.append(board)
 
         return cls(table, obstacles, box)
 
