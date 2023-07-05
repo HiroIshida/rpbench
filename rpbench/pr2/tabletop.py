@@ -2,9 +2,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import lognorm
 from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig, TerminateState
@@ -146,58 +144,67 @@ class TabletopBoxWorld(TabletopWorldBase):
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
 
         table_extent = np.array([table_depth, table_width])
-        while True:
-            box2d: Optional[Box2d]
-            if standard:
-                box_extent = np.ones(3) * 0.15
-                box2d = Box2d(box_extent[:2], PlanerCoords(np.zeros(2), 0.0 * np.pi))
-            else:
-                box_extent = np.ones(3) * 0.1 + np.random.rand(3) * np.array([0.1, 0.1, 0.05])
-                box2d = sample_box(table_extent, box_extent[:2], [])
-            if box2d is not None:
-                break
+        # while True:
+        #     box2d: Optional[Box2d]
+        #     if standard:
+        #         box_extent = np.ones(3) * 0.15
+        #         box2d = Box2d(box_extent[:2], PlanerCoords(np.zeros(2), 0.0 * np.pi))
+        #     else:
+        #         box_extent = np.ones(3) * 0.1 + np.random.rand(3) * np.array([0.1, 0.1, 0.05])
+        #         box2d = sample_box(table_extent, box_extent[:2], [])
+        #     if box2d is not None:
+        #         break
+        box2d: Optional[Box2d]
+        box_extent = np.ones(3) * 0.15  # TMP
+
+        if standard:
+            box2d = Box2d(box_extent[:2], PlanerCoords(np.zeros(2), 0.0 * np.pi))
+        else:
+            box2d = sample_box(table_extent, box_extent[:2], [])
 
         box = Box(box_extent, with_sdf=True)
         box.newcoords(table.copy_worldcoords())
         box.translate(np.hstack([box2d.coords.pos, 0.5 * (box_extent[-1] + table._extents[-1])]))
-        box.rotate(box2d.coords.angle, "z")
+        # TMP: don't rotate
+        # box.rotate(box2d.coords.angle, "z")
         box.visual_mesh.visual.face_colors = [255, 0, 0, 200]
 
         obstacles = [box]  # reaching box is also an obstacle in planning context
-        obstacles_2ds = []
-
-        if standard:
-            n_obs = 0
-        else:
-            n_obs = 1 + np.random.randint(8)
-
-        for _ in range(n_obs):
-            obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.04, 0.04, 0.2])
-            obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
-            if obs2d is None:
-                break
-            obstacles_2ds.append(obs2d)
-
-            obs = Box(obs_extent, with_sdf=True)
-            obs.newcoords(table.copy_worldcoords())
-            obs.translate(
-                np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
-            )
-            obs.rotate(obs2d.coords.angle, "z")
-            obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
-            obstacles.append(obs)
-
-        # check if all obstacle dont collide each other
-
-        debug_matplotlib = False
-        if debug_matplotlib:
-            fig, ax = plt.subplots()
-            box2d.visualize((fig, ax), "red")
-            for obs in obstacles_2ds:
-                obs.visualize((fig, ax), "green")
-            ax.set_aspect("equal", adjustable="box")
-
         return cls(table, obstacles, box)
+        # obstacles_2ds = []
+
+        # if standard:
+        #     n_obs = 0
+        # else:
+        #     n_obs = 1 + np.random.randint(8)
+
+        # for _ in range(n_obs):
+        #     obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.04, 0.04, 0.2])
+        #     obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
+        #     if obs2d is None:
+        #         break
+        #     obstacles_2ds.append(obs2d)
+
+        #     obs = Box(obs_extent, with_sdf=True)
+        #     obs.newcoords(table.copy_worldcoords())
+        #     obs.translate(
+        #         np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
+        #     )
+        #     obs.rotate(obs2d.coords.angle, "z")
+        #     obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
+        #     obstacles.append(obs)
+
+        # # check if all obstacle dont collide each other
+
+        # debug_matplotlib = False
+        # if debug_matplotlib:
+        #     fig, ax = plt.subplots()
+        #     box2d.visualize((fig, ax), "red")
+        #     for obs in obstacles_2ds:
+        #         obs.visualize((fig, ax), "green")
+        #     ax.set_aspect("equal", adjustable="box")
+
+        # return cls(table, obstacles, box)
 
 
 @dataclass
@@ -365,7 +372,7 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
         assert self._gridsdf is not None
         world_dict = {}
         # world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
-        world_dict["world"] = self.world.create_exact_heightmap()
+        # world_dict["world"] = self.world.create_exact_heightmap()
         world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.worldcoords())
 
         desc_dicts = []
