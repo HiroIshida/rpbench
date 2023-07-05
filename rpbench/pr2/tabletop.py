@@ -463,26 +463,6 @@ class TabletopTaskBase(
             ompl_solver.setup(problem)
             ompl_ret = ompl_solver.solve()
             if ompl_ret.traj is not None:
-                # now, smooth out the solution
-
-                # first solve with smaller number of waypoint
-                nlp_conf = SQPBasedSolverConfig(
-                    n_wp=20, n_max_call=20, motion_step_satisfaction="debug_ignore"
-                )
-                nlp_solver = SQPBasedSolver.init(nlp_conf)
-                nlp_solver.setup(problem)
-                nlp_ret = nlp_solver.solve(ompl_ret.traj)
-
-                # Then try to find more find-grained solution
-                if nlp_ret.traj is not None:
-                    nlp_conf = SQPBasedSolverConfig(
-                        n_wp=60, n_max_call=20, motion_step_satisfaction="post"
-                    )
-                    nlp_solver = SQPBasedSolver.init(nlp_conf)
-                    nlp_solver.setup(problem)
-                    nlp_ret = nlp_solver.solve(nlp_ret.traj)
-                    if nlp_ret.traj is not None:
-                        return nlp_ret
                 return ompl_ret
 
             if ompl_ret.terminate_state == TerminateState.FAIL_SATISFACTION:
