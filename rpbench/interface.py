@@ -192,6 +192,12 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             self._gridsdf = self.create_gridsdf(self.world, robot_model)
         return self._gridsdf
 
+    def invalidate_gridsdf(self) -> None:
+        """invalidate gridsdf
+        This feature is usefull when the data-transfer is memmory/network intense.
+        """
+        self._gridsdf = None
+
     @classmethod
     def sample(
         cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
