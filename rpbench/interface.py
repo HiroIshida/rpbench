@@ -185,6 +185,19 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def acceptable_time_admissible(self) -> float:
         return np.inf  # override this method in subclass
 
+    @property
+    def gridsdf(self):
+        if self._gridsdf is None:
+            robot_model = self.get_robot_model()
+            self._gridsdf = self.create_gridsdf(self.world, robot_model)
+        return self._gridsdf
+
+    def invalidate_gridsdf(self) -> None:
+        """invalidate gridsdf
+        This feature is usefull when the data-transfer is memmory/network intense.
+        """
+        self._gridsdf = None
+
     @classmethod
     def sample(
         cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True

@@ -352,9 +352,9 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
         return CachedPR2ConstProvider.get_pr2()
 
     def export_table(self) -> DescriptionTable:
-        assert self._gridsdf is not None
+        assert self.gridsdf is not None
         world_dict = {}
-        world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+        world_dict["world"] = self.gridsdf.values.reshape(self.gridsdf.grid.sizes)
         world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.worldcoords())
 
         desc_dicts = []
@@ -417,8 +417,8 @@ class TabletopTaskBase(
         q_start = provider.get_start_config()
         box_const = provider.get_box_const()
 
-        assert self._gridsdf is not None
-        sdf = create_union_sdf([self._gridsdf, self.world.table.sdf])
+        assert self.gridsdf is not None
+        sdf = create_union_sdf([self.gridsdf, self.world.table.sdf])
         ineq_const = provider.get_collfree_const(sdf)
 
         problems = []

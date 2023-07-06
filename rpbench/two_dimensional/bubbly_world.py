@@ -159,10 +159,10 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
 
     def export_table(self) -> DescriptionTable:
         wd = {}
-        if self._gridsdf is None:
+        if self.gridsdf is None:
             wd["world"] = self.world.export_intrinsic_description()
         else:
-            wd["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+            wd["world"] = self.gridsdf.values.reshape(self.gridsdf.grid.sizes)
 
         wcd_list = []
         for desc in self.descriptions:
@@ -189,10 +189,10 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         return 2
 
     def export_problems(self) -> List[Problem]:
-        if self._gridsdf is None:
+        if self.gridsdf is None:
             sdf = self.world.get_exact_sdf()
         else:
-            sdf = self._gridsdf
+            sdf = self.gridsdf
 
         probs = []
         for desc in self.descriptions:
