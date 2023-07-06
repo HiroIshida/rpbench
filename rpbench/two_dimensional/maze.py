@@ -175,7 +175,7 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
             return descs
 
     def export_table(self) -> DescriptionTable:
-        assert self._gridsdf is not None
+        assert self.gridsdf is not None
         wd = {}
         wd["world"] = self.world.M.flatten()  # vector description
 

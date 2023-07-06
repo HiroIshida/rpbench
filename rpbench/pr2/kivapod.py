@@ -133,8 +133,8 @@ class KivapodReachingTaskBase(ReachingTaskBase[KivapodWorldT, RobotModel]):
     def export_table(self) -> DescriptionTable:
         world_dict = {}
         if len(self.world.obstacles) > 0:
-            assert self._gridsdf is not None
-            world_dict["world"] = self._gridsdf.values.reshape(self._gridsdf.grid.sizes)
+            assert self.gridsdf is not None
+            world_dict["world"] = self.gridsdf.values.reshape(self.gridsdf.grid.sizes)
 
         world_dict["kivapod_pose"] = skcoords_to_pose_vec(
             self.world.kivapod_mesh.copy_worldcoords()
@@ -216,8 +216,8 @@ class KivapodEmptyReachingTask(KivapodReachingTaskBase[KivapodEmptyWorld]):
         box_const = provider.get_box_const()
 
         if len(self.world.obstacles) > 0:
-            assert self._gridsdf is not None
-            sdf = create_union_sdf([self._gridsdf, self.world.kivapod_mesh.sdf])
+            assert self.gridsdf is not None
+            sdf = create_union_sdf([self.gridsdf, self.world.kivapod_mesh.sdf])
         else:
             sdf = self.world.kivapod_mesh.sdf
 
