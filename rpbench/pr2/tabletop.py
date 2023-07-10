@@ -44,6 +44,11 @@ class TabletopWorldBase(WorldBase):
     table: Box
     obstacles: List[Link]
 
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        viewer.add(self.table)
+        for obs in self.obstacles:
+            viewer.add(obs)
+
     def get_exact_sdf(self) -> UnionSDF:
         lst = [self.table.sdf]
         for obstacle in self.obstacles:
@@ -108,12 +113,6 @@ class TabletopWorldBase(WorldBase):
 @dataclass
 class TabletopBoxWorld(TabletopWorldBase):
     box: Box
-
-    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        viewer.add(self.table)
-        for obs in self.obstacles:
-            viewer.add(obs)
-        viewer.add(self.box)
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
@@ -198,11 +197,6 @@ class TabletopOvenWorld(TabletopWorldBase):
     box_h: float
     box_t: float
     _intrinsic_desc: np.ndarray
-
-    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        viewer.add(self.table)
-        for obs in self.obstacles:
-            viewer.add(obs)
 
     def export_intrinsic_description(self) -> np.ndarray:
         return self._intrinsic_desc
