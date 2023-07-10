@@ -109,6 +109,81 @@ class TabletopWorldBase(WorldBase):
         # return points[is_valid] + dists[is_valid, None] * dirs[is_valid, :]
         return np.reshape(dists, (grid2d.sizes[0], grid2d.sizes[1]))
 
+    def sample_pose(self) -> np.ndarray:
+        self.get_exact_sdf()
+        tabletop_center = self.table.copy_worldcoords()
+
+        margin_from_plane = 0.03
+
+        depth, width, height = self.table._extents
+        np.array([depth, width])
+        relative_pos = np.random.rand(3) * np.array([depth, width, 0.1]) + np.array(
+            [-depth * 0.5, -width * 0.5, height * 0.5 + margin_from_plane]
+        )
+        co = tabletop_center.copy_worldcoords()
+        co.translate(relative_pos)
+        return co
+
+
+@dataclass
+class TabletopClutterWorld(TabletopWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> "TabletopClutterWorld":
+        intrinsic_desc = []
+
+        table = cls.create_standard_table()
+        table_depth, table_width, table_height = table._extents
+
+        if not standard:
+            x_rand, y_rand = np.random.randn(2)
+            x = 0.1 + 0.05 * x_rand
+            y = 0.1 * y_rand
+            z = 0.0
+            table.translate([x, y, z])
+            intrinsic_desc.extend([x_rand, y_rand])
+        else:
+            intrinsic_desc.extend([0.0, 0.0])
+
+        table_tip = table.copy_worldcoords()
+        table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
+
+        table_extent = np.array([table_depth, table_width])
+
+        obstacles = []  # reaching box is also an obstacle in planning context
+        obstacles_2ds = []
+
+        if standard:
+            n_obs = 0
+        else:
+            n_obs = 1 + np.random.randint(8)
+
+        for _ in range(n_obs):
+            obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.1, 0.1, 0.15])
+            obs2d = sample_box(table_extent, obs_extent[:2], [])
+            if obs2d is None:
+                break
+            obstacles_2ds.append(obs2d)
+
+            obs = Box(obs_extent, with_sdf=True)
+            obs.newcoords(table.copy_worldcoords())
+            obs.translate(
+                np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
+            )
+            obs.rotate(obs2d.coords.angle, "z")
+            obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
+            obstacles.append(obs)
+
+        # check if all obstacle dont collide each other
+
+        debug_matplotlib = False
+        if debug_matplotlib:
+            fig, ax = plt.subplots()
+            for obs in obstacles_2ds:
+                obs.visualize((fig, ax), "green")
+            ax.set_aspect("equal", adjustable="box")
+
+        return cls(table, obstacles)
+
 
 @dataclass
 class TabletopBoxWorld(TabletopWorldBase):
@@ -642,6 +717,36 @@ class TabletopBoxDualArmReachingTaskBase(TabletopBoxWorldMixin, TabletopTaskBase
         return 100.0
 
 
+class TabletopBoxRightArmReachingTaskBase(TabletopBoxDualArmReachingTaskBase):
+    config_provider: ClassVar[Type[CachedPR2ConstProvider]] = CachedRArmPR2ConstProvider
+
+    @classmethod
+    def sample_target_poses(
+        cls, world: TabletopBoxWorld, standard: bool
+    ) -> Tuple[Coordinates, ...]:
+
+        if standard:
+            _, _, height = world.table._extents
+            co = world.table.copy_worldcoords()
+            co.translate([0.0, -0.2, 0.5 * height + 0.1])
+            return (co,)
+        else:
+            co = world.sample_pose()
+
+            world.get_exact_sdf()
+            tabletop_center = world.table.copy_worldcoords()
+
+            margin_from_plane = 0.05
+
+            depth, width, height = world.table._extents
+            relative_pos = np.random.rand(3) * np.array([depth, width, 0.1]) + np.array(
+                [-depth * 0.5, -width * 0.5, height * 0.5 + margin_from_plane]
+            )
+            co = tabletop_center.copy_worldcoords()
+            co.translate(relative_pos)
+            return (co,)
+
+
 # fmt: off
 class TabletopOvenRightArmReachingTask(ExactGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
 class TabletopOvenVoxbloxRightArmReachingTask(VoxbloxGridSDFCreator, TabletopOvenRightArmReachingTaskBase): ...  # noqa
@@ -653,4 +758,5 @@ class TabletopOvenVoxbloxDualArmReachingTask(VoxbloxGridSDFCreator, TabletopOven
 
 class TabletopBoxWorldWrap(ExactGridSDFCreator, TabletopBoxWorldWrapBase): ...  # noqa
 class TabletopBoxDualArmReachingTask(ExactGridSDFCreator, TabletopBoxDualArmReachingTaskBase): ...  # noqa
+class TabletopBoxRightArmReachingTask(ExactGridSDFCreator, TabletopBoxRightArmReachingTaskBase): ...  # noqa
 # fmt: on
