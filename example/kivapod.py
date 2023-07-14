@@ -2,8 +2,11 @@ import time
 
 import numpy as np
 
-from rpbench.pr2.common import PR2InteractiveTaskVisualizer, PR2StaticTaskVisualizer
-from rpbench.pr2.kivapod import KivapodEmptyReachingTask
+from rpbench.articulated.pr2.common import (
+    PR2InteractiveTaskVisualizer,
+    PR2StaticTaskVisualizer,
+)
+from rpbench.articulated.pr2.kivapod import KivapodEmptyReachingTask
 
 np.random.seed(3)
 

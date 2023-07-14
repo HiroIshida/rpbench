@@ -7,7 +7,11 @@ from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
-from rpbench.jaxon.below_table import HumanoidTableReachingTask
+from rpbench.articulated.jaxon.below_table import HumanoidTableReachingTask
+from rpbench.articulated.jaxon.common import (
+    InteractiveTaskVisualizer,
+    StaticTaskVisualizer,
+)
 
 np.random.seed(1)
 

@@ -16,6 +16,11 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid, GridSDF, IntegratorType
 
+from rpbench.articulated.pr2.common import (
+    CachedDualArmPR2ConstProvider,
+    CachedPR2ConstProvider,
+    CachedRArmPR2ConstProvider,
+)
 from rpbench.interface import (
     DescriptionT,
     DescriptionTable,
@@ -25,11 +30,6 @@ from rpbench.interface import (
     WorldBase,
 )
 from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
-from rpbench.pr2.common import (
-    CachedDualArmPR2ConstProvider,
-    CachedPR2ConstProvider,
-    CachedRArmPR2ConstProvider,
-)
 from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf

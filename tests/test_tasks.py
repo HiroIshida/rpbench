@@ -7,8 +7,8 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.pr2.kivapod import KivapodEmptyReachingTask
-from rpbench.pr2.tabletop import (
+from rpbench.articulated.pr2.kivapod import KivapodEmptyReachingTask
+from rpbench.articulated.pr2.tabletop import (
     TabletopOvenDualArmReachingTask,
     TabletopOvenDualArmReachingTaskBase,
     TabletopOvenRightArmReachingTask,

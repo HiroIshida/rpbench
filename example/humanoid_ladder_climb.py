@@ -13,7 +13,7 @@ from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
-from rpbench.jaxon.ladder import ConstraintSequence, LadderWorld
+from rpbench.articulated.jaxon.ladder import ConstraintSequence, LadderWorld
 
 # np.random.seed(0)
 

@@ -3,8 +3,8 @@ from pathlib import Path
 
 from skmp.solver.ompl_solver import OMPLDataDrivenSolver, OMPLSolverConfig
 
+from rpbench.articulated.pr2.tabletop import TabletopOvenRightArmReachingTask
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset
-from rpbench.pr2.tabletop import TabletopOvenRightArmReachingTask
 
 
 def test_dataset():

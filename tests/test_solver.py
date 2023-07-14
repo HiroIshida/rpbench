@@ -1,8 +1,8 @@
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLDataDrivenSolver, OMPLSolver, OMPLSolverConfig
 
+from rpbench.articulated.pr2.tabletop import TabletopOvenRightArmReachingTask
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset, SkmpTaskSolver
-from rpbench.pr2.tabletop import TabletopOvenRightArmReachingTask
 
 
 def test_task_sovler():

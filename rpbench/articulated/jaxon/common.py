@@ -15,7 +15,7 @@ from skrobot.model.primitives import Axis
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
-from rpbench.jaxon.below_table import CachedJaxonConstProvider
+from rpbench.articulated.jaxon.below_table import CachedJaxonConstProvider
 from rpbench.utils import SceneWrapper
 
 ViewerT = TypeVar("ViewerT", bound=Union[TrimeshSceneViewer, SceneWrapper])

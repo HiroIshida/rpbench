@@ -15,9 +15,12 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
 
+from rpbench.articulated.pr2.common import (
+    CachedPR2ConstProvider,
+    CachedRArmPR2ConstProvider,
+)
+from rpbench.articulated.pr2.utils import MeshLink
 from rpbench.interface import DescriptionTable, ReachingTaskBase, WorldBase
-from rpbench.pr2.common import CachedPR2ConstProvider, CachedRArmPR2ConstProvider
-from rpbench.pr2.utils import MeshLink
 from rpbench.utils import SceneWrapper, create_union_sdf, skcoords_to_pose_vec
 
 KivapodWorldT = TypeVar("KivapodWorldT", bound="KivapodWorldBase")
