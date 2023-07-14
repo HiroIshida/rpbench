@@ -61,6 +61,15 @@ class TaskVisualizerBase(Generic[ViewerT], ABC):
         self.viewer = viewer
         self.robot_model = robot_model
         self._show_called = False
+        t = np.array(
+            [
+                [9.93795996e-01, -1.49563989e-02, -1.10208097e-01, 1.67460132e-04],
+                [-1.10181461e-01, 2.59590094e-03, -9.93908098e-01, -4.49870487e00],
+                [1.51513753e-02, 9.99884777e-01, 9.31878081e-04, 9.16509762e-01],
+                [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
+            ]
+        )
+        self.viewer.camera_transform = t
 
     def update_robot_state(self, q: np.ndarray) -> None:
         robot_config_provider = self.task.config_provider()
