@@ -242,7 +242,7 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
         return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        rrt_conf = MyRRTConfig(500, satisfaction_conf=SatisfactionConfig(n_max_eval=20))
+        rrt_conf = MyRRTConfig(5000, satisfaction_conf=SatisfactionConfig(n_max_eval=20))
 
         sqp_config = SQPBasedSolverConfig(
             n_wp=40,
