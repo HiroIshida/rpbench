@@ -2,21 +2,88 @@ import copy
 import tempfile
 import time
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from pathlib import Path
-from typing import ClassVar, Generic, List, Protocol, Tuple, Type, TypeVar, Union
+from typing import (
+    ClassVar,
+    Generic,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import imageio
 import numpy as np
+from skmp.constraint import BoxConst, COMStabilityConst, PoseConstraint
+from skmp.robot.jaxon import Jaxon, JaxonConfig
 from skmp.robot.utils import set_robot_state
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
 from skrobot.model import RobotModel
-from skrobot.model.primitives import Axis
+from skrobot.model.primitives import Axis, Box
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
-from rpbench.articulated.jaxon.below_table import CachedJaxonConstProvider
 from rpbench.utils import SceneWrapper
+
+
+class CachedJaxonConstProvider(ABC):
+    @classmethod
+    def get_config(cls) -> JaxonConfig:
+        return JaxonConfig()
+
+    @classmethod
+    @lru_cache
+    def get_jaxon(cls) -> Jaxon:
+        jaxon = Jaxon()
+        jaxon.reset_manip_pose()
+        jaxon.translate([0.0, 0.0, 0.98])
+        return jaxon
+
+    @classmethod
+    @lru_cache
+    def get_box_const(cls) -> BoxConst:
+        config = cls.get_config()
+        return config.get_box_const()
+
+    @classmethod
+    def get_dual_legs_pose_const(
+        cls,
+        jaxon: Jaxon,
+        co_rarm: Optional[Coordinates] = None,
+        co_larm: Optional[Coordinates] = None,
+    ) -> PoseConstraint:
+        config = cls.get_config()
+        efkin = config.get_endeffector_kin(
+            rleg=True, lleg=True, rarm=(co_rarm is not None), larm=(co_larm is not None)
+        )
+        coords_list = [jaxon.rleg_end_coords, jaxon.lleg_end_coords]
+
+        if co_rarm is not None:
+            coords_list.append(co_rarm)  # type: ignore
+
+        if co_larm is not None:
+            coords_list.append(co_larm)  # type: ignore
+
+        const = PoseConstraint.from_skrobot_coords(coords_list, efkin, jaxon)  # type: ignore
+        return const
+
+    @classmethod
+    def get_com_const(cls, jaxon: Jaxon) -> COMStabilityConst:
+        # TODO: the following com box computation assums that legs is aligned with x-axis
+        # also, assumes that both legs has the same x coordinate
+        ym = jaxon.rleg_end_coords.worldpos()[1]
+        yp = jaxon.lleg_end_coords.worldpos()[1]
+        com_box = Box([0.25, yp - ym + 0.14, 5.0], with_sdf=True)
+
+        com_box.visual_mesh.visual.face_colors = [255, 0, 100, 100]
+        config = cls.get_config()
+        return config.get_com_stability_const(jaxon, com_box)
+
 
 ViewerT = TypeVar("ViewerT", bound=Union[TrimeshSceneViewer, SceneWrapper])
 

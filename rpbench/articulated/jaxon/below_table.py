@@ -1,17 +1,9 @@
-from abc import ABC
 from dataclasses import dataclass
-from functools import lru_cache
-from typing import ClassVar, List, Optional, Tuple, Type, Union
+from typing import ClassVar, List, Tuple, Type, Union
 
 import numpy as np
-from skmp.constraint import (
-    BoxConst,
-    CollFreeConst,
-    COMStabilityConst,
-    IneqCompositeConst,
-    PoseConstraint,
-)
-from skmp.robot.jaxon import Jaxon, JaxonConfig
+from skmp.constraint import CollFreeConst, IneqCompositeConst, PoseConstraint
+from skmp.robot.jaxon import Jaxon
 from skmp.robot.utils import get_robot_state
 from skmp.satisfy import SatisfactionConfig
 from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
@@ -28,6 +20,7 @@ from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 from voxbloxpy.core import Grid
 
+from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
 from rpbench.interface import (
     DescriptionTable,
     Problem,
@@ -72,60 +65,6 @@ class TableWorld(WorldBase):
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         viewer.add(self.table)
-
-
-class CachedJaxonConstProvider(ABC):
-    @classmethod
-    def get_config(cls) -> JaxonConfig:
-        return JaxonConfig()
-
-    @classmethod
-    @lru_cache
-    def get_jaxon(cls) -> Jaxon:
-        jaxon = Jaxon()
-        jaxon.reset_manip_pose()
-        jaxon.translate([0.0, 0.0, 0.98])
-        return jaxon
-
-    @classmethod
-    @lru_cache
-    def get_box_const(cls) -> BoxConst:
-        config = cls.get_config()
-        return config.get_box_const()
-
-    @classmethod
-    def get_dual_legs_pose_const(
-        cls,
-        jaxon: Jaxon,
-        co_rarm: Optional[Coordinates] = None,
-        co_larm: Optional[Coordinates] = None,
-    ) -> PoseConstraint:
-        config = cls.get_config()
-        efkin = config.get_endeffector_kin(
-            rleg=True, lleg=True, rarm=(co_rarm is not None), larm=(co_larm is not None)
-        )
-        coords_list = [jaxon.rleg_end_coords, jaxon.lleg_end_coords]
-
-        if co_rarm is not None:
-            coords_list.append(co_rarm)  # type: ignore
-
-        if co_larm is not None:
-            coords_list.append(co_larm)  # type: ignore
-
-        const = PoseConstraint.from_skrobot_coords(coords_list, efkin, jaxon)  # type: ignore
-        return const
-
-    @classmethod
-    def get_com_const(cls, jaxon: Jaxon) -> COMStabilityConst:
-        # TODO: the following com box computation assums that legs is aligned with x-axis
-        # also, assumes that both legs has the same x coordinate
-        ym = jaxon.rleg_end_coords.worldpos()[1]
-        yp = jaxon.lleg_end_coords.worldpos()[1]
-        com_box = Box([0.25, yp - ym + 0.14, 5.0], with_sdf=True)
-
-        com_box.visual_mesh.visual.face_colors = [255, 0, 100, 100]
-        config = cls.get_config()
-        return config.get_com_stability_const(jaxon, com_box)
 
 
 class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
