@@ -1,39 +1,46 @@
+import argparse
 import time
 
 import numpy as np
-from skmp.robot.utils import set_robot_state
-from skrobot.model.primitives import Axis
 from skrobot.utils.urdf import mesh_simplify_factor
-from skrobot.viewers import TrimeshSceneViewer
-from tinyfk import BaseType
 
-from rpbench.articulated.jaxon.below_table import HumanoidTableReachingTask
 from rpbench.articulated.jaxon.common import (
     InteractiveTaskVisualizer,
     StaticTaskVisualizer,
+    TaskVisualizerBase,
 )
+from rpbench.articulated.jaxon.upper_table import HumanoidTableTopRarmReachingTask
 
-np.random.seed(1)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-mode", type=str, default="interactive")
+    parser.add_argument("-seed", type=int, default=0)
+    args = parser.parse_args()
 
-with mesh_simplify_factor(0.2):
-    task = HumanoidTableReachingTask.sample(1, False)
-res = task.solve_default()[0]
-assert res.traj is not None
+    np.random.seed(args.seed)
 
-jaxon = task.config_provider.get_jaxon()
-jaxon_config = task.config_provider.get_config()
+    with mesh_simplify_factor(0.2):
+        task = HumanoidTableTopRarmReachingTask.sample(1, False)
 
-vis = TrimeshSceneViewer()
-task.world.visualize(vis)
-co = task.descriptions[0][0]
-axis = Axis.from_coords(co)
-vis.add(jaxon)
-vis.add(axis)
-vis.show()
+    vis: TaskVisualizerBase
+    if args.mode == "debug":
+        vis = InteractiveTaskVisualizer(task)
+        vis.show()
+        time.sleep(20)
+    else:
+        res = task.solve_default()[0]
+        assert res.traj is not None
 
-time.sleep(2)
-for q in res.traj.resample(20):
-    set_robot_state(jaxon, jaxon_config._get_control_joint_names(), q, base_type=BaseType.FLOATING)
-    vis.redraw()
-    time.sleep(0.5)
-time.sleep(10)
+        jaxon = task.config_provider.get_jaxon()
+        jaxon_config = task.config_provider.get_config()
+
+        if args.mode == "static":
+            vis = StaticTaskVisualizer(task)
+            vis.save_trajectory_gif(res.traj.resample(10), "jaxon_demo.gif")
+        elif args.mode == "interactive":
+            vis = InteractiveTaskVisualizer(task)
+            vis.show()
+            vis.visualize_trajectory(res.traj.resample(10))
+            time.sleep(10)
+        else:
+            assert False
