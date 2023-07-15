@@ -165,7 +165,7 @@ class InteractiveTaskVisualizer(TaskVisualizerBase[TrimeshSceneViewer]):
         robot_model = robot_config_provider.get_jaxon()
         config = robot_config_provider.get_config()
 
-        for q in trajectory.numpy()[:-1]:
+        for q in trajectory.numpy():
             set_robot_state(robot_model, config._get_control_joint_names(), q, BaseType.FLOATING)
             self.viewer.redraw()
             time.sleep(t_interval)
