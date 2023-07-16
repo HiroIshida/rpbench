@@ -187,7 +187,7 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
             n_wp=40,
             n_max_call=20,
             motion_step_satisfaction="explicit",
-            verbose=True,
+            verbose=False,
             ctol_eq=1e-3,
             ctol_ineq=1e-3,
             ineq_tighten_coef=0.0,
