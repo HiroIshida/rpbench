@@ -18,7 +18,12 @@ from typing import (
 
 import imageio
 import numpy as np
-from skmp.constraint import BoxConst, COMStabilityConst, PoseConstraint, EqCompositeConst
+from skmp.constraint import (
+    BoxConst,
+    COMStabilityConst,
+    EqCompositeConst,
+    PoseConstraint,
+)
 from skmp.robot.jaxon import Jaxon, JaxonConfig
 from skmp.robot.utils import set_robot_state
 from skmp.trajectory import Trajectory
@@ -56,7 +61,7 @@ class CachedJaxonConstProvider(ABC):
         jaxon: Jaxon,
         co_rarm: Optional[Coordinates] = None,
         co_larm: Optional[Coordinates] = None,
-        arm_rot_type: RotationType = RotationType.XYZW
+        arm_rot_type: RotationType = RotationType.XYZW,
     ) -> Union[PoseConstraint, EqCompositeConst]:
         config = cls.get_config()
 
@@ -72,7 +77,9 @@ class CachedJaxonConstProvider(ABC):
         if not use_rarm and not use_larm:
             return leg_const
 
-        arm_efkin = config.get_endeffector_kin(rleg=False, lleg=False, rarm=use_rarm, larm=use_larm, rot_type=arm_rot_type)
+        arm_efkin = config.get_endeffector_kin(
+            rleg=False, lleg=False, rarm=use_rarm, larm=use_larm, rot_type=arm_rot_type
+        )
         arm_coords_list = []
         if use_rarm:
             arm_coords_list.append(co_rarm)

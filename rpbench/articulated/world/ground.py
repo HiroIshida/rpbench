@@ -12,6 +12,7 @@ from voxbloxpy.core import Grid
 from rpbench.interface import WorldBase
 from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper
+from rpbench.vision import Camera, RayMarchingConfig
 
 GroundWorldT = TypeVar("GroundWorldT", bound="GroundWorldBase")
 
@@ -51,8 +52,38 @@ class GroundWorldBase(WorldBase):
 
     def get_grid2d(self) -> Grid2d:
         grid3d = self.get_grid()
-        size = (grid3d.sizes[0], grid3d.sizes[1])
-        return Grid2d(grid3d.lb[:2], grid3d.ub[:2], size)
+        return Grid2d(grid3d.lb[:2], grid3d.ub[:2], (112, 112))
+
+    def create_exact_heightmap(self) -> np.ndarray:
+        grid2d = self.get_grid2d()
+
+        subplane = Box(extents=[1.0, 1.0, 0.7], pos=[0.5, 0.0, -0.35])
+        depth, width, height = subplane._extents
+
+        height_from_plane = 1.0
+
+        step = subplane._extents[:2] / np.array(grid2d.sizes)
+        xlin = (
+            np.linspace(step[0] * 0.5, step[0] * (grid2d.sizes[0] - 0.5), grid2d.sizes[0])
+            - depth * 0.5
+        )
+        ylin = (
+            np.linspace(step[1] * 0.5, step[1] * (grid2d.sizes[1] - 0.5), grid2d.sizes[1])
+            - width * 0.5
+        )
+        X, Y = np.meshgrid(xlin, ylin)
+        Z = np.zeros_like(X) - height * 0.5 + height_from_plane
+        points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
+        points = subplane.transform_vector(points)
+        dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
+
+        conf = RayMarchingConfig()
+        dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
+        is_valid = dists < height_from_plane
+        dists[~is_valid] = np.inf
+        # debug point cloud
+        # return points[is_valid] + dists[is_valid, None] * dirs[is_valid, :]
+        return np.reshape(dists, (grid2d.sizes[0], grid2d.sizes[1]))
 
 
 @dataclass
