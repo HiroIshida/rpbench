@@ -205,7 +205,7 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
                 if sqp_result.traj is not None:
                     return sqp_result
 
-        return SQPBasedSolverResult.abnormal(np.inf)
+        return SQPBasedSolverResult.abnormal()
 
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
         world_vec = self.world.export_intrinsic_description()

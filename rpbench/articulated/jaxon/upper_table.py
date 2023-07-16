@@ -183,4 +183,4 @@ class HumanoidTableTopRarmReachingTask(ReachingTaskBase[TabletopBoxWorld, Jaxon]
                 if sqp_result.traj is not None:
                     return sqp_result
 
-        return SQPBasedSolverResult.abnormal(np.inf)
+        return SQPBasedSolverResult.abnormal()

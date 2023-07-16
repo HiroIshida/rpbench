@@ -176,4 +176,4 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
                 if sqp_result.traj is not None:
                     return sqp_result
 
-        return SQPBasedSolverResult.abnormal(np.inf)
+        return SQPBasedSolverResult.abnormal()
