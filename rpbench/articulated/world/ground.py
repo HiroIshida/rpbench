@@ -3,12 +3,12 @@ from typing import List, TypeVar, Union
 
 import numpy as np
 from scipy.stats import lognorm
-from skrobot.model.link import Link
 from skrobot.model.primitives import Box
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
 
+from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import WorldBase
 from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper
@@ -19,20 +19,23 @@ GroundWorldT = TypeVar("GroundWorldT", bound="GroundWorldBase")
 
 @dataclass
 class GroundWorldBase(WorldBase):
-    ground: Link
-    foot_box: Link
-    obstacles: List[Link]
+    ground: BoxSkeleton
+    foot_box: BoxSkeleton
+    obstacles: List[BoxSkeleton]
 
     @classmethod
-    def default_ground(cls) -> Link:
-        ground = Box([3.0, 3.0, 0.1], with_sdf=True)
+    def default_ground(cls) -> BoxSkeleton:
+        ground = BoxSkeleton([3.0, 3.0, 0.1], with_sdf=True)
         ground.translate([0.0, 0.0, -0.05])
         return ground
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        viewer.add(self.ground)
-        viewer.add(self.foot_box)
-        for obs in self.obstacles:
+        ground = self.ground.to_box()
+        viewer.add(ground)
+
+        for obs_tmp in self.obstacles:
+            obs = obs_tmp.to_box()
+            obs.visual_mesh.visual.face_colors = [255, 0, 0, 120]
             viewer.add(obs)
 
     def get_exact_sdf(self) -> UnionSDF:
@@ -89,7 +92,7 @@ class GroundWorldBase(WorldBase):
 @dataclass
 class GroundClutteredWorld(GroundWorldBase):
     @staticmethod
-    def is_aabb_collide(box1: Box, box2: Box) -> bool:
+    def is_aabb_collide(box1: BoxSkeleton, box2: BoxSkeleton) -> bool:
         U1 = box1.worldpos() + np.array(box1._extents) * 0.5
         L1 = box1.worldpos() - np.array(box1._extents) * 0.5
         U2 = box2.worldpos() + np.array(box2._extents) * 0.5
@@ -106,11 +109,10 @@ class GroundClutteredWorld(GroundWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "GroundClutteredWorld":
         ground = cls.default_ground()
-        foot_box = Box(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
-        foot_box.visual_mesh.visual.face_colors = [0, 255, 0, 120]
+        foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
 
         n_obstacle = np.random.randint(20)
-        obstacles: List[Box] = []
+        obstacles: List[BoxSkeleton] = []
         if not standard:
 
             while len(obstacles) < n_obstacle:
@@ -119,12 +121,11 @@ class GroundClutteredWorld(GroundWorldBase):
                 pos2d = np.random.rand(2)
                 pos2d[1] += -0.5
                 pos3d = np.hstack([pos2d, box_size[2] * 0.5])
-                box = Box(box_size, pos=pos3d, with_sdf=True)
+                box = BoxSkeleton(box_size, pos=pos3d, with_sdf=True)
 
                 if cls.is_aabb_collide(foot_box, box):
                     continue
 
-                box.visual_mesh.visual.face_colors = [255, 0, 0, 120]
                 obstacles.append(box)
 
         return cls(ground, foot_box, obstacles)
