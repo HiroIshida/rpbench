@@ -16,6 +16,8 @@ from rpbench.vision import Camera, RayMarchingConfig
 
 GroundWorldT = TypeVar("GroundWorldT", bound="GroundWorldBase")
 
+_HMAP_INF_SUBST = -1.0
+
 
 @dataclass
 class GroundWorldBase(WorldBase):
@@ -63,7 +65,7 @@ class GroundWorldBase(WorldBase):
         subplane = Box(extents=[1.0, 1.0, 0.7], pos=[0.5, 0.0, -0.35])
         depth, width, height = subplane._extents
 
-        height_from_plane = 1.0
+        height_from_plane = 1.5
 
         step = subplane._extents[:2] / np.array(grid2d.sizes)
         xlin = (
@@ -75,18 +77,20 @@ class GroundWorldBase(WorldBase):
             - width * 0.5
         )
         X, Y = np.meshgrid(xlin, ylin)
-        Z = np.zeros_like(X) - height * 0.5 + height_from_plane
+        Z = np.zeros_like(X) + height_from_plane
+
         points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
         points = subplane.transform_vector(points)
         dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
 
         conf = RayMarchingConfig()
         dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
-        is_valid = dists < height_from_plane
-        dists[~is_valid] = np.inf
-        # debug point cloud
-        # return points[is_valid] + dists[is_valid, None] * dirs[is_valid, :]
-        return np.reshape(dists, (grid2d.sizes[0], grid2d.sizes[1]))
+        is_valid = dists < height_from_plane + 1e-3
+
+        points_hit = points + dists[:, None] * dirs
+        points_hit_z = points_hit[:, 2]
+        points_hit_z[~is_valid] = _HMAP_INF_SUBST
+        return points_hit_z.reshape((grid2d.sizes[0], grid2d.sizes[1]))
 
 
 @dataclass

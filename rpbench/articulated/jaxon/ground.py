@@ -57,9 +57,7 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}
-        hmap = self.world.create_exact_heightmap()
-        hmap[np.isinf(hmap)] = -1.0
-        world_dict["world"] = hmap
+        world_dict["world"] = self.world.create_exact_heightmap()
 
         desc_dicts = []
         for desc in self.descriptions:
