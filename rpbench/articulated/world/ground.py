@@ -1,0 +1,99 @@
+from dataclasses import dataclass
+from typing import List, TypeVar, Union
+
+import numpy as np
+from scipy.stats import lognorm
+from skrobot.model.link import Link
+from skrobot.model.primitives import Box
+from skrobot.sdf import UnionSDF
+from skrobot.viewers import TrimeshSceneViewer
+from voxbloxpy.core import Grid
+
+from rpbench.interface import WorldBase
+from rpbench.two_dimensional.utils import Grid2d
+from rpbench.utils import SceneWrapper
+
+GroundWorldT = TypeVar("GroundWorldT", bound="GroundWorldBase")
+
+
+@dataclass
+class GroundWorldBase(WorldBase):
+    ground: Link
+    foot_box: Link
+    obstacles: List[Link]
+
+    @classmethod
+    def default_ground(cls) -> Link:
+        ground = Box([3.0, 3.0, 0.1], with_sdf=True)
+        ground.translate([0.0, 0.0, -0.05])
+        return ground
+
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        viewer.add(self.ground)
+        viewer.add(self.foot_box)
+        for obs in self.obstacles:
+            viewer.add(obs)
+
+    def get_exact_sdf(self) -> UnionSDF:
+        lst = [self.ground.sdf]
+        for obstacle in self.obstacles:
+            lst.append(obstacle.sdf)
+        return UnionSDF(lst)
+
+    def get_grid(self) -> Grid:
+        grid_sizes = (56, 56, 28)
+        depth = 1.0
+        width = 1.0
+        height = 0.7
+        lb = np.array([0.0, -0.5 * width, height])
+        ub = lb + np.array([depth, width, height])
+        return Grid(lb, ub, grid_sizes)
+
+    def get_grid2d(self) -> Grid2d:
+        grid3d = self.get_grid()
+        size = (grid3d.sizes[0], grid3d.sizes[1])
+        return Grid2d(grid3d.lb[:2], grid3d.ub[:2], size)
+
+
+@dataclass
+class GroundClutteredWorld(GroundWorldBase):
+    @staticmethod
+    def is_aabb_collide(box1: Box, box2: Box) -> bool:
+        U1 = box1.worldpos() + np.array(box1._extents) * 0.5
+        L1 = box1.worldpos() - np.array(box1._extents) * 0.5
+        U2 = box2.worldpos() + np.array(box2._extents) * 0.5
+        L2 = box2.worldpos() - np.array(box2._extents) * 0.5
+
+        if U1[0] < L2[0] or L1[0] > U2[0]:
+            return False
+        if U1[1] < L2[1] or L1[1] > U2[1]:
+            return False
+        if U1[2] < L2[2] or L1[2] > U2[2]:
+            return False
+        return True
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "GroundClutteredWorld":
+        ground = cls.default_ground()
+        foot_box = Box(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
+        foot_box.visual_mesh.visual.face_colors = [0, 255, 0, 120]
+
+        n_obstacle = np.random.randint(20)
+        obstacles: List[Box] = []
+        if not standard:
+
+            while len(obstacles) < n_obstacle:
+                box_size = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.2, 0.2, 0.4])
+                box_size[2] = min(box_size[2], 0.7)
+                pos2d = np.random.rand(2)
+                pos2d[1] += -0.5
+                pos3d = np.hstack([pos2d, box_size[2] * 0.5])
+                box = Box(box_size, pos=pos3d, with_sdf=True)
+
+                if cls.is_aabb_collide(foot_box, box):
+                    continue
+
+                box.visual_mesh.visual.face_colors = [255, 0, 0, 120]
+                obstacles.append(box)
+
+        return cls(ground, foot_box, obstacles)
