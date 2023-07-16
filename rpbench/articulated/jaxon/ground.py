@@ -89,7 +89,10 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
                 if sd_vals > 0.1:
                     co = Coordinates(pos)
                     return (co,)
-            assert False
+
+            # failed ... so return invalid pose
+            co = Coordinates(pos)
+            return (co,)
 
     @classmethod
     def sample_descriptions(
