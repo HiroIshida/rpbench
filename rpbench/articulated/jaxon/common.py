@@ -18,7 +18,7 @@ from typing import (
 
 import imageio
 import numpy as np
-from skmp.constraint import BoxConst, COMStabilityConst, PoseConstraint
+from skmp.constraint import BoxConst, COMStabilityConst, PoseConstraint, EqCompositeConst
 from skmp.robot.jaxon import Jaxon, JaxonConfig
 from skmp.robot.utils import set_robot_state
 from skmp.trajectory import Trajectory
@@ -26,7 +26,7 @@ from skrobot.coordinates import Coordinates
 from skrobot.model import RobotModel
 from skrobot.model.primitives import Axis, Box
 from skrobot.viewers import TrimeshSceneViewer
-from tinyfk import BaseType
+from tinyfk import BaseType, RotationType
 
 from rpbench.utils import SceneWrapper
 
@@ -56,20 +56,30 @@ class CachedJaxonConstProvider(ABC):
         jaxon: Jaxon,
         co_rarm: Optional[Coordinates] = None,
         co_larm: Optional[Coordinates] = None,
-    ) -> PoseConstraint:
+        arm_rot_type: RotationType = RotationType.XYZW
+    ) -> Union[PoseConstraint, EqCompositeConst]:
         config = cls.get_config()
-        efkin = config.get_endeffector_kin(
-            rleg=True, lleg=True, rarm=(co_rarm is not None), larm=(co_larm is not None)
-        )
-        coords_list = [jaxon.rleg_end_coords, jaxon.lleg_end_coords]
 
-        if co_rarm is not None:
-            coords_list.append(co_rarm)  # type: ignore
+        # TODO: for simplicity, split the kinematics solver to legs and arms
+        # because leg rot-type are always XYZW but arm rot-type can be IGNORE
 
-        if co_larm is not None:
-            coords_list.append(co_larm)  # type: ignore
+        leg_efkin = config.get_endeffector_kin(rleg=True, lleg=True, rarm=False, larm=False)
+        leg_coords_list = [jaxon.rleg_end_coords, jaxon.lleg_end_coords]
+        leg_const = PoseConstraint.from_skrobot_coords(leg_coords_list, leg_efkin, jaxon)  # type: ignore
 
-        const = PoseConstraint.from_skrobot_coords(coords_list, efkin, jaxon)  # type: ignore
+        use_rarm = co_rarm is not None
+        use_larm = co_larm is not None
+        if not use_rarm and not use_larm:
+            return leg_const
+
+        arm_efkin = config.get_endeffector_kin(rleg=False, lleg=False, rarm=use_rarm, larm=use_larm, rot_type=arm_rot_type)
+        arm_coords_list = []
+        if use_rarm:
+            arm_coords_list.append(co_rarm)
+        if use_larm:
+            arm_coords_list.append(co_larm)
+        arm_const = PoseConstraint.from_skrobot_coords(arm_coords_list, arm_efkin, jaxon)  # type: ignore
+        const = EqCompositeConst([leg_const, arm_const])
         return const
 
     @classmethod
