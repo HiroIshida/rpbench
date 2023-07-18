@@ -22,6 +22,7 @@ from rpbench.two_dimensional.bubbly_world import (
     BubblyComplexMeshPointConnectTask,
     BubblyComplexPointConnectTask,
 )
+from rpbench.two_dimensional.dummy import DummyConfig, DummySolver, DummyTask
 from rpbench.two_dimensional.maze import MazeSolvingTask
 
 np.random.seed(0)
@@ -193,6 +194,28 @@ def test_bubbly_world_point_connecting_task():
         task = task_type.sample(1, True)
         result = task.solve_default()[0]
         assert result.traj is not None
+
+
+def test_dummy_task():
+    task = DummyTask.sample(1, standard=True)
+    res_off = task.solve_default()[0]
+    assert res_off.traj is not None
+
+    conf = DummyConfig(500)  # dist < 0.5
+    online_solver = DummySolver.init(conf)
+
+    task = DummyTask.sample(1, standard=False)
+    task.descriptions[0] = np.array([0.49, 0.0])
+    prob = task.export_problems()[0]
+    online_solver.setup(prob)
+    res = online_solver.solve(res_off.traj)
+    assert res.traj is not None
+
+    task.descriptions[0] = np.array([0.51, 0.0])
+    prob = task.export_problems()[0]
+    online_solver.setup(prob)
+    res = online_solver.solve(res_off.traj)
+    assert res.traj is None
 
 
 if __name__ == "__main__":
