@@ -142,6 +142,8 @@ class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
 class DummyConfig:
     n_max_call: int
     random: bool = True
+    random_scale: float = 2.0
+    random_force_failure_rate: float = 0.2  # to intensionaly create false positive state
 
 
 @dataclass
@@ -178,7 +180,10 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         dist = np.linalg.norm(q_end_target - q_end_init)
         n_call = int(dist * 1000)
         if self.config.random:
-            n_call = n_call + int(np.random.randint(n_call) * 0.5)
+            if np.random.rand() < self.config.random_force_failure_rate:
+                n_call = self.config.n_max_call + 1  # meaning failure
+            else:
+                n_call = n_call + int(np.random.randint(n_call) * self.config.random_scale)
         traj: Optional[Trajectory]
         if n_call < self.config.n_max_call:
             traj = Trajectory.from_two_points(q_end_init, q_end_target, 2)
