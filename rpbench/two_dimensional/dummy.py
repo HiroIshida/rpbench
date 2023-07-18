@@ -141,6 +141,7 @@ class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
 @dataclass
 class DummyConfig:
     n_max_call: int
+    random: bool = True
 
 
 @dataclass
@@ -156,11 +157,11 @@ class DummyResult:
 
 @dataclass
 class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
-    n_max_call: int
+    config: DummyConfig
 
     @classmethod
     def init(cls, config: DummyConfig) -> "DummySolver":
-        return cls(config.n_max_call)
+        return cls(config)
 
     def get_result_type(self) -> Type[DummyResult]:
         return DummyResult
@@ -176,8 +177,10 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         q_end_target = self.problem.goal_const.desired_angles
         dist = np.linalg.norm(q_end_target - q_end_init)
         n_call = int(dist * 1000)
+        if self.config.random:
+            n_call = n_call + int(np.random.randint(n_call) * 0.5)
         traj: Optional[Trajectory]
-        if n_call < self.n_max_call:
+        if n_call < self.config.n_max_call:
             traj = Trajectory.from_two_points(q_end_init, q_end_target, 2)
         else:
             traj = None

@@ -201,7 +201,7 @@ def test_dummy_task():
     res_off = task.solve_default()[0]
     assert res_off.traj is not None
 
-    conf = DummyConfig(500)  # dist < 0.5
+    conf = DummyConfig(500, random=False)  # dist < 0.5
     online_solver = DummySolver.init(conf)
 
     task = DummyTask.sample(1, standard=False)
