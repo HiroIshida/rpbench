@@ -107,7 +107,7 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         assert isinstance(self.problem.goal_const, ConfigPointConst)
         q_end_target = self.problem.goal_const.desired_angles
         dist = np.linalg.norm(q_end_target - q_end_init)
-        n_call = int(dist * 1000)
+        n_call = int(dist * 1000) + 1
         if self.config.random:
             if np.random.rand() < self.config.random_force_failure_rate:
                 n_call = self.config.n_max_call + 1  # meaning failure
