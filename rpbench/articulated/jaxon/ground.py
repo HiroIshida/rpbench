@@ -5,7 +5,7 @@ from skmp.constraint import CollFreeConst, IneqCompositeConst, PoseConstraint
 from skmp.robot.jaxon import Jaxon
 from skmp.robot.utils import get_robot_state
 from skmp.satisfy import SatisfactionConfig
-from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
+from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver, MyRRTResult
 from skmp.solver.nlp_solver.sqp_based_solver import (
     SQPBasedSolver,
     SQPBasedSolverConfig,
@@ -24,6 +24,7 @@ from rpbench.interface import (
     ReachingTaskBase,
     ResultProtocol,
 )
+from rpbench.timeout_decorator import TimeoutError, timeout
 from rpbench.utils import skcoords_to_pose_vec
 
 
@@ -153,6 +154,14 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
         return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        try:
+            return self._solve_default_each(problem)
+        except TimeoutError:
+            print("timeout!! solved default failed.")
+            return MyRRTResult.abnormal()
+
+    @timeout(180)
+    def _solve_default_each(self, problem: Problem) -> ResultProtocol:
         rrt_conf = MyRRTConfig(5000, satisfaction_conf=SatisfactionConfig(n_max_eval=20))
 
         sqp_config = SQPBasedSolverConfig(
