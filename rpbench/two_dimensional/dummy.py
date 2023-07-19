@@ -6,8 +6,7 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 from scipy.stats import gaussian_kde
 from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
-from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
-from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
+from skmp.solver.interface import AbstractScratchSolver, Problem
 from skmp.trajectory import Trajectory
 
 from rpbench.interface import DescriptionTable, TaskBase, WorldBase
@@ -68,76 +67,6 @@ class DummyWorld(WorldBase):
         # plt.colorbar(cf)
 
 
-class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
-    @staticmethod
-    def get_world_type() -> Type[DummyWorld]:
-        return DummyWorld
-
-    @staticmethod
-    def get_robot_model() -> None:
-        return None
-
-    @staticmethod
-    def create_gridsdf(world: DummyWorld, robot_model: None) -> Grid2dSDF:
-        return world.get_exact_sdf()
-
-    @classmethod
-    def sample_descriptions(
-        cls, world: DummyWorld, n_sample: int, standard: bool = False
-    ) -> List[np.ndarray]:
-
-        sdf = world.get_exact_sdf()
-
-        if standard:
-            assert n_sample == 1
-            return [np.zeros(2)]
-        else:
-            descs: List[np.ndarray] = []
-            while len(descs) < n_sample:
-                p = np.random.rand(2) * (world.b_max - world.b_min) + world.b_min
-                if sdf(np.expand_dims(p, axis=0))[0] > 0:
-                    descs.append(p)
-            return descs
-
-    def export_table(self) -> DescriptionTable:
-        assert self.gridsdf is not None
-        wd = {}  # type: ignore
-        wcd_list = []  # type: ignore
-        for desc in self.descriptions:
-            wcd = {"p": desc}
-            wcd_list.append(wcd)
-        return DescriptionTable(wd, wcd_list)
-
-    def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=100, simplify=False))
-        ompl_sovler.setup(problem)
-        ompl_res = ompl_sovler.solve()
-        return ompl_res
-
-    @classmethod
-    def get_dof(cls) -> int:
-        return 2
-
-    def export_problems(self) -> List[Problem]:
-        box = BoxConst(self.world.b_min, self.world.b_max)
-        sdf = self.world.get_exact_sdf()
-        # create easy simple dummy problem
-        probs = []
-        for desc in self.descriptions:
-            goal_const = ConfigPointConst(desc)
-            prob = Problem(desc, box, goal_const, PointCollFreeConst(sdf), None)
-            probs.append(prob)
-        return probs
-
-    def visualize(self) -> Tuple:
-        fig, ax = plt.subplots()
-        self.world.visualize((fig, ax))
-
-        for goal in self.descriptions:
-            ax.scatter(goal[0], goal[1], label="point", c="red")
-        return fig, ax
-
-
 @dataclass
 class DummyConfig:
     n_max_call: int
@@ -190,3 +119,75 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         else:
             traj = None
         return DummyResult(traj, None, n_call)
+
+
+class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
+    @staticmethod
+    def get_world_type() -> Type[DummyWorld]:
+        return DummyWorld
+
+    @staticmethod
+    def get_robot_model() -> None:
+        return None
+
+    @staticmethod
+    def create_gridsdf(world: DummyWorld, robot_model: None) -> Grid2dSDF:
+        return world.get_exact_sdf()
+
+    @classmethod
+    def sample_descriptions(
+        cls, world: DummyWorld, n_sample: int, standard: bool = False
+    ) -> List[np.ndarray]:
+
+        sdf = world.get_exact_sdf()
+
+        if standard:
+            assert n_sample == 1
+            return [np.zeros(2)]
+        else:
+            descs: List[np.ndarray] = []
+            while len(descs) < n_sample:
+                p = np.random.rand(2) * (world.b_max - world.b_min) + world.b_min
+                if sdf(np.expand_dims(p, axis=0))[0] > 0:
+                    descs.append(p)
+            return descs
+
+    def export_table(self) -> DescriptionTable:
+        assert self.gridsdf is not None
+        wd = {}  # type: ignore
+        wcd_list = []  # type: ignore
+        for desc in self.descriptions:
+            wcd = {"p": desc}
+            wcd_list.append(wcd)
+        return DescriptionTable(wd, wcd_list)
+
+    def solve_default_each(self, problem: Problem) -> DummyResult:
+        x0 = problem.start
+        assert isinstance(problem.goal_const, ConfigPointConst)
+        x1 = problem.goal_const.desired_angles
+        assert np.linalg.norm(x1 - x0) < 1e-3
+        dummy_traj = Trajectory.from_two_points(x0, x1, 2)
+        return DummyResult(dummy_traj, 1.0, 3000)  # whatever
+
+    @classmethod
+    def get_dof(cls) -> int:
+        return 2
+
+    def export_problems(self) -> List[Problem]:
+        box = BoxConst(self.world.b_min, self.world.b_max)
+        sdf = self.world.get_exact_sdf()
+        # create easy simple dummy problem
+        probs = []
+        for desc in self.descriptions:
+            goal_const = ConfigPointConst(desc)
+            prob = Problem(desc, box, goal_const, PointCollFreeConst(sdf), None)
+            probs.append(prob)
+        return probs
+
+    def visualize(self) -> Tuple:
+        fig, ax = plt.subplots()
+        self.world.visualize((fig, ax))
+
+        for goal in self.descriptions:
+            ax.scatter(goal[0], goal[1], label="point", c="red")
+        return fig, ax
