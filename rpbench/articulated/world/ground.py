@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, TypeVar, Union
+from typing import List, Optional, TypeVar, Union
 
 import numpy as np
 from scipy.stats import lognorm
@@ -24,6 +24,7 @@ class GroundWorldBase(WorldBase):
     ground: BoxSkeleton
     foot_box: BoxSkeleton
     obstacles: List[BoxSkeleton]
+    _heightmap: Optional[np.ndarray] = None  # lazy
 
     @classmethod
     def default_ground(cls) -> BoxSkeleton:
@@ -59,38 +60,41 @@ class GroundWorldBase(WorldBase):
         grid3d = self.get_grid()
         return Grid2d(grid3d.lb[:2], grid3d.ub[:2], (112, 112))
 
-    def create_exact_heightmap(self) -> np.ndarray:
-        grid2d = self.get_grid2d()
+    def heightmap(self) -> np.ndarray:
+        if self._heightmap is None:
+            grid2d = self.get_grid2d()
 
-        subplane = Box(extents=[1.0, 1.0, 0.7], pos=[0.5, 0.0, -0.35])
-        depth, width, height = subplane._extents
+            subplane = Box(extents=[1.0, 1.0, 0.7], pos=[0.5, 0.0, -0.35])
+            depth, width, height = subplane._extents
 
-        height_from_plane = 1.5
+            height_from_plane = 1.5
 
-        step = subplane._extents[:2] / np.array(grid2d.sizes)
-        xlin = (
-            np.linspace(step[0] * 0.5, step[0] * (grid2d.sizes[0] - 0.5), grid2d.sizes[0])
-            - depth * 0.5
-        )
-        ylin = (
-            np.linspace(step[1] * 0.5, step[1] * (grid2d.sizes[1] - 0.5), grid2d.sizes[1])
-            - width * 0.5
-        )
-        X, Y = np.meshgrid(xlin, ylin)
-        Z = np.zeros_like(X) + height_from_plane
+            step = subplane._extents[:2] / np.array(grid2d.sizes)
+            xlin = (
+                np.linspace(step[0] * 0.5, step[0] * (grid2d.sizes[0] - 0.5), grid2d.sizes[0])
+                - depth * 0.5
+            )
+            ylin = (
+                np.linspace(step[1] * 0.5, step[1] * (grid2d.sizes[1] - 0.5), grid2d.sizes[1])
+                - width * 0.5
+            )
+            X, Y = np.meshgrid(xlin, ylin)
+            Z = np.zeros_like(X) + height_from_plane
 
-        points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-        points = subplane.transform_vector(points)
-        dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
+            points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
+            points = subplane.transform_vector(points)
+            dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
 
-        conf = RayMarchingConfig()
-        dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
-        is_valid = dists < height_from_plane + 1e-3
+            conf = RayMarchingConfig()
+            dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
+            is_valid = dists < height_from_plane + 1e-3
 
-        points_hit = points + dists[:, None] * dirs
-        points_hit_z = points_hit[:, 2]
-        points_hit_z[~is_valid] = _HMAP_INF_SUBST
-        return points_hit_z.reshape((grid2d.sizes[0], grid2d.sizes[1]))
+            points_hit = points + dists[:, None] * dirs
+            points_hit_z = points_hit[:, 2]
+            points_hit_z[~is_valid] = _HMAP_INF_SUBST
+
+            self._heightmap = points_hit_z.reshape((grid2d.sizes[0], grid2d.sizes[1]))
+        return self._heightmap
 
 
 @dataclass
