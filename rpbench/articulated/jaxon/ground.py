@@ -187,3 +187,12 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
                     return sqp_result
 
         return SQPBasedSolverResult.abnormal()
+
+    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+        # NOTE: for now, we ignore world description
+        intrinsic_descs = []
+        for desc in self.descriptions:
+            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
+            intrinsic_desc = np.hstack(pose_vecs)
+            intrinsic_descs.append(intrinsic_desc)
+        return intrinsic_descs
