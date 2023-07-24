@@ -45,12 +45,6 @@ class GroundWorldBase(WorldBase):
             obs.visual_mesh.visual.face_colors = [255, 0, 0, 120]
             viewer.add(obs)
 
-    def get_exact_sdf(self) -> UnionSDF:
-        lst = [self.ground.sdf]
-        for obstacle in self.obstacles:
-            lst.append(obstacle.sdf)
-        return UnionSDF(lst)
-
     def get_grid(self) -> Grid:
         grid_sizes = (56, 56, 28)
         depth = 1.0
@@ -65,6 +59,12 @@ class GroundWorldBase(WorldBase):
         return Grid2d(grid3d.lb[:2], grid3d.ub[:2], (112, 112))
 
     def heightmap(self) -> np.ndarray:
+
+        lst = [self.ground.sdf]
+        for obstacle in self.obstacles:
+            lst.append(obstacle.sdf)
+        sdf = UnionSDF(lst)
+
         if self._heightmap is None:
             grid2d = self.get_grid2d()
 
@@ -90,7 +90,7 @@ class GroundWorldBase(WorldBase):
             dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
 
             conf = RayMarchingConfig()
-            dists = Camera.ray_marching(points, dirs, self.get_exact_sdf(), conf)
+            dists = Camera.ray_marching(points, dirs, sdf, conf)
             is_valid = dists < height_from_plane + 1e-3
 
             points_hit = points + dists[:, None] * dirs
@@ -100,9 +100,6 @@ class GroundWorldBase(WorldBase):
             self._heightmap = points_hit_z.reshape((grid2d.sizes[0], grid2d.sizes[1]))
         return self._heightmap
 
-
-@dataclass
-class GroundClutteredWorld(GroundWorldBase):
     @staticmethod
     def is_aabb_collide(box1: BoxSkeleton, box2: BoxSkeleton) -> bool:
         U1 = box1.worldpos() + np.array(box1._extents) * 0.5
@@ -118,6 +115,9 @@ class GroundClutteredWorld(GroundWorldBase):
             return False
         return True
 
+
+@dataclass
+class GroundClutteredWorld(GroundWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "GroundClutteredWorld":
         ground = cls.default_ground()
@@ -141,3 +141,54 @@ class GroundClutteredWorld(GroundWorldBase):
                 obstacles.append(box)
 
         return cls(ground, foot_box, obstacles)
+
+    def get_exact_sdf(self) -> UnionSDF:
+        lst = [self.ground.sdf]
+        for obstacle in self.obstacles:
+            lst.append(obstacle.sdf)
+        return UnionSDF(lst)
+
+
+@dataclass
+class GroundClutteredTableWorld(GroundWorldBase):
+    table: Optional[
+        Box
+    ] = None  # it will never be None. but just because inheritance from dataclass
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "GroundClutteredTableWorld":
+        ground = cls.default_ground()
+        table = Box([1.0, 1.0, 0.05], pos=(0.8, 0.0, 0.9), with_sdf=True)
+        foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
+
+        n_obstacle = np.random.randint(20)
+        obstacles: List[BoxSkeleton] = []
+        if not standard:
+
+            while len(obstacles) < n_obstacle:
+                box_size = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.2, 0.2, 0.4])
+                box_size[2] = min(box_size[2], 0.7)
+                pos2d = np.random.rand(2)
+                pos2d[1] += -0.5
+                pos3d = np.hstack([pos2d, box_size[2] * 0.5])
+                box = BoxSkeleton(box_size, pos=pos3d, with_sdf=True)
+
+                if cls.is_aabb_collide(foot_box, box):
+                    continue
+
+                obstacles.append(box)
+
+        return cls(ground, foot_box, obstacles, None, table)
+
+    def get_exact_sdf(self) -> UnionSDF:
+        assert self.table is not None
+        lst = [self.ground.sdf, self.table.sdf]
+        for obstacle in self.obstacles:
+            lst.append(obstacle.sdf)
+        return UnionSDF(lst)
+
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        super().visualize(viewer)
+        assert self.table is not None
+        self.table.visual_mesh.visual.face_colors = [0, 255, 0, 120]
+        viewer.add(self.table)

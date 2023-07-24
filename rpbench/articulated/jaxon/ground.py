@@ -17,7 +17,11 @@ from tinyfk import BaseType, RotationType
 from voxbloxpy.core import GridSDF
 
 from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
-from rpbench.articulated.world.ground import GroundClutteredWorld
+from rpbench.articulated.world.ground import (
+    GroundClutteredTableWorld,
+    GroundClutteredWorld,
+    GroundWorldT,
+)
 from rpbench.interface import (
     DescriptionTable,
     Problem,
@@ -28,7 +32,7 @@ from rpbench.timeout_decorator import TimeoutError, timeout
 from rpbench.utils import skcoords_to_pose_vec
 
 
-class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxon]):
+class HumanoidGroundRarmReachingTaskBase(ReachingTaskBase[GroundWorldT, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
     @staticmethod
@@ -36,11 +40,7 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
         return CachedJaxonConstProvider.get_jaxon()
 
     @staticmethod
-    def get_world_type() -> Type[GroundClutteredWorld]:
-        return GroundClutteredWorld
-
-    @staticmethod
-    def create_gridsdf(world: GroundClutteredWorld, robot_model: RobotModel) -> GridSDF:
+    def create_gridsdf(world: GroundWorldT, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -71,9 +71,7 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
         return DescriptionTable(world_dict, desc_dicts)
 
     @classmethod
-    def sample_target_poses(
-        cls, world: GroundClutteredWorld, standard: bool
-    ) -> Tuple[Coordinates, ...]:
+    def sample_target_poses(cls, world: GroundWorldT, standard: bool) -> Tuple[Coordinates, ...]:
         # NOTE: COPIED from pr2.tabletop
 
         if standard:
@@ -95,7 +93,7 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
 
     @classmethod
     def sample_descriptions(
-        cls, world: GroundClutteredWorld, n_sample: int, standard: bool = False
+        cls, world: GroundWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, ...]]:
         # TODO: duplication of tabletop.py
         if standard:
@@ -196,3 +194,17 @@ class HumanoidGroundRarmReachingTask(ReachingTaskBase[GroundClutteredWorld, Jaxo
             intrinsic_desc = np.hstack(pose_vecs)
             intrinsic_descs.append(intrinsic_desc)
         return intrinsic_descs
+
+
+class HumanoidGroundRarmReachingTask(HumanoidGroundRarmReachingTaskBase[GroundClutteredWorld]):
+    @staticmethod
+    def get_world_type() -> Type[GroundClutteredWorld]:
+        return GroundClutteredWorld
+
+
+class HumanoidGroundTableRarmReachingTask(
+    HumanoidGroundRarmReachingTaskBase[GroundClutteredTableWorld]
+):
+    @staticmethod
+    def get_world_type() -> Type[GroundClutteredTableWorld]:
+        return GroundClutteredTableWorld
