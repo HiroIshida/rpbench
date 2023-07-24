@@ -26,6 +26,10 @@ class GroundWorldBase(WorldBase):
     obstacles: List[BoxSkeleton]
     _heightmap: Optional[np.ndarray] = None  # lazy
 
+    def __reduce__(self):
+        # delete _heightmap cache for now.
+        return (self.__class__, (self.ground, self.foot_box, self.obstacles, None))
+
     @classmethod
     def default_ground(cls) -> BoxSkeleton:
         ground = BoxSkeleton([3.0, 3.0, 0.1], with_sdf=True)
