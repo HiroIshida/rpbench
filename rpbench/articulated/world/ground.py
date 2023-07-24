@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import List, Optional, TypeVar, Union
 
 import numpy as np
@@ -27,8 +27,14 @@ class GroundWorldBase(WorldBase):
     _heightmap: Optional[np.ndarray] = None  # lazy
 
     def __reduce__(self):
-        # delete _heightmap cache for now.
-        return (self.__class__, (self.ground, self.foot_box, self.obstacles, None))
+        args = []  # type: ignore
+        for field in fields(self):
+            if field.name == "_heightmap":
+                # delete _heightmap cache for now.
+                args.append(None)
+            else:
+                args.append(getattr(self, field.name))
+        return (self.__class__, tuple(args))
 
     @classmethod
     def default_ground(cls) -> BoxSkeleton:
