@@ -400,7 +400,7 @@ class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):
         ...
 
     @abstractmethod
-    def solve(self, timeout: Optional[int] = None) -> ResultT:
+    def solve(self) -> ResultT:
         """solve problem
 
         NOTE: unlike AbstractSolver, this function does not
@@ -436,8 +436,8 @@ class SkmpTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         prob = task.export_problems()[0]
         self.skmp_solver.setup(prob)
 
-    def solve(self, timeout: Optional[int] = None) -> ResultT:
-        return self.skmp_solver.solve(timeout=timeout)
+    def solve(self) -> ResultT:
+        return self.skmp_solver.solve()
 
 
 @dataclass
@@ -572,8 +572,8 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         self.skmp_solver.setup(prob)
         self.query_desc = task.export_intrinsic_descriptions()[0]
 
-    def solve(self, timeout: Optional[int] = None) -> ResultT:
+    def solve(self) -> ResultT:
         assert self.query_desc is not None
-        result = self.skmp_solver.solve(self.query_desc, timeout=timeout)
+        result = self.skmp_solver.solve(self.query_desc)
         self.query_desc = None
         return result
