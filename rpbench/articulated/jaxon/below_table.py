@@ -6,7 +6,7 @@ from skmp.constraint import CollFreeConst, IneqCompositeConst, PoseConstraint
 from skmp.robot.jaxon import Jaxon
 from skmp.robot.utils import get_robot_state
 from skmp.satisfy import SatisfactionConfig
-from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver
+from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver, MyRRTResult
 from skmp.solver.nlp_solver.sqp_based_solver import (
     SQPBasedSolver,
     SQPBasedSolverConfig,
@@ -28,6 +28,7 @@ from rpbench.interface import (
     ResultProtocol,
     WorldBase,
 )
+from rpbench.timeout_decorator import TimeoutError, timeout
 from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 
 
@@ -35,6 +36,7 @@ from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 class TableWorld(WorldBase):
     target_region: Box
     table: Box
+    obstacle: Box
     _intrinsic_desc: np.ndarray
 
     @classmethod
@@ -52,10 +54,28 @@ class TableWorld(WorldBase):
         target_region = Box([0.8, 0.8, table_height], with_sdf=True)
         target_region.visual_mesh.visual.face_colors = [0, 255, 100, 100]
         target_region.translate([0.6, -0.7, 0.5 * table_height])
-        return cls(target_region, table, table_position)
+
+        # determine obstacle
+        if standard:
+            obs = Box([0.1, 0.1, 0.5], pos=[0.6, -0.2, 0.25], with_sdf=True)
+        else:
+            region_width = np.array(target_region._extents[:2])
+            region_center = target_region.worldpos()[:2]
+            b_min = region_center - region_width * 0.5
+            b_max = region_center + region_width * 0.5
+
+            obs_width = np.random.rand(2) * np.ones(2) * 0.2 + np.ones(2) * 0.1
+            obs_height = 0.3 + np.random.rand() * 0.5
+            b_min = region_center - region_width * 0.5 + 0.5 * obs_width
+            b_max = region_center + region_width * 0.5 - 0.5 * obs_width
+            pos2d = np.random.rand(2) * (b_max - b_min) + b_min
+            pos = np.hstack([pos2d, obs_height * 0.5])
+            obs = Box(np.hstack([obs_width, obs_height]), pos=pos, with_sdf=True)
+
+        return cls(target_region, table, obs, table_position)
 
     def get_exact_sdf(self) -> UnionSDF:
-        return UnionSDF([self.table.sdf])
+        return UnionSDF([self.table.sdf, self.obstacle.sdf])
 
     def export_intrinsic_description(self) -> np.ndarray:
         return self._intrinsic_desc
@@ -64,7 +84,10 @@ class TableWorld(WorldBase):
         raise NotImplementedError("girdsdf is not used")
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
+        viewer.add(self.target_region)
         viewer.add(self.table)
+        viewer.add(self.obstacle)
 
 
 class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
@@ -89,7 +112,13 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}
-        world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.copy_worldcoords())
+        world_dict["world"] = np.hstack(
+            [
+                self.world.table.worldpos(),
+                self.world.obstacle.worldpos(),
+                np.array(self.world.obstacle._extents),
+            ]
+        )
 
         desc_dicts = []
         for desc in self.descriptions:
@@ -181,6 +210,14 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
         return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        try:
+            return self._solve_default_each(problem)
+        except TimeoutError:
+            print("timeout!! solved default failed.")
+            return MyRRTResult.abnormal()
+
+    @timeout(180)
+    def _solve_default_each(self, problem: Problem) -> ResultProtocol:
         rrt_conf = MyRRTConfig(5000, satisfaction_conf=SatisfactionConfig(n_max_eval=20))
 
         sqp_config = SQPBasedSolverConfig(
