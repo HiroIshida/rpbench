@@ -43,7 +43,9 @@ class TabletopWorldBase(WorldBase):
         table_width = 0.75
         table_height = 0.7
         pos = [0.5 + table_depth * 0.5, 0.0, table_height * 0.5]
-        table = Box(extents=[table_depth, table_width, table_height], pos=pos, with_sdf=True)
+        table = Box(
+            extents=[table_depth, table_width, table_height], pos=pos, with_sdf=True, name=""
+        )
         return table
 
     def get_grid(self) -> Grid:
@@ -145,7 +147,7 @@ class TabletopClutterWorld(TabletopWorldBase):
                 break
             obstacles_2ds.append(obs2d)
 
-            obs = Box(obs_extent, with_sdf=True)
+            obs = Box(obs_extent, with_sdf=True, name="")
             obs.newcoords(table.copy_worldcoords())
             obs.translate(
                 np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
@@ -202,7 +204,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             if box2d is not None:
                 break
 
-        box = Box(box_extent, with_sdf=True)
+        box = Box(box_extent, with_sdf=True, name="")
         box.newcoords(table.copy_worldcoords())
         box.translate(np.hstack([box2d.coords.pos, 0.5 * (box_extent[-1] + table._extents[-1])]))
         box.rotate(box2d.coords.angle, "z")
@@ -223,7 +225,7 @@ class TabletopBoxWorld(TabletopWorldBase):
                 break
             obstacles_2ds.append(obs2d)
 
-            obs = Box(obs_extent, with_sdf=True)
+            obs = Box(obs_extent, with_sdf=True, name="")
             obs.newcoords(table.copy_worldcoords())
             obs.translate(
                 np.hstack([obs2d.coords.pos, 0.5 * (obs_extent[-1] + table._extents[-1])])
@@ -318,27 +320,27 @@ class TabletopOvenWorld(TabletopWorldBase):
 
             intrinsic_desc.extend([x_rand, y_rand])
 
-        lower_plate = Box([d, w, t], with_sdf=True, face_colors=color)
+        lower_plate = Box([d, w, t], with_sdf=True, face_colors=color, name="")
         lower_plate.newcoords(box_center.copy_worldcoords())
         lower_plate.translate([0, 0, 0.5 * t])
         obstacles.append(lower_plate)
 
-        upper_plate = Box([d, w, t], with_sdf=True, face_colors=color)
+        upper_plate = Box([d, w, t], with_sdf=True, face_colors=color, name="")
         upper_plate.newcoords(box_center.copy_worldcoords())
         upper_plate.translate([0, 0, h - 0.5 * t])
         obstacles.append(upper_plate)
 
-        left_plate = Box([d, t, h], with_sdf=True, face_colors=color)
+        left_plate = Box([d, t, h], with_sdf=True, face_colors=color, name="")
         left_plate.newcoords(box_center.copy_worldcoords())
         left_plate.translate([0, 0.5 * w - 0.5 * t, 0.5 * h])
         obstacles.append(left_plate)
 
-        right_plate = Box([d, t, h], with_sdf=True, face_colors=color)
+        right_plate = Box([d, t, h], with_sdf=True, face_colors=color, name="")
         right_plate.newcoords(box_center.copy_worldcoords())
         right_plate.translate([0, -0.5 * w + 0.5 * t, 0.5 * h])
         obstacles.append(right_plate)
 
-        opposite_plate = Box([t, w, h], with_sdf=True, face_colors=color)
+        opposite_plate = Box([t, w, h], with_sdf=True, face_colors=color, name="")
         opposite_plate.newcoords(box_center.copy_worldcoords())
         opposite_plate.translate([0.5 * d - 0.5 * t, 0.0, 0.5 * h])
         obstacles.append(opposite_plate)

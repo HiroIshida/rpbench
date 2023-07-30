@@ -158,13 +158,13 @@ class GroundClutteredWorld(GroundWorldBase):
 @dataclass
 class GroundClutteredTableWorld(GroundWorldBase):
     table: Optional[
-        Box
+        BoxSkeleton
     ] = None  # it will never be None. but just because inheritance from dataclass
 
     @classmethod
     def sample(cls, standard: bool = False) -> "GroundClutteredTableWorld":
         ground = cls.default_ground()
-        table = Box([1.0, 1.0, 0.05], pos=(0.8, 0.0, 0.9), with_sdf=True)
+        table = BoxSkeleton([1.0, 1.0, 0.05], pos=(0.8, 0.0, 0.9), with_sdf=True)
         foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
 
         n_obstacle = np.random.randint(20)
@@ -196,5 +196,6 @@ class GroundClutteredTableWorld(GroundWorldBase):
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         super().visualize(viewer)
         assert self.table is not None
-        self.table.visual_mesh.visual.face_colors = [0, 255, 0, 120]
-        viewer.add(self.table)
+        table = self.table.to_box()
+        table.visual_mesh.visual.face_colors = [0, 255, 0, 120]
+        viewer.add(table)
