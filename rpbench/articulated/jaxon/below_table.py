@@ -84,9 +84,10 @@ class TableWorld(WorldBase):
         raise NotImplementedError("girdsdf is not used")
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
-        viewer.add(self.target_region)
+        # self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
+        # viewer.add(self.target_region)
         viewer.add(self.table)
+        self.obstacle.visual_mesh.visual.face_colors = [255, 0, 0, 150]
         viewer.add(self.obstacle)
 
 
