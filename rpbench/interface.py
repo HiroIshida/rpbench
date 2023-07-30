@@ -181,10 +181,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def n_inner_task(self) -> int:
         return len(self.descriptions)
 
-    @classmethod
-    def acceptable_time_admissible(self) -> float:
-        return np.inf  # override this method in subclass
-
     @property
     def gridsdf(self):
         if self._gridsdf is None:
@@ -200,7 +196,11 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @classmethod
     def sample(
-        cls: Type[SamplableT], n_wcond_desc: int, standard: bool = False, with_gridsdf: bool = True
+        cls: Type[SamplableT],
+        n_wcond_desc: int,
+        standard: bool = False,
+        with_gridsdf: bool = True,
+        timeout: float = 180.0,
     ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
         robot_model = cls.get_robot_model()
@@ -209,11 +209,8 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         t_start = time.time()
         while True:
             t_elapsed = time.time() - t_start
-            t_admissible = cls.acceptable_time_admissible()
-            if t_elapsed > t_admissible:
-                assert False, "elapsed time {} sec exceeds limit {} sec".format(
-                    t_elapsed, t_admissible
-                )
+            if t_elapsed > timeout:
+                assert False, "sample: timeout! after {} sec".format(timeout)
 
             world = world_t.sample(standard=standard)
             if world is None:
@@ -237,6 +234,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         predicate: Callable[[SamplableT], bool],
         max_trial_per_desc: int,
         with_gridsdf: bool = True,
+        timeout: int = 180,
     ) -> Optional[SamplableT]:
         """sample task that maches the predicate function"""
 
@@ -249,11 +247,9 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         t_start = time.time()
         while True:
             t_elapsed = time.time() - t_start
-            t_admissible = cls.acceptable_time_admissible()
-            if t_elapsed > t_admissible:
-                assert False, "elapsed time {} sec exceeds limit {} sec".format(
-                    t_elapsed, t_admissible
-                )
+            if t_elapsed > timeout:
+                print("predicated_sample: timeout!")
+                return None
 
             world = world_t.sample(standard=standard)
             if world is None:

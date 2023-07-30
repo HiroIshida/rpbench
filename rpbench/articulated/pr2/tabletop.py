@@ -136,9 +136,7 @@ class TabletopOvenWorldWrapBase(TabletopOvenWorldMixin, TabletopWorldWrapBase[Ta
 
 
 class TabletopBoxWorldWrapBase(TabletopBoxWorldMixin, TabletopWorldWrapBase[TabletopBoxWorld]):
-    @classmethod
-    def acceptable_time_admissible(cls) -> float:
-        return 100.0
+    ...
 
 
 class TabletopTaskBase(
