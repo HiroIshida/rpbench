@@ -43,11 +43,11 @@ class GroundWorldBase(WorldBase):
         return ground
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        ground = self.ground.to_box()
+        ground = self.ground.to_visualizable()
         viewer.add(ground)
 
         for obs_tmp in self.obstacles:
-            obs = obs_tmp.to_box()
+            obs = obs_tmp.to_visualizable()
             obs.visual_mesh.visual.face_colors = [255, 0, 0, 120]
             viewer.add(obs)
 
@@ -196,6 +196,6 @@ class GroundClutteredTableWorld(GroundWorldBase):
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         super().visualize(viewer)
         assert self.table is not None
-        table = self.table.to_box()
+        table = self.table.to_visualizable()
         table.visual_mesh.visual.face_colors = [0, 255, 0, 120]
         viewer.add(table)
