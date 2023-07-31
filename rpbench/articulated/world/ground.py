@@ -108,10 +108,10 @@ class GroundWorldBase(WorldBase):
 
     @staticmethod
     def is_aabb_collide(box1: BoxSkeleton, box2: BoxSkeleton) -> bool:
-        U1 = box1.worldpos() + np.array(box1._extents) * 0.5
-        L1 = box1.worldpos() - np.array(box1._extents) * 0.5
-        U2 = box2.worldpos() + np.array(box2._extents) * 0.5
-        L2 = box2.worldpos() - np.array(box2._extents) * 0.5
+        U1 = box1.worldpos() + np.array(box1.extents) * 0.5
+        L1 = box1.worldpos() - np.array(box1.extents) * 0.5
+        U2 = box2.worldpos() + np.array(box2.extents) * 0.5
+        L2 = box2.worldpos() - np.array(box2.extents) * 0.5
 
         if U1[0] < L2[0] or L1[0] > U2[0]:
             return False
