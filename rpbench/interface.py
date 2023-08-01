@@ -43,6 +43,7 @@ OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
+CacheT = TypeVar("CacheT", bound=Any)
 
 
 class SDFProtocol(Protocol):

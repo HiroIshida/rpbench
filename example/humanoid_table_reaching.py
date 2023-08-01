@@ -9,7 +9,7 @@ from rpbench.articulated.jaxon.common import (
     StaticTaskVisualizer,
     TaskVisualizerBase,
 )
-from rpbench.articulated.jaxon.upper_table import HumanoidTableTopRarmReachingTask
+from rpbench.articulated.jaxon.ground import HumanoidGroundTableRarmReachingTask
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     with mesh_simplify_factor(0.2):
-        task = HumanoidTableTopRarmReachingTask.sample(1, False)
+        task = HumanoidGroundTableRarmReachingTask.sample(1, False)
 
     vis: TaskVisualizerBase
     if args.mode == "debug":
