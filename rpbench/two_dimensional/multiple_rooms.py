@@ -10,7 +10,6 @@ from skmp.solver.interface import Problem, ResultProtocol
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skmp.trajectory import Trajectory
-from voxbloxpy.core import Grid
 
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
 
@@ -55,9 +54,6 @@ class MultipleRoomsWorldBase(WorldBase):
 
     def get_margin(self) -> float:
         return self.w_bridge * 0.1
-
-    def get_grid(self) -> Grid:
-        raise NotImplementedError("girdsdf currently supports only 3d")  # TODO
 
     @classmethod
     def sample(cls: Type[MultipleRoomsWorldT], standard: bool = False) -> MultipleRoomsWorldT:

@@ -254,6 +254,3 @@ class TabletopClutteredOvenWorld(WorldBase):
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         return self.oven_conts.sample_pregrasp_coords()
-
-    def get_grid(self):
-        ...

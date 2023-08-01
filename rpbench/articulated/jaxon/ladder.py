@@ -15,7 +15,6 @@ from skrobot.model.primitives import Axis, Box
 from skrobot.sdf import UnionSDF
 from skrobot.utils.urdf import mesh_simplify_factor
 from skrobot.viewers import TrimeshSceneViewer
-from voxbloxpy.core import Grid
 
 from rpbench.utils import SceneWrapper
 
@@ -96,9 +95,6 @@ class LadderWorld:
         for step in self.steps:
             lst.append(step.sdf)
         return UnionSDF(lst)
-
-    def get_grid(self) -> Grid:
-        raise NotImplementedError("girdsdf is not used")
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         # add origin

@@ -18,7 +18,6 @@ from skrobot.model.robot_model import RobotModel
 from skrobot.sdf.signed_distance_function import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
-from voxbloxpy.core import Grid
 
 from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
 from rpbench.interface import (
@@ -79,9 +78,6 @@ class TableWorld(WorldBase):
 
     def export_intrinsic_description(self) -> np.ndarray:
         return self._intrinsic_desc
-
-    def get_grid(self) -> Grid:
-        raise NotImplementedError("girdsdf is not used")
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         # self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]

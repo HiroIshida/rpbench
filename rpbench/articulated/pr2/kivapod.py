@@ -13,7 +13,6 @@ from skrobot.model.primitives import Axis, Box, Sphere
 from skrobot.sdf import GridSDF as SkrobotGridSDF
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
-from voxbloxpy.core import Grid
 
 from rpbench.articulated.pr2.common import (
     CachedPR2ConstProvider,
@@ -78,9 +77,6 @@ class KivapodWorldBase(WorldBase):
         for obstacle in self.obstacles:
             lst.append(obstacle.sdf)
         return UnionSDF(lst)
-
-    def get_grid(self) -> Grid:
-        raise NotImplementedError("girdsdf is not used")
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         # add origin

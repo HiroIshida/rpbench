@@ -89,10 +89,6 @@ class WorldBase(ABC):
         """get an exact sdf"""
         ...
 
-    @abstractmethod
-    def get_grid(self) -> GridProtocol:
-        ...
-
     def export_intrinsic_description(self) -> np.ndarray:
         raise NotImplementedError()
 
@@ -319,6 +315,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def sample_descriptions(
         cls, world: WorldT, n_sample: int, standard: bool = False
     ) -> Optional[List[DescriptionT]]:
+
         ...
 
     @abstractmethod
