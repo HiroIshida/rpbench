@@ -1,4 +1,5 @@
 import copy
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -7,7 +8,11 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
 from rpbench.articulated.world.utils import BoxSkeleton, CylinderSkelton
+from rpbench.interface import WorldBase
 from rpbench.utils import SceneWrapper
+from rpbench.vision import Camera, RayMarchingConfig
+
+_HMAP_INF_SUBST = -1.0
 
 
 class Oven(CascadedCoords):
@@ -170,20 +175,51 @@ class OvenWithContents(CascadedCoords):
             return None
         return co
 
+    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
+        available_size = self.oven.size[:2] - 2 * self.oven.thickness
+        b_min_wrt_oven = -available_size * 0.5
+        b_max_wrt_oven = +available_size * 0.5
+        xlin = np.linspace(b_min_wrt_oven[0], b_max_wrt_oven[0], n_grid)
+        ylin = np.linspace(b_min_wrt_oven[1], b_max_wrt_oven[1], n_grid)
+        X, Y = np.meshgrid(xlin, ylin)
+        height_from_plane = 0.5
+        Z = np.zeros_like(X) + height_from_plane
 
-class TabletopOvenWithContents(CascadedCoords):
+        points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
+        points = self.transform_vector(points)
+        dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
+
+        # create sdf
+        sdfs = []
+        sdfs.append(self.oven.panels["bottom"].sdf)
+        for c in self.contents:
+            sdfs.append(c.sdf)
+        union_sdf = UnionSDF(sdfs)
+
+        conf = RayMarchingConfig()
+        dists = Camera.ray_marching(points, dirs, union_sdf, conf)
+        is_valid = dists < height_from_plane + 1e-3
+
+        dists_from_ground = height_from_plane - dists
+        dists_from_ground[~is_valid] = _HMAP_INF_SUBST
+        # points_hit = points + dists[:, None] * dirs
+        # points_hit_z = points_hit[:, 2]
+        # points_hit_z[~is_valid] = _HMAP_INF_SUBST
+
+        self._heightmap = dists_from_ground.reshape((n_grid, n_grid))
+        # from IPython import embed; embed()
+        return self._heightmap
+        # return points
+
+
+@dataclass
+class TabletopClutteredOvenWorld(WorldBase):
     table: BoxSkeleton
     oven_conts: OvenWithContents
-
-    def __init__(self, table: BoxSkeleton, oven_with_contents: OvenWithContents):
-        super().__init__()
-        self.assoc(table, wrt="local")
-        self.assoc(oven_with_contents, wrt="local")
-        self.table = table
-        self.oven_conts = oven_with_contents
+    _heightmap: Optional[np.ndarray] = None  # lazy
 
     @classmethod
-    def sample(cls, standard: bool) -> "TabletopOvenWithContents":
+    def sample(cls, standard: bool = False) -> Optional["TabletopClutteredOvenWorld"]:
         if standard:
             table_size = np.array([0.6, 3.0, 0.7])
         else:
@@ -197,6 +233,14 @@ class TabletopOvenWithContents(CascadedCoords):
         else:
             oven_conts.translate([np.random.rand() * 0.3 - 0.15, 0.0, table_size[2]])
             print(oven_conts.worldpos())
+
+        # slide table and oven to some extent
+        slide = 1.0 + np.random.rand() * 0.5
+        angle = np.random.rand() * 0.5 * np.pi - 0.25 * np.pi
+        table.translate([slide, 0.0, 0.0])
+        table.rotate(angle, "z")
+        oven_conts.translate([slide, 0.0, 0.0])
+        oven_conts.rotate(angle, "z")
         return cls(table, oven_conts)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -210,3 +254,6 @@ class TabletopOvenWithContents(CascadedCoords):
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         return self.oven_conts.sample_pregrasp_coords()
+
+    def get_grid(self):
+        ...
