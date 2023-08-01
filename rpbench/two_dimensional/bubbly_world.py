@@ -159,10 +159,10 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
 
     def export_table(self) -> DescriptionTable:
         wd = {}
-        if self.gridsdf is None:
+        if self.cache is None:
             wd["world"] = self.world.export_intrinsic_description()
         else:
-            wd["world"] = self.gridsdf.values.reshape(self.gridsdf.grid.sizes)
+            wd["world"] = self.cache.values.reshape(self.cache.grid.sizes)
 
         wcd_list = []
         for desc in self.descriptions:
@@ -189,10 +189,10 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         return 2
 
     def export_problems(self) -> List[Problem]:
-        if self.gridsdf is None:
+        if self.cache is None:
             sdf = self.world.get_exact_sdf()
         else:
-            sdf = self.gridsdf
+            sdf = self.cache
 
         probs = []
         for desc in self.descriptions:
@@ -212,13 +212,13 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
 
 class WithoutGridSDFMixin:
     @staticmethod
-    def create_gridsdf(world: BubblyWorldBase, robot_model: None) -> None:
+    def create_cache(world: BubblyWorldBase, robot_model: None) -> None:
         return None
 
 
 class WithGridSDFMixin:
     @staticmethod
-    def create_gridsdf(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
+    def create_cache(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
         grid = world.get_grid()
 
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]

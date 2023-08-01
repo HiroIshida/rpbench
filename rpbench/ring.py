@@ -194,7 +194,7 @@ class RingNSpherePlanningTask(TaskBase[RingWorldT, Tuple[np.ndarray, ...], None]
         return probs
 
     @staticmethod
-    def create_gridsdf(world: RingWorldBase, robot_model: None) -> None:
+    def create_cache(world: RingWorldBase, robot_model: None) -> None:
         return None
 
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:

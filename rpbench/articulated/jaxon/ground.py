@@ -40,7 +40,7 @@ class HumanoidGroundRarmReachingTaskBase(ReachingTaskBase[GroundWorldT, Jaxon]):
         return CachedJaxonConstProvider.get_jaxon()
 
     @staticmethod
-    def create_gridsdf(world: GroundWorldT, robot_model: RobotModel) -> GridSDF:
+    def create_cache(world: GroundWorldT, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 

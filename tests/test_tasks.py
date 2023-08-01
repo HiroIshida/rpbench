@@ -133,7 +133,7 @@ def test_tabletop_task(task_type: Type[TabletopTaskBase]):
     assert result.traj is not None
 
     # test lazy gridsdf creation
-    task = task_type.sample(1, standard=True, with_gridsdf=False)
+    task = task_type.sample(1, standard=True, create_cache=False)
     result = task.solve_default()[0]
     assert result.traj is not None
 

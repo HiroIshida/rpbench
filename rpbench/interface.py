@@ -132,6 +132,7 @@ class DescriptionTable:
     def get_vector_descs(self) -> List[np.ndarray]:
         wd_ndim_to_value = {v.ndim: v for v in self.world_desc_dict.values()}
         ndim_set = wd_ndim_to_value.keys()
+        # TODO: we should multiple keys for one dim
         one_key_per_dim = len(wd_ndim_to_value) == len(self.world_desc_dict)
         assert one_key_per_dim
         wd_1dim_desc: Optional[np.ndarray] = None
@@ -171,31 +172,29 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     world: WorldT
     descriptions: List[DescriptionT]
-    _gridsdf: Optional[GridSDFProtocol]
+    _cache: Optional[GridSDFProtocol]
 
     @property
     def n_inner_task(self) -> int:
         return len(self.descriptions)
 
     @property
-    def gridsdf(self):
-        if self._gridsdf is None:
+    def cache(self):
+        if self._cache is None:
             robot_model = self.get_robot_model()
-            self._gridsdf = self.create_gridsdf(self.world, robot_model)
-        return self._gridsdf
+            self._cache = self.create_cache(self.world, robot_model)
+        return self._cache
 
-    def invalidate_gridsdf(self) -> None:
-        """invalidate gridsdf
-        This feature is usefull when the data-transfer is memmory/network intense.
-        """
-        self._gridsdf = None
+    def delete_cache(self) -> None:
+        # This feature is usefull when the data-transfer is memmory/network intense.
+        self._cache = None
 
     @classmethod
     def sample(
         cls: Type[SamplableT],
         n_wcond_desc: int,
         standard: bool = False,
-        with_gridsdf: bool = True,
+        create_cache: bool = True,
         timeout: float = 180.0,
     ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
@@ -216,12 +215,12 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             if descriptions is None:
                 continue
 
-            if with_gridsdf:
-                gridsdf = cls.create_gridsdf(world, robot_model)
+            if create_cache:
+                cache = cls.create_cache(world, robot_model)
             else:
-                gridsdf = None
+                cache = None
 
-            return cls(world, descriptions, gridsdf)
+            return cls(world, descriptions, cache)
 
     @classmethod
     def predicated_sample(
@@ -229,7 +228,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         n_wcond_desc: int,
         predicate: Callable[[SamplableT], bool],
         max_trial_per_desc: int,
-        with_gridsdf: bool = True,
+        create_cache: bool = True,
         timeout: int = 180,
     ) -> Optional[SamplableT]:
         """sample task that maches the predicate function"""
@@ -251,10 +250,10 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             if world is None:
                 continue
 
-            if with_gridsdf:
-                gridsdf = cls.create_gridsdf(world, robot_model)
+            if create_cache:
+                cache = cls.create_cache(world, robot_model)
             else:
-                gridsdf = None
+                cache = None
 
             # do some bit tricky thing.
             # Naively, we can sample task with multiple description and then check if
@@ -273,17 +272,17 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
                 if descs is not None:
                     desc = descs[0]
-                    temp_problem = cls(world, [desc], gridsdf)
+                    temp_problem = cls(world, [desc], cache)
 
-                    # note that some predicate may depends on gridsdf
-                    # thus, you must be careful if you set with_grisdf=False
+                    # note that some predicate may depends on cache
+                    # thus, you must be careful if you set create_cache=False
                     if predicate(temp_problem):
                         descriptions.append(desc)
 
                 if count_trial_before_first_success > max_trial_per_desc:
                     return None
 
-            return cls(world, descriptions, gridsdf)
+            return cls(world, descriptions, cache)
 
     @staticmethod
     @abstractmethod
@@ -303,8 +302,8 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @staticmethod
     @abstractmethod
-    def create_gridsdf(world: WorldT, robot_model: RobotModelT) -> Optional[GridSDFProtocol]:
-        """create gridsdf of the world given robot state
+    def create_cache(world: WorldT, robot_model: RobotModelT) -> Optional[GridSDFProtocol]:
+        """create cache of the world given robot state
         The reason why this takes RobotModel as input is that, this method
         may involves vision-simulation using robot model (e.g. synthetic pcloud)
         """

@@ -213,7 +213,7 @@ class MultipleRoomsPlanningTaskBase(TaskBase[MultipleRoomsWorldT, Tuple[np.ndarr
         return probs
 
     @staticmethod
-    def create_gridsdf(world: EightRoomsWorld, robot_model: None) -> None:  # type: ignore[override]
+    def create_cache(world: EightRoomsWorld, robot_model: None) -> None:  # type: ignore[override]
         return None
 
 

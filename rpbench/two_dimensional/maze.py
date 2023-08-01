@@ -147,7 +147,7 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
         return None
 
     @staticmethod
-    def create_gridsdf(world: MazeWorld, robot_model: None) -> GridSDFProtocol:
+    def create_cache(world: MazeWorld, robot_model: None) -> GridSDFProtocol:
         return world.get_exact_sdf()
 
     @classmethod
@@ -175,7 +175,7 @@ class MazeSolvingTask(TaskBase[MazeWorld, StartAndGoal, None]):
             return descs
 
     def export_table(self) -> DescriptionTable:
-        assert self.gridsdf is not None
+        assert self.cache is not None
         wd = {}
         wd["world"] = self.world.M.flatten()  # vector description
 

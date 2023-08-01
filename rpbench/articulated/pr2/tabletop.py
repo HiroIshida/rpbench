@@ -37,7 +37,7 @@ OtherTabletopBoxSamplableT = TypeVar("OtherTabletopBoxSamplableT", bound="Tablet
 
 class ExactGridSDFCreator:
     @staticmethod
-    def create_gridsdf(world: TabletopWorldBase, robot_model: RobotModel) -> GridSDF:
+    def create_cache(world: TabletopWorldBase, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -59,7 +59,7 @@ class VoxbloxGridSDFCreator:
         return camera
 
     @staticmethod
-    def create_gridsdf(world: TabletopWorldBase, robot_model: RobotModel) -> GridSDF:
+    def create_cache(world: TabletopWorldBase, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -91,9 +91,9 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
         return CachedPR2ConstProvider.get_pr2()
 
     def export_table(self) -> DescriptionTable:
-        assert self.gridsdf is not None
+        assert self.cache is not None
         world_dict = {}
-        world_dict["world"] = self.gridsdf.values.reshape(self.gridsdf.grid.sizes)
+        world_dict["world"] = self.cache.values.reshape(self.cache.grid.sizes)
         world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.worldcoords())
 
         desc_dicts = []
@@ -118,9 +118,9 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
     @classmethod
     def cast_from(cls: Type[TabletopSamplableT], other: SamplableT) -> TabletopSamplableT:
         assert isinstance(other, TabletopSamplableBase)
-        is_compatible_meshgen = cls.create_gridsdf == other.create_gridsdf
+        is_compatible_meshgen = cls.create_cache == other.create_cache
         assert is_compatible_meshgen
-        return cls(other.world, [], other._gridsdf)
+        return cls(other.world, [], other._cache)
 
 
 class TabletopWorldWrapBase(TabletopSamplableBase[TabletopWorldT, None]):
@@ -154,8 +154,8 @@ class TabletopTaskBase(
         q_start = provider.get_start_config()
         box_const = provider.get_box_const()
 
-        assert self.gridsdf is not None
-        sdf = create_union_sdf([self.gridsdf, self.world.table.sdf])
+        assert self.cache is not None
+        sdf = create_union_sdf([self.cache, self.world.table.sdf])
         ineq_const = provider.get_collfree_const(sdf)
 
         problems = []

@@ -132,7 +132,7 @@ class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
         return None
 
     @staticmethod
-    def create_gridsdf(world: DummyWorld, robot_model: None) -> Grid2dSDF:
+    def create_cache(world: DummyWorld, robot_model: None) -> Grid2dSDF:
         return world.get_exact_sdf()
 
     @classmethod
@@ -154,7 +154,7 @@ class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
             return descs
 
     def export_table(self) -> DescriptionTable:
-        assert self.gridsdf is not None
+        assert self.cache is not None
         wd = {}  # type: ignore
         wcd_list = []  # type: ignore
         for desc in self.descriptions:

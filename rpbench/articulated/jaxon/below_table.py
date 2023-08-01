@@ -99,7 +99,7 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
         return TableWorld
 
     @staticmethod
-    def create_gridsdf(world: TableWorld, robot_model: RobotModel) -> None:
+    def create_cache(world: TableWorld, robot_model: RobotModel) -> None:
         return None
 
     @classmethod

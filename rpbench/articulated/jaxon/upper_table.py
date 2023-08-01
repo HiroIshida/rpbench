@@ -39,7 +39,7 @@ class HumanoidTableTopRarmReachingTask(ReachingTaskBase[TabletopBoxWorld, Jaxon]
         return TabletopBoxWorld
 
     @staticmethod
-    def create_gridsdf(world: TabletopBoxWorld, robot_model: RobotModel) -> GridSDF:
+    def create_cache(world: TabletopBoxWorld, robot_model: RobotModel) -> GridSDF:
         grid = world.get_grid()
         sdf = world.get_exact_sdf()
 
@@ -57,7 +57,7 @@ class HumanoidTableTopRarmReachingTask(ReachingTaskBase[TabletopBoxWorld, Jaxon]
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}
-        world_dict["world"] = self.gridsdf.values.reshape(self.gridsdf.grid.sizes)
+        world_dict["world"] = self.cache.values.reshape(self.cache.grid.sizes)
         world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.copy_worldcoords())
 
         desc_dicts = []
