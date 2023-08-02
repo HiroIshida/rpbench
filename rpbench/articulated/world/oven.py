@@ -92,6 +92,7 @@ class Oven(CascadedCoords):
         solid_box = BoxSkeleton(self.size, with_sdf=True)
         solid_box.newcoords(self.copy_worldcoords())
         solid_box.translate([-0.5 * backward_margin, 0.0, self.size[2] * 0.5])
+        assert solid_box.sdf is not None
         val = solid_box.sdf(np.expand_dims(pos, axis=0))[0]
         return val > 0.0
 

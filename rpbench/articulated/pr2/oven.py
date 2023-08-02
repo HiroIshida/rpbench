@@ -41,7 +41,7 @@ class TabletopClutteredOvenReachingTask(ReachingTaskBase[TabletopClutteredOvenWo
         if standard:
             assert n_sample == 1
 
-        pose_list: List[Tuple[Coordinates]] = []
+        pose_list: List[Tuple[Coordinates, ...]] = []
         while len(pose_list) < n_sample:
             pose = world.sample_pregrasp_coords()
             if pose is not None:
@@ -53,8 +53,9 @@ class TabletopClutteredOvenReachingTask(ReachingTaskBase[TabletopClutteredOvenWo
         return None
 
     def export_table(self) -> DescriptionTable:
-        world_dict = {}
-        world_dict["vector"] = self.world.vector_description
+        world_dict = {}  # type: ignore
+        assert False, "vector description is not implemented yet"
+        # world_dict["vector"] = self.world.vector_description 
         world_dict["mesh"] = self.world.oven_conts.create_heightmap()
 
         desc_dicts = []
