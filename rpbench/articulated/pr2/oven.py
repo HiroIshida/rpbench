@@ -55,7 +55,7 @@ class TabletopClutteredOvenReachingTask(ReachingTaskBase[TabletopClutteredOvenWo
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
         assert False, "vector description is not implemented yet"
-        # world_dict["vector"] = self.world.vector_description 
+        # world_dict["vector"] = self.world.vector_description
         world_dict["mesh"] = self.world.oven_conts.create_heightmap()
 
         desc_dicts = []

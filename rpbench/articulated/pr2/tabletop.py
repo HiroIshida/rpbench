@@ -15,6 +15,12 @@ from rpbench.articulated.pr2.common import (
     CachedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
+from rpbench.articulated.vision import (
+    Camera,
+    EsdfMap,
+    RayMarchingConfig,
+    create_synthetic_esdf,
+)
 from rpbench.articulated.world.tabletop import (
     TabletopBoxWorld,
     TabletopOvenWorld,
@@ -28,7 +34,6 @@ from rpbench.interface import (
     SamplableT,
 )
 from rpbench.utils import create_union_sdf, skcoords_to_pose_vec
-from rpbench.vision import Camera, EsdfMap, RayMarchingConfig, create_synthetic_esdf
 
 TabletopWorldT = TypeVar("TabletopWorldT", bound="TabletopWorldBase")
 TabletopSamplableT = TypeVar("TabletopSamplableT", bound="TabletopSamplableBase")

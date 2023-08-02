@@ -2,7 +2,7 @@ import numpy as np
 from skrobot.model.primitives import PointCloudLink
 from skrobot.viewers import TrimeshSceneViewer
 
-from rpbench.articulated.world.heightmap import LocatedHeightmap
+from rpbench.articulated.vision import LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton, CylinderSkelton
 
 if __name__ == "__main__":

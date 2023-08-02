@@ -11,11 +11,11 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
 
+from rpbench.articulated.vision import Camera, RayMarchingConfig
 from rpbench.interface import WorldBase
 from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
 from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper
-from rpbench.vision import Camera, RayMarchingConfig
 
 TabletopWorldT = TypeVar("TabletopWorldT", bound="TabletopWorldBase")
 

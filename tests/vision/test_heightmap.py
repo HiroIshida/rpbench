@@ -1,6 +1,6 @@
 import numpy as np
 
-from rpbench.articulated.world.heightmap import LocatedHeightmap
+from rpbench.articulated.vision import LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton, CylinderSkelton
 
 

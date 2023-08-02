@@ -5,7 +5,7 @@ import tqdm
 from skrobot.model.primitives import Sphere
 from voxbloxpy.core import EsdfMap, IntegratorType
 
-from rpbench.vision import Camera, CameraConfig, RayMarchingConfig
+from rpbench.articulated.vision import Camera, CameraConfig, RayMarchingConfig
 
 
 def genrate_camera_pcloud_pairs(

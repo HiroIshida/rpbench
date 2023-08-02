@@ -8,11 +8,11 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from voxbloxpy.core import Grid
 
+from rpbench.articulated.vision import Camera, RayMarchingConfig
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import WorldBase
 from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper
-from rpbench.vision import Camera, RayMarchingConfig
 
 GroundWorldT = TypeVar("GroundWorldT", bound="GroundWorldBase")
 

@@ -7,10 +7,10 @@ from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
+from rpbench.articulated.vision import Camera, RayMarchingConfig
 from rpbench.articulated.world.utils import BoxSkeleton, CylinderSkelton
 from rpbench.interface import WorldBase
 from rpbench.utils import SceneWrapper
-from rpbench.vision import Camera, RayMarchingConfig
 
 _HMAP_INF_SUBST = -1.0
 
