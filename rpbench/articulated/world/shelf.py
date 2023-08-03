@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.model.primitives import Axis
+from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
 from rpbench.articulated.world.utils import BoxSkeleton
@@ -18,6 +19,7 @@ class ShelfMock(CascadedCoords):
     target_region: BoxSkeleton
     percel: BoxSkeleton
     obs_list: List[BoxSkeleton]
+    shelf_sub_regions: List[BoxSkeleton]
 
     def __init__(
         self,
@@ -25,14 +27,18 @@ class ShelfMock(CascadedCoords):
         target_region: BoxSkeleton,
         percel: BoxSkeleton,
         obs_list: List[BoxSkeleton],
+        shelf_sub_regions: List[BoxSkeleton],
     ):
         super().__init__()
         self.assoc(shelf)
+        for sub in shelf_sub_regions:
+            self.assoc(sub)
         self.assoc(target_region)
         self.shelf = shelf
         self.target_region = target_region
         self.percel = percel
         self.obs_list = obs_list
+        self.shelf_sub_regions = shelf_sub_regions
 
     @dataclass
     class Param:
@@ -72,9 +78,9 @@ class ShelfMock(CascadedCoords):
             )
 
         # define shelf
-        d, w, h = param.shelf_depth, 3.0, 3.0
-        shelf = BoxSkeleton([d, w, h])
-        shelf.translate([0, 0, 0.5 * h])
+        D, W, H = param.shelf_depth, 3.0, 3.0
+        shelf = BoxSkeleton([D, W, H])
+        shelf.translate([0, 0, 0.5 * H])
 
         # define target region
         region_width = 0.6
@@ -84,7 +90,7 @@ class ShelfMock(CascadedCoords):
 
         # define percel in the target region
         if standard:
-            co = PlanerCoords(np.array([-0.2, 0.0]), 0.0)
+            co = PlanerCoords(np.array([0.05, 0.0]), 0.0)
             percel_box2d = Box2d(param.percel_size[:2], co)
         else:
             percel_box2d = sample_box(region_extents[:2], param.percel_size[:2], [])
@@ -117,7 +123,30 @@ class ShelfMock(CascadedCoords):
                 target_region.assoc(obs, relative_coords="local")
                 obs_list.append(obs)
 
-        return cls(shelf, target_region, percel, obs_list)
+        # define subregions
+        d, w, h = target_region.extents
+        _, y, z = target_region.worldpos()
+        right_box_width = y - 0.5 * w + 0.5 * W
+        right_box = BoxSkeleton(
+            [D, right_box_width, H], pos=[0, y - 0.5 * w - 0.5 * right_box_width, 0.5 * H]
+        )
+
+        left_box_width = 0.5 * W - (y + 0.5 * w)
+        left_box = BoxSkeleton(
+            [D, left_box_width, H], pos=[0, y + 0.5 * w + 0.5 * left_box_width, 0.5 * H]
+        )
+
+        bottom_box_height = z - 0.5 * h
+        bottom_box = BoxSkeleton([D, w, bottom_box_height], pos=[0, y, 0.5 * bottom_box_height])
+
+        top_box_height = H - (z + 0.5 * h)
+        top_box = BoxSkeleton(
+            [D, w, top_box_height], pos=[0, y, z + 0.5 * h + 0.5 * top_box_height]
+        )
+
+        sub_regions = [right_box, left_box, bottom_box, top_box]
+
+        return cls(shelf, target_region, percel, obs_list, sub_regions)
 
     def grasp_poses(self) -> Tuple[Coordinates, Coordinates]:
         class GraspType(Enum):
@@ -160,13 +189,16 @@ class ShelfMock(CascadedCoords):
             co_right, co_left = co_left, co_right
 
         co_right.translate([0.0, 0.0, 0.5 * h - 0.05])
+        co_right.rotate(0.5 * np.pi, "x")
         co_left.translate([0.0, 0.0, 0.5 * h - 0.05])
+        co_left.rotate(-0.5 * np.pi, "x")
         return co_right, co_left
 
     def visualize(
         self, viewer: Union[TrimeshSceneViewer, SceneWrapper], show_grasp_pose: bool = False
     ) -> None:
-        viewer.add(self.shelf.to_visualizable((255, 255, 255, 100)))
+        for shelf_sub in self.shelf_sub_regions:
+            viewer.add(shelf_sub.to_visualizable((255, 255, 255, 100)))
         viewer.add(self.target_region.to_visualizable((255, 0, 0, 150)))
         viewer.add(self.percel.to_visualizable((0, 255, 0, 150)))
         for obs in self.obs_list:
@@ -180,12 +212,12 @@ class ShelfMock(CascadedCoords):
             viewer.add(ax_left)
 
     def get_exact_sdf(self) -> SDFProtocol:
-        def sdf_shelf(x: np.ndarray) -> np.ndarray:
-            return np.maximum(self.shelf.shelf.sdf(x), -self.shelf.target_region.sdf(x))
+        # NOTE: sdf subtraction (i.e. max(d1, -d2)) is not good for grad based solved thus...
+        sdf_shelf = UnionSDF([sub.sdf for sub in self.shelf_sub_regions])
 
         def sdf_all(x: np.ndarray) -> np.ndarray:
-            sdfs = [obs.sdf for obs in self.shelf.obs_list]
-            sdfs.append(self.shelf.percel.sdf)
+            sdfs = [obs.sdf for obs in self.obs_list]
+            sdfs.append(self.percel.sdf)
             sdfs.append(sdf_shelf)
             vals = np.vstack([f(x) for f in sdfs])
             return np.min(vals, axis=0)
@@ -208,17 +240,7 @@ class ShelfWorld(WorldBase):
         return cls(shelf)
 
     def get_exact_sdf(self) -> SDFProtocol:
-        def sdf_shelf(x: np.ndarray) -> np.ndarray:
-            return np.maximum(self.shelf.shelf.sdf(x), -self.shelf.target_region.sdf(x))
-
-        def sdf_all(x: np.ndarray) -> np.ndarray:
-            sdfs = [obs.sdf for obs in self.shelf.obs_list]
-            sdfs.append(self.shelf.percel.sdf)
-            sdfs.append(sdf_shelf)
-            vals = np.vstack([f(x) for f in sdfs])
-            return np.min(vals, axis=0)
-
-        return sdf_all
+        return self.shelf.get_exact_sdf()
 
     def visualize(
         self, viewer: Union[TrimeshSceneViewer, SceneWrapper], show_grasp_pose: bool = False
