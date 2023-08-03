@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -31,7 +31,8 @@ class Box2d:
     extent: np.ndarray
     coords: PlanerCoords
 
-    def get_verts(self) -> np.ndarray:
+    @property
+    def verts(self) -> np.ndarray:
         half_extent = self.extent * 0.5
         dir1 = rotation_matrix_2d(self.coords.angle).dot(half_extent)
 
@@ -46,9 +47,14 @@ class Box2d:
         v4 = self.coords.pos - dir2
         return np.array([v1, v2, v3, v4])
 
+    @property
+    def edges(self) -> List[Tuple[np.ndarray, np.ndarray]]:
+        v0, v1, v2, v3 = self.verts
+        return [(v0, v1), (v1, v2), (v2, v3), (v3, v0)]
+
     def visualize(self, fax, color="red") -> None:
         fig, ax = fax
-        verts = self.get_verts()
+        verts = self.verts
         ax.scatter(verts[:, 0], verts[:, 1], c=color)
 
         idx_pairs = [[0, 1], [1, 2], [2, 3], [3, 0]]
@@ -73,12 +79,20 @@ class Box2d:
         sd_vals = positive_dists + negative_dists
         return sd_vals
 
-    def is_colliding(self, box: "Box2d") -> bool:
-        vals = self.sd(box.get_verts())
-        if np.any(vals < 0.0):
+    def is_colliding(self, other: "Box2d") -> bool:
+        def is_separating(edge: Tuple[np.ndarray, np.ndarray]):
+            v0, v1 = edge
+            vec_self = v1 - v0
+            for v_other in other.verts:
+                vec_other = v_other - v0
+                if np.linalg.det(np.vstack([vec_self, vec_other]).T) > 0:
+                    return False
             return True
-        vals = box.sd(self.get_verts())
-        return bool(np.any(vals < 0.0))
+
+        for edge in self.edges:
+            if is_separating(edge):
+                return False
+        return True
 
 
 def sample_box(
@@ -92,7 +106,7 @@ def sample_box(
         box_cand = Box2d(box_extent, PlanerCoords(box_pos_cand, angle_cand))
 
         def is_valid(box_cand):
-            is_inside = np.all(table.sd(box_cand.get_verts()) < 0.0)
+            is_inside = np.all(table.sd(box_cand.verts) < 0.0)
             if is_inside:
                 for obs in obstacles:
                     if box_cand.is_colliding(obs):
