@@ -57,7 +57,7 @@ class ShelfMock(CascadedCoords):
             return np.hstack(vecs)
 
     @classmethod
-    def sample(cls, standard: bool = False, n_obstacle: int = 0) -> "ShelfMock":
+    def sample(cls, standard: bool = False, n_obstacle: int = 0) -> Optional["ShelfMock"]:
         param = cls.Param()  # NOTE: dict will do, but dataclass is less buggy
         if standard:
             param.shelf_depth = 0.4
@@ -77,6 +77,11 @@ class ShelfMock(CascadedCoords):
                 [0.2, 0.2, 0.15]
             )
 
+        assert param.shelf_depth is not None
+        assert param.region_height is not None
+        assert param.region_pos2d is not None
+        assert param.percel_size is not None
+
         # define shelf
         D, W, H = param.shelf_depth, 3.0, 3.0
         shelf = BoxSkeleton([D, W, H])
@@ -85,7 +90,7 @@ class ShelfMock(CascadedCoords):
         # define target region
         region_width = 0.6
         region_extents = np.hstack((param.shelf_depth, region_width, param.region_height))
-        region_pos = np.hstack((0.0, param.region_pos2d))
+        region_pos = np.hstack((0.0, param.region_pos2d))  # type: ignore[arg-type]
         target_region = BoxSkeleton(region_extents, pos=region_pos)
 
         # define percel in the target region
@@ -93,7 +98,10 @@ class ShelfMock(CascadedCoords):
             co = PlanerCoords(np.array([0.05, 0.0]), 0.0)
             percel_box2d = Box2d(param.percel_size[:2], co)
         else:
-            percel_box2d = sample_box(region_extents[:2], param.percel_size[:2], [])
+            ret = sample_box(region_extents[:2], param.percel_size[:2], [])
+            if ret is None:
+                return None
+            percel_box2d = ret
         assert percel_box2d is not None
         param.percel_pos2d = percel_box2d.coords.pos
         param.percel_yaw = percel_box2d.coords.angle
@@ -219,7 +227,7 @@ class ShelfMock(CascadedCoords):
             sdfs = [obs.sdf for obs in self.obs_list]
             sdfs.append(self.percel.sdf)
             sdfs.append(sdf_shelf)
-            vals = np.vstack([f(x) for f in sdfs])
+            vals = np.vstack([f(x) for f in sdfs])  # type: ignore[misc]
             return np.min(vals, axis=0)
 
         return sdf_all
@@ -235,9 +243,11 @@ class ShelfWorld(WorldBase):
             n_obs = 0
         else:
             n_obs = np.random.randint(10)
-        shelf = ShelfMock.sample(standard=True, n_obstacle=n_obs)
-        shelf.translate([0.8 + shelf.shelf.extents[0] * 0.5, 0.0, 0.0])
-        return cls(shelf)
+        while True:
+            shelf = ShelfMock.sample(standard=standard, n_obstacle=n_obs)
+            if shelf is not None:
+                shelf.translate([0.8 + shelf.shelf.extents[0] * 0.5, 0.0, 0.0])
+                return cls(shelf)
 
     def get_exact_sdf(self) -> SDFProtocol:
         return self.shelf.get_exact_sdf()
