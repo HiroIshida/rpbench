@@ -33,7 +33,7 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
     # works as Box but does not have trimesh geometries
     _extents: np.ndarray
 
-    def __init__(self, extents, pos=None, with_sdf=False):
+    def __init__(self, extents, pos=None, with_sdf=True):
         CascadedCoords.__init__(self, pos=pos)
         self._extents = extents
         if with_sdf:
@@ -64,7 +64,7 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
     radius: float
     height: float
 
-    def __init__(self, radius, height, pos=(0, 0, 0), with_sdf=False):
+    def __init__(self, radius, height, pos=(0, 0, 0), with_sdf=True):
         CascadedCoords.__init__(self, pos=pos)
         self.radius = radius
         self.height = height

@@ -8,7 +8,8 @@ from skrobot.model.primitives import Axis
 from skrobot.viewers import TrimeshSceneViewer
 
 from rpbench.articulated.world.utils import BoxSkeleton
-from rpbench.planer_box_utils import sample_box
+from rpbench.interface import SDFProtocol, WorldBase
+from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
 from rpbench.utils import SceneWrapper
 
 
@@ -25,6 +26,9 @@ class ShelfMock(CascadedCoords):
         percel: BoxSkeleton,
         obs_list: List[BoxSkeleton],
     ):
+        super().__init__()
+        self.assoc(shelf)
+        self.assoc(target_region)
         self.shelf = shelf
         self.target_region = target_region
         self.percel = percel
@@ -57,7 +61,12 @@ class ShelfMock(CascadedCoords):
         else:
             param.shelf_depth = np.random.rand() * 0.3 + 0.2
             param.region_height = 0.3 + np.random.rand() * 0.3
-            param.region_pos2d = np.array([2.0, 1.8]) + np.array([-1.0, 0.0])
+
+            region_max_height = 1.4
+            region_min_height = param.region_height * 0.5
+            param.region_pos2d = np.random.rand(2) * np.array(
+                [2.0, region_max_height - region_min_height]
+            ) + np.array([-1.0, region_min_height])
             param.percel_size = np.array([0.1, 0.1, 0.15]) + np.random.rand(3) * np.array(
                 [0.2, 0.2, 0.15]
             )
@@ -74,7 +83,11 @@ class ShelfMock(CascadedCoords):
         target_region = BoxSkeleton(region_extents, pos=region_pos)
 
         # define percel in the target region
-        percel_box2d = sample_box(region_extents[:2], param.percel_size[:2], [])
+        if standard:
+            co = PlanerCoords(np.array([-0.2, 0.0]), 0.0)
+            percel_box2d = Box2d(param.percel_size[:2], co)
+        else:
+            percel_box2d = sample_box(region_extents[:2], param.percel_size[:2], [])
         assert percel_box2d is not None
         param.percel_pos2d = percel_box2d.coords.pos
         param.percel_yaw = percel_box2d.coords.angle
@@ -165,3 +178,49 @@ class ShelfMock(CascadedCoords):
             ax_left = Axis.from_coords(co_left)
             viewer.add(ax_right)
             viewer.add(ax_left)
+
+    def get_exact_sdf(self) -> SDFProtocol:
+        def sdf_shelf(x: np.ndarray) -> np.ndarray:
+            return np.maximum(self.shelf.shelf.sdf(x), -self.shelf.target_region.sdf(x))
+
+        def sdf_all(x: np.ndarray) -> np.ndarray:
+            sdfs = [obs.sdf for obs in self.shelf.obs_list]
+            sdfs.append(self.shelf.percel.sdf)
+            sdfs.append(sdf_shelf)
+            vals = np.vstack([f(x) for f in sdfs])
+            return np.min(vals, axis=0)
+
+        return sdf_all
+
+
+@dataclass
+class ShelfWorld(WorldBase):
+    shelf: ShelfMock
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "ShelfWorld":
+        if standard:
+            n_obs = 0
+        else:
+            n_obs = np.random.randint(10)
+        shelf = ShelfMock.sample(standard=True, n_obstacle=n_obs)
+        shelf.translate([0.8 + shelf.shelf.extents[0] * 0.5, 0.0, 0.0])
+        return cls(shelf)
+
+    def get_exact_sdf(self) -> SDFProtocol:
+        def sdf_shelf(x: np.ndarray) -> np.ndarray:
+            return np.maximum(self.shelf.shelf.sdf(x), -self.shelf.target_region.sdf(x))
+
+        def sdf_all(x: np.ndarray) -> np.ndarray:
+            sdfs = [obs.sdf for obs in self.shelf.obs_list]
+            sdfs.append(self.shelf.percel.sdf)
+            sdfs.append(sdf_shelf)
+            vals = np.vstack([f(x) for f in sdfs])
+            return np.min(vals, axis=0)
+
+        return sdf_all
+
+    def visualize(
+        self, viewer: Union[TrimeshSceneViewer, SceneWrapper], show_grasp_pose: bool = False
+    ) -> None:
+        self.shelf.visualize(viewer, show_grasp_pose=show_grasp_pose)
