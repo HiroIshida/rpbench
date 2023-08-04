@@ -115,18 +115,19 @@ class ShelfMock(CascadedCoords):
         # define obstacles
         grasp_poses = list(cls._get_grasp_poses(target_region, percel))
         grasp_poses_transed = [p.copy_worldcoords() for p in grasp_poses]
-        print("trasp_poses", grasp_poses)
         for gp_transed in grasp_poses_transed:
-            gp_transed.translate([-0.15, -0.15, 0.0])
+            gp_transed.translate([-0.15, 0.0, 0.0])
 
         def is_colliding(obs: BoxSkeleton) -> bool:
             # check if new obstacle is colliding the grasp poses
             for pose in grasp_poses:
                 sd = obs.sdf(np.expand_dims(pose.worldpos(), axis=0))[0]
-                print(sd)
+                if sd < 0.04:
+                    return True
+            for pose in grasp_poses_transed:
+                sd = obs.sdf(np.expand_dims(pose.worldpos(), axis=0))[0]
                 if sd < 0.06:
                     return True
-
             return False
 
         mult_scale = 2.0
@@ -235,7 +236,7 @@ class ShelfMock(CascadedCoords):
     ) -> None:
         for shelf_sub in self.shelf_sub_regions:
             viewer.add(shelf_sub.to_visualizable((255, 255, 255, 100)))
-        viewer.add(self.target_region.to_visualizable((255, 0, 0, 150)))
+        # viewer.add(self.target_region.to_visualizable((255, 0, 0, 150)))
         viewer.add(self.percel.to_visualizable((0, 255, 0, 150)))
         for obs in self.obs_list:
             viewer.add(obs.to_visualizable((0, 0, 255, 150)))
@@ -270,7 +271,7 @@ class ShelfWorld(WorldBase):
         if standard:
             n_obs = 0
         else:
-            n_obs = np.random.randint(10)
+            n_obs = np.random.randint(20)
         while True:
             shelf = ShelfMock.sample(standard=standard, n_obstacle=n_obs)
             if shelf is not None:
