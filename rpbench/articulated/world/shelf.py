@@ -197,21 +197,22 @@ class ShelfMock(CascadedCoords):
         co_right = percel.copy_worldcoords()
         co_left = percel.copy_worldcoords()
         d, w, h = percel.extents
-        margin = 0.06
+        margin_slide = 0.06
+        margin_surface = 0.04
         if gtype in [GraspType.X_OBVERSE, GraspType.X_REVERSE]:
-            co_right.translate([0.0, -0.5 * w - margin, 0.0])
-            co_left.translate([0.0, +0.5 * w + margin, 0.0])
+            co_right.translate([0.0, -0.5 * w - margin_surface, 0.0])
+            co_left.translate([0.0, +0.5 * w + margin_surface, 0.0])
 
             # slide
-            co_right.translate([-0.5 * d + margin, 0.0, 0.0])
-            co_left.translate([-0.5 * d + margin, 0.0, 0.0])
+            co_right.translate([-0.5 * d + margin_slide, 0.0, 0.0])
+            co_left.translate([-0.5 * d + margin_slide, 0.0, 0.0])
         else:
-            co_right.translate([-0.5 * d - margin, 0.0, 0.0])
-            co_left.translate([+0.5 * d + margin, 0.0, 0.0])
+            co_right.translate([-0.5 * d - margin_surface, 0.0, 0.0])
+            co_left.translate([+0.5 * d + margin_surface, 0.0, 0.0])
 
             # slide
-            co_right.translate([0.0, -0.5 * w + margin, 0.0])
-            co_left.translate([0.0, -0.5 * w + margin, 0.0])
+            co_right.translate([0.0, -0.5 * w + margin_slide, 0.0])
+            co_left.translate([0.0, -0.5 * w + margin_slide, 0.0])
 
             co_right.rotate(0.5 * np.pi, "z")
             co_left.rotate(0.5 * np.pi, "z")
