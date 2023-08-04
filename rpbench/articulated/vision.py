@@ -177,6 +177,7 @@ class LocatedHeightmap:
     heightmap: np.ndarray
     surrounding_box: BoxSkeleton
     config: HeightmapConfig
+    debug_points: Optional[np.ndarray]
 
     @classmethod
     def by_raymarching(
@@ -185,22 +186,28 @@ class LocatedHeightmap:
         objects: Sequence[PrimitiveSkelton],
         conf: HeightmapConfig = HeightmapConfig(),
         raymarching_conf: RayMarchingConfig = RayMarchingConfig(),
+        create_debug_points: bool = False,
     ) -> "LocatedHeightmap":
         # although height map can be reated by rule-based method. But because
         # python is slow in loops thus, we resort to raymarching which can
         # be easily be vectorized.
+
         extent_plane = target_region.extents[:2]
         xlin = np.linspace(-0.5 * extent_plane[0], +0.5 * extent_plane[0], conf.resol_x)
         ylin = np.linspace(-0.5 * extent_plane[1], +0.5 * extent_plane[1], conf.resol_y)
         X, Y = np.meshgrid(xlin, ylin)
         height = target_region.extents[2]
-        Z = np.zeros_like(X) + height
+        Z = np.zeros_like(X) + 0.5 * height
 
         points_wrt_region = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
         points_wrt_world = target_region.transform_vector(points_wrt_region)
         dirs = np.tile(np.array([0, 0, -1]), (len(points_wrt_world), 1))
 
-        union_sdf = UnionSDF([o.sdf for o in objects])
+        # we must consider "ground" as obstacle
+        ground = copy.deepcopy(target_region)
+        ground.translate([0.0, 0.0, -ground.extents[2]])
+
+        union_sdf = UnionSDF([o.sdf for o in objects] + [ground.sdf])
 
         dists = Camera.ray_marching(points_wrt_world, dirs, union_sdf, raymarching_conf)
         is_valid = dists < height + 1e-3
@@ -208,8 +215,13 @@ class LocatedHeightmap:
         dists_from_ground = height - dists
         dists_from_ground[~is_valid] = conf.inf_subst_value
 
+        if create_debug_points:
+            debug_points = points_wrt_world + dists[:, None] * dirs
+        else:
+            debug_points = None
+
         heightmap = dists_from_ground.reshape((conf.resol_x, conf.resol_y))
-        return cls(heightmap, target_region, conf)
+        return cls(heightmap, target_region, conf, debug_points)
 
     @property
     def grid_width(self) -> np.ndarray:
@@ -217,10 +229,17 @@ class LocatedHeightmap:
             [self.config.resol_x, self.config.resol_y]
         )
 
-    def is_colliding(self, point_wrt_world: np.ndarray) -> bool:
+    def get_max_height(self, point_wrt_world: np.ndarray) -> float:
+        # note that height from ground
         point_wrt_local = self.surrounding_box.inverse_transform_vector(point_wrt_world)
         idx_x, idx_y = np.floor(
             (point_wrt_local[:2] - (-0.5 * self.surrounding_box.extents[:2])) / self.grid_width
         ).astype(int)
         max_height_local = self.heightmap[idx_y, idx_x]
-        return point_wrt_local[2] < max_height_local
+        return max_height_local
+
+    def is_colliding(self, point_wrt_world: np.ndarray) -> bool:
+        point_wrt_local = self.surrounding_box.inverse_transform_vector(point_wrt_world)
+        return point_wrt_local[2] + 0.5 * self.surrounding_box.extents[2] < self.get_max_height(
+            point_wrt_world
+        )
