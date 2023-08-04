@@ -47,7 +47,7 @@ class ShelfBoxSandwitchingTask(ReachingTaskBase[ShelfWorld, RobotModel]):
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
         world_dict["vector"] = self.world.export_intrinsic_description()
-        world_dict["mesh"] = self.world.create_heightmap()
+        world_dict["mesh"] = self.world.heightmap()
 
         desc_dicts = []
         for desc in self.descriptions:

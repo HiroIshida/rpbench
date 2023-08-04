@@ -274,6 +274,7 @@ class ShelfMock(CascadedCoords):
 @dataclass
 class ShelfWorld(WorldBase):
     shelf: ShelfMock
+    _heightmap: Optional[np.ndarray] = None  # lazy
 
     @classmethod
     def sample(cls, standard: bool = False) -> "ShelfWorld":
@@ -298,5 +299,17 @@ class ShelfWorld(WorldBase):
     def export_intrinsic_description(self) -> np.ndarray:
         return self.shelf.param.to_vector()
 
-    def create_heightmap(self) -> np.ndarray:
-        return self.shelf.create_heightmap()
+    def heightmap(self) -> np.ndarray:
+        if self._heightmap is None:
+            self._heightmap = self.shelf.create_heightmap()
+        return self._heightmap
+
+    def __reduce__(self):
+        args = []  # type: ignore
+        for field in fields(self):
+            if field.name == "_heightmap":
+                # delete _heightmap cache for now.
+                args.append(None)
+            else:
+                args.append(getattr(self, field.name))
+        return (self.__class__, tuple(args))
