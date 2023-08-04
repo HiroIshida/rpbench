@@ -16,7 +16,7 @@ class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
     only has analytical property as atributes.
     """
 
-    sdf: Optional[SignedDistanceFunction]
+    sdf: SignedDistanceFunction
 
     def to_visualizable(self, color: Optional[Tuple[int, int, int, int]] = None) -> PrimitiveT:
         primitive = self._to_skrobot_primitive()
@@ -33,15 +33,13 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
     # works as Box but does not have trimesh geometries
     _extents: np.ndarray
 
-    def __init__(self, extents, pos=None, with_sdf=True):
+    def __init__(self, extents, pos=None):
         CascadedCoords.__init__(self, pos=pos)
         self._extents = extents
-        if with_sdf:
-            sdf = BoxSDF(np.zeros(3), extents)
-            self.assoc(sdf.coords, relative_coords="local")
-            self.sdf = sdf
-        else:
-            self.sdf = None
+
+        sdf = BoxSDF(np.zeros(3), extents)
+        self.assoc(sdf.coords, relative_coords="local")
+        self.sdf = sdf
 
     @property
     def extents(self) -> np.ndarray:
@@ -64,16 +62,13 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
     radius: float
     height: float
 
-    def __init__(self, radius, height, pos=(0, 0, 0), with_sdf=True):
+    def __init__(self, radius, height, pos=(0, 0, 0)):
         CascadedCoords.__init__(self, pos=pos)
         self.radius = radius
         self.height = height
-        if with_sdf:
-            sdf = CylinderSDF(np.zeros(3), height, radius)
-            self.assoc(sdf.coords, relative_coords="local")
-            self.sdf = sdf
-        else:
-            self.sdf = None
+        sdf = CylinderSDF(np.zeros(3), height, radius)
+        self.assoc(sdf.coords, relative_coords="local")
+        self.sdf = sdf
 
     def _to_skrobot_primitive(self) -> Cylinder:
         cylidner = Cylinder(self.radius, self.height)

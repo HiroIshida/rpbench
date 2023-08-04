@@ -38,7 +38,7 @@ class GroundWorldBase(WorldBase):
 
     @classmethod
     def default_ground(cls) -> BoxSkeleton:
-        ground = BoxSkeleton([3.0, 3.0, 0.1], with_sdf=True)
+        ground = BoxSkeleton([3.0, 3.0, 0.1])
         ground.translate([0.0, 0.0, -0.05])
         return ground
 
@@ -127,7 +127,7 @@ class GroundClutteredWorld(GroundWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "GroundClutteredWorld":
         ground = cls.default_ground()
-        foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
+        foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25])
 
         n_obstacle = np.random.randint(20)
         obstacles: List[BoxSkeleton] = []
@@ -139,7 +139,7 @@ class GroundClutteredWorld(GroundWorldBase):
                 pos2d = np.random.rand(2)
                 pos2d[1] += -0.5
                 pos3d = np.hstack([pos2d, box_size[2] * 0.5])
-                box = BoxSkeleton(box_size, pos=pos3d, with_sdf=True)
+                box = BoxSkeleton(box_size, pos=pos3d)
 
                 if cls.is_aabb_collide(foot_box, box):
                     continue
@@ -164,8 +164,8 @@ class GroundClutteredTableWorld(GroundWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "GroundClutteredTableWorld":
         ground = cls.default_ground()
-        table = BoxSkeleton([1.0, 1.0, 0.05], pos=(0.8, 0.0, 0.9), with_sdf=True)
-        foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25], with_sdf=True)
+        table = BoxSkeleton([1.0, 1.0, 0.05], pos=(0.8, 0.0, 0.9))
+        foot_box = BoxSkeleton(extents=[0.4, 0.5, 0.7], pos=[0.0, 0, 0.25])
 
         n_obstacle = np.random.randint(20)
         obstacles: List[BoxSkeleton] = []
@@ -177,7 +177,7 @@ class GroundClutteredTableWorld(GroundWorldBase):
                 pos2d = np.random.rand(2)
                 pos2d[1] += -0.5
                 pos3d = np.hstack([pos2d, box_size[2] * 0.5])
-                box = BoxSkeleton(box_size, pos=pos3d, with_sdf=True)
+                box = BoxSkeleton(box_size, pos=pos3d)
 
                 if cls.is_aabb_collide(foot_box, box):
                     continue

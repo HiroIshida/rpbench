@@ -113,7 +113,7 @@ class ShelfMock(CascadedCoords):
         percel_pos = np.hstack(
             [param.percel_pos2d, 0.5 * param.percel_size[2] - 0.5 * param.region_height]
         )
-        percel = BoxSkeleton(param.percel_size, percel_pos, True)
+        percel = BoxSkeleton(param.percel_size, percel_pos)
         percel.rotate(param.percel_yaw, "z")
         target_region.assoc(percel, relative_coords="local")
 
@@ -148,7 +148,7 @@ class ShelfMock(CascadedCoords):
                 pos = np.hstack([obs2d.coords.pos, 0.5 * height - 0.5 * param.region_height])
 
                 obs_size = np.hstack([obs_size_2d, height])
-                obs = BoxSkeleton(obs_size, pos, True)
+                obs = BoxSkeleton(obs_size, pos)
                 target_region.assoc(obs, relative_coords="local")
                 if not is_colliding(obs):
                     obs_list.append(obs)

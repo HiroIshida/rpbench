@@ -24,9 +24,9 @@ class Oven(CascadedCoords):
     def __init__(self, size: np.ndarray, thickness: float, angle: float):
         CascadedCoords.__init__(self)
         d, w, h = size
-        plane_xaxis = BoxSkeleton([thickness, w, h], with_sdf=True)
-        plane_yaxis = BoxSkeleton([d, thickness, h], with_sdf=True)
-        plane_zaxis = BoxSkeleton([d, w, thickness], with_sdf=True)
+        plane_xaxis = BoxSkeleton([thickness, w, h])
+        plane_yaxis = BoxSkeleton([d, thickness, h])
+        plane_zaxis = BoxSkeleton([d, w, thickness])
 
         bottom = copy.deepcopy(plane_zaxis)
         bottom.translate([0, 0, 0.5 * thickness])
@@ -89,7 +89,7 @@ class Oven(CascadedCoords):
     def is_outside(self, pos: np.ndarray) -> bool:
         backward_margin = 0.1
         self.size + np.array([backward_margin, 0.0, 0.0])
-        solid_box = BoxSkeleton(self.size, with_sdf=True)
+        solid_box = BoxSkeleton(self.size)
         solid_box.newcoords(self.copy_worldcoords())
         solid_box.translate([-0.5 * backward_margin, 0.0, self.size[2] * 0.5])
         assert solid_box.sdf is not None
@@ -114,7 +114,7 @@ class OvenWithContents(CascadedCoords):
         oven = Oven.sample(standard)
 
         if standard:
-            cylinder = CylinderSkelton(radius=0.02, height=0.12, with_sdf=True)
+            cylinder = CylinderSkelton(radius=0.02, height=0.12)
             co = oven.copy_worldcoords()
             co.translate([0.0, 0.0, 0.06 + oven.thickness])
             cylinder.newcoords(co)
@@ -139,7 +139,7 @@ class OvenWithContents(CascadedCoords):
                 pos2d_wrt_oven = np.random.rand(2) * available_size - available_size * 0.5
 
                 if not is_colliding(pos2d_wrt_oven, r):
-                    c_new = CylinderSkelton(radius=r, height=h, with_sdf=True)
+                    c_new = CylinderSkelton(radius=r, height=h)
                     co = oven.copy_worldcoords()
                     co.translate(np.hstack([pos2d_wrt_oven, oven.thickness + 0.5 * h]))
                     c_new.newcoords(co)
@@ -225,7 +225,7 @@ class TabletopClutteredOvenWorld(WorldBase):
             table_size = np.array([0.6, 3.0, 0.7])
         else:
             table_size = np.array([0.6, 3.0, np.random.rand() * 0.2 + 0.6])
-        table = BoxSkeleton(table_size, with_sdf=True)
+        table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
 
         oven_conts = OvenWithContents.sample(standard)
