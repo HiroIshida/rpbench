@@ -8,10 +8,28 @@ from skrobot.model.primitives import Axis
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
+from rpbench.articulated.vision import LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import SDFProtocol, WorldBase
 from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
 from rpbench.utils import SceneWrapper
+
+
+@dataclass
+class ShelfMockParam:
+    shelf_depth: Optional[float] = None
+    region_height: Optional[float] = None
+    region_pos2d: Optional[np.ndarray] = None
+    percel_size: Optional[np.ndarray] = None
+    percel_pos2d: Optional[np.ndarray] = None
+    percel_yaw: Optional[float] = None
+
+    def to_vector(self) -> np.ndarray:
+        vecs = []
+        for f in fields(self):
+            attr = getattr(self, f.name)
+            vecs.append(attr)
+        return np.hstack(vecs)
 
 
 class ShelfMock(CascadedCoords):
@@ -20,6 +38,7 @@ class ShelfMock(CascadedCoords):
     percel: BoxSkeleton
     obs_list: List[BoxSkeleton]
     shelf_sub_regions: List[BoxSkeleton]
+    param: ShelfMockParam
 
     def __init__(
         self,
@@ -28,6 +47,7 @@ class ShelfMock(CascadedCoords):
         percel: BoxSkeleton,
         obs_list: List[BoxSkeleton],
         shelf_sub_regions: List[BoxSkeleton],
+        param: ShelfMockParam,
     ):
         super().__init__()
         self.assoc(shelf)
@@ -39,26 +59,11 @@ class ShelfMock(CascadedCoords):
         self.percel = percel
         self.obs_list = obs_list
         self.shelf_sub_regions = shelf_sub_regions
-
-    @dataclass
-    class Param:
-        shelf_depth: Optional[float] = None
-        region_height: Optional[float] = None
-        region_pos2d: Optional[np.ndarray] = None
-        percel_size: Optional[np.ndarray] = None
-        percel_pos2d: Optional[np.ndarray] = None
-        percel_yaw: Optional[float] = None
-
-        def to_vector(self) -> np.ndarray:
-            vecs = []
-            for f in fields(self):
-                attr = getattr(self, f.name)
-                vecs.append(attr)
-            return np.hstack(vecs)
+        self.param = param
 
     @classmethod
     def sample(cls, standard: bool = False, n_obstacle: int = 0) -> Optional["ShelfMock"]:
-        param = cls.Param()  # NOTE: dict will do, but dataclass is less buggy
+        param = ShelfMockParam()  # NOTE: dict will do, but dataclass is less buggy
         if standard:
             param.shelf_depth = 0.4
             param.region_height = 0.4
@@ -173,7 +178,7 @@ class ShelfMock(CascadedCoords):
 
         sub_regions = [right_box, left_box, bottom_box, top_box]
 
-        return cls(shelf, target_region, percel, obs_list, sub_regions)
+        return cls(shelf, target_region, percel, obs_list, sub_regions, param)
 
     def get_grasp_poses(self) -> Tuple[Coordinates, Coordinates]:
         return self._get_grasp_poses(self.target_region, self.percel)
@@ -261,6 +266,10 @@ class ShelfMock(CascadedCoords):
 
         return sdf_all
 
+    def create_heightmap(self) -> np.ndarray:
+        hmap = LocatedHeightmap.by_raymarching(self.target_region, self.obs_list)
+        return hmap.heightmap
+
 
 @dataclass
 class ShelfWorld(WorldBase):
@@ -285,3 +294,9 @@ class ShelfWorld(WorldBase):
         self, viewer: Union[TrimeshSceneViewer, SceneWrapper], show_grasp_pose: bool = False
     ) -> None:
         self.shelf.visualize(viewer, show_grasp_pose=show_grasp_pose)
+
+    def export_intrinsic_description(self) -> np.ndarray:
+        return self.shelf.param.to_vector()
+
+    def create_heightmap(self) -> np.ndarray:
+        return self.shelf.create_heightmap()
