@@ -272,21 +272,9 @@ class ShelfMock(CascadedCoords):
 
 
 @dataclass
-class ShelfWorld(WorldBase):
+class ShelfWorldBase(WorldBase):
     shelf: ShelfMock
     _heightmap: Optional[np.ndarray] = None  # lazy
-
-    @classmethod
-    def sample(cls, standard: bool = False) -> "ShelfWorld":
-        if standard:
-            n_obs = 0
-        else:
-            n_obs = np.random.randint(20)
-        while True:
-            shelf = ShelfMock.sample(standard=standard, n_obstacle=n_obs)
-            if shelf is not None:
-                shelf.translate([0.8 + shelf.shelf.extents[0] * 0.5, 0.0, 0.0])
-                return cls(shelf)
 
     def get_exact_sdf(self) -> SDFProtocol:
         return self.shelf.get_exact_sdf()
@@ -313,3 +301,36 @@ class ShelfWorld(WorldBase):
             else:
                 args.append(getattr(self, field.name))
         return (self.__class__, tuple(args))
+
+
+@dataclass
+class ShelfBoxWorld(ShelfWorldBase):
+    shelf: ShelfMock
+    _heightmap: Optional[np.ndarray] = None  # lazy
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "ShelfBoxWorld":
+        n_obs = 0
+        while True:
+            shelf = ShelfMock.sample(standard=standard, n_obstacle=n_obs)
+            if shelf is not None:
+                shelf.translate([0.8 + shelf.shelf.extents[0] * 0.5, 0.0, 0.0])
+                return cls(shelf)
+
+
+@dataclass
+class ShelfBoxClutteredWorld(ShelfWorldBase):
+    shelf: ShelfMock
+    _heightmap: Optional[np.ndarray] = None  # lazy
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "ShelfBoxClutteredWorld":
+        if standard:
+            n_obs = 0
+        else:
+            n_obs = np.random.randint(20)
+        while True:
+            shelf = ShelfMock.sample(standard=standard, n_obstacle=n_obs)
+            if shelf is not None:
+                shelf.translate([0.8 + shelf.shelf.extents[0] * 0.5, 0.0, 0.0])
+                return cls(shelf)
