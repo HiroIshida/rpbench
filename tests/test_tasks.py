@@ -8,6 +8,7 @@ from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.articulated.pr2.kivapod import KivapodEmptyReachingTask
+from rpbench.articulated.pr2.shelf import ShelfBoxSandwitchingTask
 from rpbench.articulated.pr2.tabletop import (
     TabletopOvenDualArmReachingTask,
     TabletopOvenDualArmReachingTaskBase,
@@ -171,6 +172,12 @@ def test_bubbly_world_point_connecting_task():
         task = task_type.sample(1, True)
         result = task.solve_default()[0]
         assert result.traj is not None
+
+
+def test_ShelfBoxSandwitchingTask():
+    task = ShelfBoxSandwitchingTask.sample(1, True)
+    result = task.solve_default()[0]
+    assert result.traj is not None
 
 
 def test_dummy_task():
