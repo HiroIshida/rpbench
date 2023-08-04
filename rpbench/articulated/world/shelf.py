@@ -88,7 +88,7 @@ class ShelfMock(CascadedCoords):
         shelf.translate([0, 0, 0.5 * H])
 
         # define target region
-        region_width = 0.6
+        region_width = 0.8
         region_extents = np.hstack((param.shelf_depth, region_width, param.region_height))
         region_pos = np.hstack((0.0, param.region_pos2d))  # type: ignore[arg-type]
         target_region = BoxSkeleton(region_extents, pos=region_pos)
@@ -113,6 +113,22 @@ class ShelfMock(CascadedCoords):
         target_region.assoc(percel, relative_coords="local")
 
         # define obstacles
+        grasp_poses = list(cls._get_grasp_poses(target_region, percel))
+        grasp_poses_transed = [p.copy_worldcoords() for p in grasp_poses]
+        print("trasp_poses", grasp_poses)
+        for gp_transed in grasp_poses_transed:
+            gp_transed.translate([-0.15, -0.15, 0.0])
+
+        def is_colliding(obs: BoxSkeleton) -> bool:
+            # check if new obstacle is colliding the grasp poses
+            for pose in grasp_poses:
+                sd = obs.sdf(np.expand_dims(pose.worldpos(), axis=0))[0]
+                print(sd)
+                if sd < 0.06:
+                    return True
+
+            return False
+
         mult_scale = 2.0
         plane_extents = np.array([param.shelf_depth, region_width * mult_scale])
         obs_list: List[BoxSkeleton] = []
@@ -124,12 +140,14 @@ class ShelfMock(CascadedCoords):
                 max_height = target_region.extents[2] - heigh_margin
                 height = min(np.random.lognormal(0.0, 0.3) * (region_extents[2] / 2.5), max_height)
                 pos = np.hstack([obs2d.coords.pos, 0.5 * height - 0.5 * param.region_height])
-                obs2d.coords.angle
 
                 obs_size = np.hstack([obs_size_2d, height])
                 obs = BoxSkeleton(obs_size, pos, True)
                 target_region.assoc(obs, relative_coords="local")
-                obs_list.append(obs)
+                if not is_colliding(obs):
+                    obs_list.append(obs)
+                else:
+                    target_region.dissoc(obs)
 
         # define subregions
         d, w, h = target_region.extents
@@ -156,23 +174,29 @@ class ShelfMock(CascadedCoords):
 
         return cls(shelf, target_region, percel, obs_list, sub_regions)
 
-    def grasp_poses(self) -> Tuple[Coordinates, Coordinates]:
+    def get_grasp_poses(self) -> Tuple[Coordinates, Coordinates]:
+        return self._get_grasp_poses(self.target_region, self.percel)
+
+    @staticmethod
+    def _get_grasp_poses(
+        target_region: BoxSkeleton, percel: BoxSkeleton
+    ) -> Tuple[Coordinates, Coordinates]:
         class GraspType(Enum):
             X_OBVERSE = 0
             X_REVERSE = 1
             Y_OBVERSE = 2
             Y_REVERSE = 3
 
-        ex_percel, ey_percel, _ = self.percel.worldrot()
-        ex_region, _, _ = self.target_region.worldrot()
+        ex_percel, ey_percel, _ = percel.worldrot()
+        ex_region, _, _ = target_region.worldrot()
 
         dots = [ex_region.dot(v) for v in [ex_percel, -ex_percel, ey_percel, -ey_percel]]
         gtype = GraspType(np.argmax(dots))
         assert gtype != GraspType.X_REVERSE
 
-        co_right = self.percel.copy_worldcoords()
-        co_left = self.percel.copy_worldcoords()
-        d, w, h = self.percel.extents
+        co_right = percel.copy_worldcoords()
+        co_left = percel.copy_worldcoords()
+        d, w, h = percel.extents
         margin = 0.06
         if gtype in [GraspType.X_OBVERSE, GraspType.X_REVERSE]:
             co_right.translate([0.0, -0.5 * w - margin, 0.0])
@@ -192,8 +216,12 @@ class ShelfMock(CascadedCoords):
             co_right.rotate(0.5 * np.pi, "z")
             co_left.rotate(0.5 * np.pi, "z")
 
-        if gtype in [GraspType.Y_REVERSE]:
-            co_right, co_left = co_left, co_right
+            if gtype == GraspType.Y_OBVERSE:
+                co_right.rotate(np.pi, "z")
+                co_left.rotate(np.pi, "z")
+
+            if gtype == GraspType.Y_REVERSE:
+                co_right, co_left = co_left, co_right
 
         co_right.translate([0.0, 0.0, 0.5 * h - 0.05])
         co_right.rotate(0.5 * np.pi, "x")
@@ -212,7 +240,7 @@ class ShelfMock(CascadedCoords):
             viewer.add(obs.to_visualizable((0, 0, 255, 150)))
 
         if show_grasp_pose:
-            co_right, co_left = self.grasp_poses()
+            co_right, co_left = self.get_grasp_poses()
             ax_right = Axis.from_coords(co_right)
             ax_left = Axis.from_coords(co_left)
             viewer.add(ax_right)
