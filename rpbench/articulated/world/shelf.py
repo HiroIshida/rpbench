@@ -71,8 +71,8 @@ class ShelfMock(CascadedCoords):
             region_max_height = 1.4
             region_min_height = param.region_height * 0.5
             param.region_pos2d = np.random.rand(2) * np.array(
-                [2.0, region_max_height - region_min_height]
-            ) + np.array([-1.0, region_min_height])
+                [1.0, region_max_height - region_min_height]
+            ) + np.array([-0.5, region_min_height])
             param.percel_size = np.array([0.1, 0.1, 0.15]) + np.random.rand(3) * np.array(
                 [0.2, 0.2, 0.15]
             )
@@ -168,6 +168,7 @@ class ShelfMock(CascadedCoords):
 
         dots = [ex_region.dot(v) for v in [ex_percel, -ex_percel, ey_percel, -ey_percel]]
         gtype = GraspType(np.argmax(dots))
+        assert gtype != GraspType.X_REVERSE
 
         co_right = self.percel.copy_worldcoords()
         co_left = self.percel.copy_worldcoords()
@@ -191,9 +192,7 @@ class ShelfMock(CascadedCoords):
             co_right.rotate(0.5 * np.pi, "z")
             co_left.rotate(0.5 * np.pi, "z")
 
-        if gtype in [GraspType.X_REVERSE, GraspType.Y_OBVERSE]:
-            co_right.rotate(np.pi, "z")
-            co_left.rotate(np.pi, "z")
+        if gtype in [GraspType.Y_REVERSE]:
             co_right, co_left = co_left, co_right
 
         co_right.translate([0.0, 0.0, 0.5 * h - 0.05])
