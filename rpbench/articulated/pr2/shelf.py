@@ -1,5 +1,6 @@
 from typing import ClassVar, List, Tuple, Type
 
+import numpy as np
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skrobot.coordinates import Coordinates
 from skrobot.model.robot_model import RobotModel
@@ -47,7 +48,8 @@ class ShelfBoxSandwitchingTask(ReachingTaskBase[ShelfBoxClutteredWorld, RobotMod
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
         world_dict["vector"] = self.world.export_intrinsic_description()
-        world_dict["mesh"] = self.world.heightmap()
+        heightmap = self.world.heightmap()
+        world_dict["mesh"] = heightmap.astype(np.float32)
 
         desc_dicts = []
         for desc in self.descriptions:

@@ -8,7 +8,7 @@ from skrobot.model.primitives import Axis
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
-from rpbench.articulated.vision import LocatedHeightmap
+from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import SDFProtocol, WorldBase
 from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
@@ -267,7 +267,8 @@ class ShelfMock(CascadedCoords):
         return sdf_all
 
     def create_heightmap(self) -> np.ndarray:
-        hmap = LocatedHeightmap.by_raymarching(self.target_region, self.obs_list)
+        hmap_config = HeightmapConfig(56, 56)
+        hmap = LocatedHeightmap.by_raymarching(self.target_region, self.obs_list, conf=hmap_config)
         return hmap.heightmap
 
 
