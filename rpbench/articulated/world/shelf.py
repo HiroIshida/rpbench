@@ -74,10 +74,10 @@ class ShelfMock(CascadedCoords):
             param.region_height = 0.3 + np.random.rand() * 0.3
 
             region_max_height = 1.4
-            region_min_height = param.region_height * 0.5
+            region_min_height = 0.8
             param.region_pos2d = np.random.rand(2) * np.array(
-                [1.0, region_max_height - region_min_height]
-            ) + np.array([-0.5, region_min_height])
+                [0.6, region_max_height - region_min_height]
+            ) + np.array([-0.3, region_min_height])
             param.percel_size = np.array([0.1, 0.1, 0.15]) + np.random.rand(3) * np.array(
                 [0.2, 0.2, 0.15]
             )
