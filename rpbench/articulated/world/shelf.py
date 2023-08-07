@@ -1,6 +1,6 @@
 from dataclasses import dataclass, fields
 from enum import Enum
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, TypeVar, Union
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords, Coordinates
@@ -270,6 +270,9 @@ class ShelfMock(CascadedCoords):
         hmap_config = HeightmapConfig(56, 56)
         hmap = LocatedHeightmap.by_raymarching(self.target_region, self.obs_list, conf=hmap_config)
         return hmap.heightmap
+
+
+ShelfWorldT = TypeVar("ShelfWorldT", bound="ShelfWorldBase")
 
 
 @dataclass

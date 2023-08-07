@@ -6,7 +6,11 @@ from skrobot.coordinates import Coordinates
 from skrobot.model.robot_model import RobotModel
 
 from rpbench.articulated.pr2.common import CachedDualArmTorsoPR2ConstProvider
-from rpbench.articulated.world.shelf import ShelfBoxClutteredWorld
+from rpbench.articulated.world.shelf import (
+    ShelfBoxClutteredWorld,
+    ShelfBoxWorld,
+    ShelfWorldT,
+)
 from rpbench.interface import (
     DescriptionTable,
     Problem,
@@ -16,14 +20,10 @@ from rpbench.interface import (
 from rpbench.utils import skcoords_to_pose_vec
 
 
-class ShelfBoxSandwitchingTask(ReachingTaskBase[ShelfBoxClutteredWorld, RobotModel]):
+class ShelfBoxSandwitchingTaskBase(ReachingTaskBase[ShelfWorldT, RobotModel]):
     config_provider: ClassVar[
         Type[CachedDualArmTorsoPR2ConstProvider]
     ] = CachedDualArmTorsoPR2ConstProvider
-
-    @staticmethod
-    def get_world_type() -> Type[ShelfBoxClutteredWorld]:
-        return ShelfBoxClutteredWorld
 
     @staticmethod
     def get_robot_model() -> RobotModel:
@@ -35,14 +35,14 @@ class ShelfBoxSandwitchingTask(ReachingTaskBase[ShelfBoxClutteredWorld, RobotMod
 
     @classmethod
     def sample_descriptions(
-        cls, world: ShelfBoxClutteredWorld, n_sample: int, standard: bool = False
+        cls, world: ShelfWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, ...]]:
         assert n_sample == 1
         pose_list: List[Tuple[Coordinates, ...]] = [world.shelf.get_grasp_poses()]
         return pose_list
 
     @staticmethod
-    def create_cache(world: ShelfBoxClutteredWorld, robot_model: RobotModel) -> None:
+    def create_cache(world: ShelfWorldT, robot_model: RobotModel) -> None:
         return None
 
     def export_table(self) -> DescriptionTable:
@@ -81,3 +81,15 @@ class ShelfBoxSandwitchingTask(ReachingTaskBase[ShelfBoxClutteredWorld, RobotMod
         ompl_solver = OMPLSolver.init(solcon)
         ompl_solver.setup(problem)
         return ompl_solver.solve()
+
+
+class ShelfBoxSandwitchingTask(ShelfBoxSandwitchingTaskBase[ShelfBoxWorld]):
+    @staticmethod
+    def get_world_type() -> Type[ShelfBoxWorld]:
+        return ShelfBoxWorld
+
+
+class ShelfBoxClutteredSandwitchingTask(ShelfBoxSandwitchingTaskBase[ShelfBoxClutteredWorld]):
+    @staticmethod
+    def get_world_type() -> Type[ShelfBoxClutteredWorld]:
+        return ShelfBoxClutteredWorld
