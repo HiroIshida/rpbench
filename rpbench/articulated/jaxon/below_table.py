@@ -13,13 +13,13 @@ from skmp.solver.nlp_solver.sqp_based_solver import (
     SQPBasedSolverResult,
 )
 from skrobot.coordinates import Coordinates
-from skrobot.model.primitives import Box
 from skrobot.model.robot_model import RobotModel
 from skrobot.sdf.signed_distance_function import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
 from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
+from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import (
     DescriptionTable,
     Problem,
@@ -33,9 +33,9 @@ from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 
 @dataclass
 class TableWorld(WorldBase):
-    target_region: Box
-    table: Box
-    obstacle: Box
+    target_region: BoxSkeleton
+    table: BoxSkeleton
+    obstacle: BoxSkeleton
     _intrinsic_desc: np.ndarray
 
     @classmethod
@@ -46,17 +46,17 @@ class TableWorld(WorldBase):
             table_position = np.array([0.7, 0.0, 0.6]) + np.random.rand(3) * np.array(
                 [0.5, 0.0, 0.4]
             )
-        table = Box([1.0, 3.0, 0.1], with_sdf=True)
+        table = BoxSkeleton([1.0, 3.0, 0.1])
         table.translate(table_position)
 
         table_height = table_position[2]
-        target_region = Box([0.8, 0.8, table_height], with_sdf=True)
-        target_region.visual_mesh.visual.face_colors = [0, 255, 100, 100]
+        target_region = BoxSkeleton([0.8, 0.8, table_height])
+        # target_region.visual_mesh.visual.face_colors = [0, 255, 100, 100]
         target_region.translate([0.6, -0.7, 0.5 * table_height])
 
         # determine obstacle
         if standard:
-            obs = Box([0.1, 0.1, 0.5], pos=[0.6, -0.2, 0.25], with_sdf=True)
+            obs = BoxSkeleton([0.1, 0.1, 0.5], pos=[0.6, -0.2, 0.25])
         else:
             region_width = np.array(target_region._extents[:2])
             region_center = target_region.worldpos()[:2]
@@ -69,7 +69,7 @@ class TableWorld(WorldBase):
             b_max = region_center + region_width * 0.5 - 0.5 * obs_width
             pos2d = np.random.rand(2) * (b_max - b_min) + b_min
             pos = np.hstack([pos2d, obs_height * 0.5])
-            obs = Box(np.hstack([obs_width, obs_height]), pos=pos, with_sdf=True)
+            obs = BoxSkeleton(np.hstack([obs_width, obs_height]), pos=pos)
 
         return cls(target_region, table, obs, table_position)
 
@@ -80,6 +80,7 @@ class TableWorld(WorldBase):
         return self._intrinsic_desc
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        assert False
         # self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
         # viewer.add(self.target_region)
         viewer.add(self.table)
