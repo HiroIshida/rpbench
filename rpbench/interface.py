@@ -288,7 +288,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
-        ...
+        raise NotImplementedError()
 
     @staticmethod
     @abstractmethod
@@ -299,7 +299,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         Also, we assume that robot joint configuration for every
         call of this method is consistent.
         """
-        ...
+        raise NotImplementedError()
 
     @staticmethod
     @abstractmethod
@@ -308,15 +308,14 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         The reason why this takes RobotModel as input is that, this method
         may involves vision-simulation using robot model (e.g. synthetic pcloud)
         """
-        ...
+        raise NotImplementedError()
 
     @classmethod
     @abstractmethod
     def sample_descriptions(
         cls, world: WorldT, n_sample: int, standard: bool = False
     ) -> Optional[List[DescriptionT]]:
-
-        ...
+        raise NotImplementedError()
 
     @abstractmethod
     def export_table(self) -> DescriptionTable:
