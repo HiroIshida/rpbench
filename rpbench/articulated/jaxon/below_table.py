@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import ClassVar, List, Tuple, Type, Union
+from typing import ClassVar, List, Tuple, Type, TypeVar, Union
 
 import numpy as np
 from skmp.constraint import CollFreeConst, IneqCompositeConst, PoseConstraint
@@ -30,16 +30,33 @@ from rpbench.interface import (
 from rpbench.timeout_decorator import TimeoutError, timeout
 from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
 
+BelowTableWorldT = TypeVar("BelowTableWorldT", bound="BelowTableWorldBase")
+
 
 @dataclass
-class TableWorld(WorldBase):
+class BelowTableWorldBase(WorldBase):
     target_region: BoxSkeleton
     table: BoxSkeleton
-    obstacle: BoxSkeleton
+    obstacles: List[BoxSkeleton]
     _intrinsic_desc: np.ndarray
 
-    @classmethod
-    def sample(cls, standard: bool = False) -> "TableWorld":
+    def get_exact_sdf(self) -> UnionSDF:
+        return UnionSDF([self.table.sdf] + [obs.sdf for obs in self.obstacles])
+
+    def export_intrinsic_description(self) -> np.ndarray:
+        return self._intrinsic_desc
+
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
+        # self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
+        # viewer.add(self.target_region)
+        viewer.add(self.table.to_visualizable())
+        for obs in self.obstacles:
+            skobs = obs.to_visualizable()
+            skobs.visual_mesh.visual.face_colors = [255, 0, 0, 150]
+            viewer.add(skobs)
+
+    @staticmethod
+    def sample_table_and_target_region(standard: bool = False) -> Tuple[BoxSkeleton, BoxSkeleton]:
         if standard:
             table_position = np.array([0.8, 0.0, 0.8])
         else:
@@ -51,8 +68,17 @@ class TableWorld(WorldBase):
 
         table_height = table_position[2]
         target_region = BoxSkeleton([0.8, 0.8, table_height])
-        # target_region.visual_mesh.visual.face_colors = [0, 255, 100, 100]
         target_region.translate([0.6, -0.7, 0.5 * table_height])
+        return table, target_region
+
+
+@dataclass
+class BelowTableSingleObstacleWorld(BelowTableWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> "BelowTableSingleObstacleWorld":
+
+        table, target_region = cls.sample_table_and_target_region(standard)
+        table_position = table.worldpos()
 
         # determine obstacle
         if standard:
@@ -71,24 +97,10 @@ class TableWorld(WorldBase):
             pos = np.hstack([pos2d, obs_height * 0.5])
             obs = BoxSkeleton(np.hstack([obs_width, obs_height]), pos=pos)
 
-        return cls(target_region, table, obs, table_position)
-
-    def get_exact_sdf(self) -> UnionSDF:
-        return UnionSDF([self.table.sdf, self.obstacle.sdf])
-
-    def export_intrinsic_description(self) -> np.ndarray:
-        return self._intrinsic_desc
-
-    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        assert False
-        # self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
-        # viewer.add(self.target_region)
-        viewer.add(self.table)
-        self.obstacle.visual_mesh.visual.face_colors = [255, 0, 0, 150]
-        viewer.add(self.obstacle)
+        return cls(target_region, table, [obs], table_position)
 
 
-class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
+class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
     @staticmethod
@@ -96,11 +108,7 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
         return CachedJaxonConstProvider.get_jaxon()
 
     @staticmethod
-    def get_world_type() -> Type[TableWorld]:
-        return TableWorld
-
-    @staticmethod
-    def create_cache(world: TableWorld, robot_model: RobotModel) -> None:
+    def create_cache(world: BelowTableWorldT, robot_model: RobotModel) -> None:
         return None
 
     @classmethod
@@ -108,28 +116,8 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
         config = CachedJaxonConstProvider.get_config()
         return len(config._get_control_joint_names()) + 6
 
-    def export_table(self) -> DescriptionTable:
-        world_dict = {}
-        world_dict["world"] = np.hstack(
-            [
-                self.world.table.worldpos(),
-                self.world.obstacle.worldpos(),
-                np.array(self.world.obstacle._extents),
-            ]
-        )
-
-        desc_dicts = []
-        for desc in self.descriptions:
-            desc_dict = {}
-            for idx, co in enumerate(desc):
-                pose = skcoords_to_pose_vec(co)
-                name = "target_pose-{}".format(idx)
-                desc_dict[name] = pose
-            desc_dicts.append(desc_dict)
-        return DescriptionTable(world_dict, desc_dicts)
-
     @classmethod
-    def sample_target_poses(cls, world: TableWorld, standard: bool) -> Tuple[Coordinates]:
+    def sample_target_poses(cls, world: BelowTableWorldT, standard: bool) -> Tuple[Coordinates]:
         if standard:
             co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
             return (co,)
@@ -151,7 +139,7 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
 
     @classmethod
     def sample_descriptions(
-        cls, world: TableWorld, n_sample: int, standard: bool = False
+        cls, world: BelowTableWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, ...]]:
         # TODO: duplication of tabletop.py
         if standard:
@@ -252,3 +240,30 @@ class HumanoidTableReachingTask(ReachingTaskBase[TableWorld, Jaxon]):
             intrinsic_desc = np.hstack(vecs)
             intrinsic_descs.append(intrinsic_desc)
         return intrinsic_descs
+
+
+class HumanoidTableReachingTask(HumanoidTableReachingTaskBase[BelowTableSingleObstacleWorld]):
+    @staticmethod
+    def get_world_type() -> Type[BelowTableSingleObstacleWorld]:
+        return BelowTableSingleObstacleWorld
+
+    def export_table(self) -> DescriptionTable:
+        assert len(self.world.obstacles) == 1
+        world_dict = {}
+        world_dict["world"] = np.hstack(
+            [
+                self.world.table.worldpos(),
+                self.world.obstacles[0].worldpos(),
+                np.array(self.world.obstacles[0]._extents),
+            ]
+        )
+
+        desc_dicts = []
+        for desc in self.descriptions:
+            desc_dict = {}
+            for idx, co in enumerate(desc):
+                pose = skcoords_to_pose_vec(co)
+                name = "target_pose-{}".format(idx)
+                desc_dict[name] = pose
+            desc_dicts.append(desc_dict)
+        return DescriptionTable(world_dict, desc_dicts)
