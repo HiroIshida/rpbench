@@ -1,7 +1,9 @@
-from dataclasses import dataclass
-from typing import ClassVar, List, Tuple, Type, TypeVar, Union
+from abc import abstractmethod
+from dataclasses import dataclass, fields
+from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
+from scipy.stats import lognorm
 from skmp.constraint import CollFreeConst, IneqCompositeConst, PoseConstraint
 from skmp.robot.jaxon import Jaxon
 from skmp.robot.utils import get_robot_state
@@ -19,6 +21,7 @@ from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType
 
 from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
+from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import (
     DescriptionTable,
@@ -100,6 +103,59 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
         return cls(target_region, table, [obs], table_position)
 
 
+@dataclass
+class BelowTableClutteredWorld(BelowTableWorldBase):
+    _heightmap: Optional[np.ndarray] = None  # lazy
+
+    @classmethod
+    def sample(cls, standard: bool = False) -> "BelowTableClutteredWorld":
+        table, target_region = cls.sample_table_and_target_region(standard)
+        table_position = table.worldpos()
+
+        # determine obstacle
+        if standard:
+            obs = BoxSkeleton([0.1, 0.1, 0.5], pos=[0.6, -0.2, 0.25])
+            obstacles = [obs]
+        else:
+            obstacles = []
+
+            n_obstacle = np.random.randint(20)
+            for _ in range(n_obstacle):
+                region_width = np.array(target_region._extents[:2])
+                region_center = target_region.worldpos()[:2]
+
+                obs_width = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.2, 0.2, 0.4])
+                obs_width[2] = min(obs_width[2], table_position[2])
+
+                b_min = region_center - region_width * 0.5 + 0.5 * obs_width[:2]
+                b_max = region_center + region_width * 0.5 - 0.5 * obs_width[:2]
+                pos2d = np.random.rand(2) * (b_max - b_min) + b_min
+                pos = np.hstack([pos2d, obs_width[2] * 0.5])
+                obs = BoxSkeleton(obs_width, pos=pos)
+                obstacles.append(obs)
+
+        return cls(target_region, table, obstacles, table_position)
+
+    def heightmap(self) -> np.ndarray:
+        if self._heightmap is None:
+            hmap_config = HeightmapConfig(112, 112)
+            hmap = LocatedHeightmap.by_raymarching(
+                self.target_region, self.obstacles, conf=hmap_config
+            )
+            self._heightmap = hmap.heightmap
+        return self._heightmap
+
+    def __reduce__(self):
+        args = []  # type: ignore
+        for field in fields(self):
+            if field.name == "_heightmap":
+                # delete _heightmap cache for now.
+                args.append(None)
+            else:
+                args.append(getattr(self, field.name))
+        return (self.__class__, tuple(args))
+
+
 class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
@@ -117,25 +173,9 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
         return len(config._get_control_joint_names()) + 6
 
     @classmethod
+    @abstractmethod
     def sample_target_poses(cls, world: BelowTableWorldT, standard: bool) -> Tuple[Coordinates]:
-        if standard:
-            co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
-            return (co,)
-
-        sdf = world.get_exact_sdf()
-
-        n_max_trial = 100
-        ext = np.array(world.target_region._extents)
-        for _ in range(n_max_trial):
-            p_local = -0.5 * ext + np.random.rand(3) * ext
-            co = world.target_region.copy_worldcoords()
-            co.translate(p_local)
-            points = np.expand_dims(co.worldpos(), axis=0)
-            sd_val = sdf(points)[0]
-            if sd_val > 0.03:
-                co.rotate(-0.5 * np.pi, "y")
-                return (co,)
-        assert False
+        ...
 
     @classmethod
     def sample_descriptions(
@@ -267,3 +307,80 @@ class HumanoidTableReachingTask(HumanoidTableReachingTaskBase[BelowTableSingleOb
                 desc_dict[name] = pose
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
+
+    @classmethod
+    def sample_target_poses(
+        cls, world: BelowTableSingleObstacleWorld, standard: bool
+    ) -> Tuple[Coordinates]:
+        if standard:
+            co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
+            return (co,)
+
+        sdf = world.get_exact_sdf()
+
+        n_max_trial = 100
+        ext = np.array(world.target_region._extents)
+        for _ in range(n_max_trial):
+            p_local = -0.5 * ext + np.random.rand(3) * ext
+            co = world.target_region.copy_worldcoords()
+            co.translate(p_local)
+            points = np.expand_dims(co.worldpos(), axis=0)
+            sd_val = sdf(points)[0]
+            if sd_val > 0.03:
+                co.rotate(-0.5 * np.pi, "y")
+                return (co,)
+        assert False
+
+
+class HumanoidTableClutteredReachingTask(HumanoidTableReachingTaskBase[BelowTableClutteredWorld]):
+    @staticmethod
+    def get_world_type() -> Type[BelowTableClutteredWorld]:
+        return BelowTableClutteredWorld
+
+    def export_table(self) -> DescriptionTable:
+        world_dict = {}
+        world_dict["world_vector"] = self.world.table.worldpos()
+        world_dict["world_mat"] = self.world.heightmap()
+
+        desc_dicts = []
+        for desc in self.descriptions:
+            desc_dict = {}
+            for idx, co in enumerate(desc):
+                pose = skcoords_to_pose_vec(co)
+                name = "target_pose-{}".format(idx)
+                desc_dict[name] = pose
+            desc_dicts.append(desc_dict)
+        return DescriptionTable(world_dict, desc_dicts)
+
+    @classmethod
+    def sample_target_poses(
+        cls, world: BelowTableClutteredWorld, standard: bool
+    ) -> Tuple[Coordinates]:
+        if standard:
+            co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
+            return (co,)
+
+        sdf = world.get_exact_sdf()
+
+        n_max_trial = 100
+        ext = np.array(world.target_region._extents)
+        for _ in range(n_max_trial):
+            p_local = -0.5 * ext + np.random.rand(3) * ext
+            co = world.target_region.copy_worldcoords()
+            co.translate(p_local)
+            points = np.expand_dims(co.worldpos(), axis=0)
+            sd_val = sdf(points)[0]
+
+            co_backward = co.copy_worldcoords()
+            co_backward.translate([0, 0, 0.1])
+            points = np.expand_dims(co_backward.worldpos(), axis=0)
+            sd_val_back = sdf(points)[0]
+
+            margin = 0.08
+            if sd_val > margin and sd_val_back > margin:
+                co.rotate(-0.5 * np.pi, "y")
+                return (co,)
+
+        # because no way to sample,
+        co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
+        return (co,)
