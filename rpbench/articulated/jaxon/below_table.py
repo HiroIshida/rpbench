@@ -119,7 +119,7 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         else:
             obstacles = []
 
-            n_obstacle = np.random.randint(20)
+            n_obstacle = np.random.randint(8)
             for _ in range(n_obstacle):
                 region_width = np.array(target_region._extents[:2])
                 region_center = target_region.worldpos()[:2]
