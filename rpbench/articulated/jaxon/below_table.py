@@ -125,7 +125,8 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
                 region_center = target_region.worldpos()[:2]
 
                 obs_width = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.2, 0.2, 0.4])
-                obs_width[2] = min(obs_width[2], table_position[2])
+                obs_width[2] = min(obs_width[2], table_position[2] - 0.1)
+                assert obs_width[2] < target_region.extents[2]
 
                 b_min = region_center - region_width * 0.5 + 0.5 * obs_width[:2]
                 b_max = region_center + region_width * 0.5 - 0.5 * obs_width[:2]
