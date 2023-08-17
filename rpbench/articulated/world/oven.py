@@ -68,14 +68,12 @@ class Oven(CascadedCoords):
 
     @classmethod
     def sample(cls, standard: bool = False) -> "Oven":
+        size = np.array([0.5, 0.5, 0.4])
+        thickness = 0.06
         if standard:
-            size = np.array([0.4, 0.5, 0.4])
-            thickness = 0.03
             angle = 140 * (np.pi / 180.0)
         else:
-            size = np.array([0.3, 0.4, 0.3]) + np.random.rand(3) * 0.2
-            thickness = 0.02 + np.random.rand() * 0.03
-            angle = (40 + np.random.rand() * 120) * (np.pi / 180.0)
+            angle = (90 + np.random.rand() * 80) * (np.pi / 180.0)
         return cls(size, thickness, angle)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -158,23 +156,47 @@ class OvenWithContents(CascadedCoords):
         return sdf
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
-        idx = np.random.randint(len(self.contents))
-        cylinder = self.contents[idx]
-        co = cylinder.copy_worldcoords()
-        rot_angle = np.random.rand() * np.pi - 0.5 * np.pi
-
-        min_height = 0.07
-        grasp_height = (
-            np.random.rand() * (cylinder.height - min_height) + min_height - cylinder.height * 0.5
-        )
-        co.rotate(rot_angle, "z")
-        co.translate([-0.1 - cylinder.radius, 0.0, grasp_height])
-
+        n_budget = 100
         sdf = self.get_exact_sdf()
-        dist = sdf(np.expand_dims(co.worldpos(), axis=0))[0]
-        if dist < 0.05 or self.oven.is_outside(co.worldpos()):
-            return None
+        for _ in range(n_budget):
+            pos = np.random.rand(3) * self.oven.size - 0.5 * self.oven.size
+            pos_world = self.transform_vector(pos)
+            sd_val = sdf(np.expand_dims(pos_world, axis=0))[0]
+            if sd_val > 0.05 and not self.oven.is_outside(pos_world):
+                co = Coordinates(pos_world)
+                co.rotation = self.rotation
+                angle = np.random.randn() * 0.2
+                co.rotate(angle, "z")
+
+                co_back = co.copy_worldcoords()
+                co_back.translate([-0.1, 0.0, 0])
+
+                sd_val = sdf(np.expand_dims(co_back.worldpos(), axis=0))[0]
+                if sd_val > 0.05:
+                    return co
+
+        pos = self.transform_vector(np.zeros(3))
+        co = Coordinates(pos)
         return co
+
+        # return None
+
+        # idx = np.random.randint(len(self.contents))
+        # cylinder = self.contents[idx]
+        # co = cylinder.copy_worldcoords()
+        # rot_angle = np.random.rand() * np.pi - 0.5 * np.pi
+
+        # min_height = 0.07
+        # grasp_height = (
+        #     np.random.rand() * (cylinder.height - min_height) + min_height - cylinder.height * 0.5
+        # )
+        # co.rotate(rot_angle, "z")
+        # co.translate([-0.06 - cylinder.radius, 0.0, grasp_height])
+
+        # sdf = self.get_exact_sdf()
+        # dist = sdf(np.expand_dims(co.worldpos(), axis=0))[0]
+        # if dist < 0.05 or self.oven.is_outside(co.worldpos()):
+        #     return None
 
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         available_size = self.oven.size[:2] - 2 * self.oven.thickness
@@ -221,23 +243,15 @@ class TabletopClutteredOvenWorld(WorldBase):
 
     @classmethod
     def sample(cls, standard: bool = False) -> Optional["TabletopClutteredOvenWorld"]:
-        if standard:
-            table_size = np.array([0.6, 3.0, 0.7])
-        else:
-            table_size = np.array([0.6, 3.0, np.random.rand() * 0.2 + 0.6])
+        table_size = np.array([0.6, 3.0, 0.8])
         table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
 
         oven_conts = OvenWithContents.sample(standard)
-        if standard:
-            oven_conts.translate([0.0, 0.0, table_size[2]])
-        else:
-            oven_conts.translate([np.random.rand() * 0.3 - 0.15, 0.0, table_size[2]])
-            print(oven_conts.worldpos())
+        oven_conts.translate([0.0, 0.0, table_size[2]])
 
-        # slide table and oven to some extent
-        slide = 1.0 + np.random.rand() * 0.5
-        angle = np.random.rand() * 0.5 * np.pi - 0.25 * np.pi
+        slide = 0.6
+        angle = 0.0
         table.translate([slide, 0.0, 0.0])
         table.rotate(angle, "z")
         oven_conts.translate([slide, 0.0, 0.0])
