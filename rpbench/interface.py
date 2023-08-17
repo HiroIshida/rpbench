@@ -11,6 +11,7 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Iterable,
     List,
     Optional,
     Protocol,
@@ -359,7 +360,7 @@ class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
         ...
 
     @abstractmethod
-    def export_problems(self) -> List[Problem]:
+    def export_problems(self) -> Iterable[Problem]:
         ...
 
 
@@ -425,7 +426,8 @@ class SkmpTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
 
     def setup(self, task: TaskT) -> None:
         assert task.n_inner_task == 1
-        prob = task.export_problems()[0]
+        probs = [p for p in task.export_problems()]
+        prob = probs[0]
         self.skmp_solver.setup(prob)
 
     def solve(self) -> ResultT:
@@ -560,7 +562,8 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
 
     def setup(self, task: TaskT) -> None:
         assert task.n_inner_task == 1
-        prob = task.export_problems()[0]
+        probs = [p for p in task.export_problems()]
+        prob = probs[0]
         self.skmp_solver.setup(prob)
         self.query_desc = task.export_intrinsic_descriptions()[0]
 
