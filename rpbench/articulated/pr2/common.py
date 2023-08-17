@@ -3,7 +3,7 @@ from functools import lru_cache
 from typing import Callable, List, Type, TypeVar
 
 import numpy as np
-from skmp.constraint import AbstractIneqConst, BoxConst, CollFreeConst, PoseConstraint
+from skmp.constraint import BoxConst, CollFreeConst, PoseConstraint
 from skmp.kinematics import (
     ArticulatedCollisionKinematicsMap,
     ArticulatedEndEffectorKinematicsMap,
@@ -58,14 +58,6 @@ class CachedPR2ConstProvider(ABC):
         return angles
 
     @classmethod
-    @abstractmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> AbstractIneqConst:
-        """get collision free constraint"""
-        # make this method abstract because usually self-collision must be considerd
-        # when dual-arm planning, but not have to be in single arm planning.
-        ...
-
-    @classmethod
     @lru_cache
     def get_pr2(cls) -> PR2:
         pr2 = PR2(use_tight_joint_limit=False)
@@ -100,7 +92,10 @@ class CachedPR2ConstProvider(ABC):
 
     @classmethod
     def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
+        # NOTE: for pr2 planning, using closest feature speeds up the planning and also
+        # success rate will be improved.
+        # (But is not the case for humanoid from my experience))
+        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2(), only_closest_feature=True)
         return colfree
 
 
