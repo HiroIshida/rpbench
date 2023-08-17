@@ -3,13 +3,7 @@ from functools import lru_cache
 from typing import Callable, List, Type, TypeVar
 
 import numpy as np
-from skmp.constraint import (
-    AbstractIneqConst,
-    BoxConst,
-    CollFreeConst,
-    IneqCompositeConst,
-    PoseConstraint,
-)
+from skmp.constraint import AbstractIneqConst, BoxConst, CollFreeConst, PoseConstraint
 from skmp.kinematics import (
     ArticulatedCollisionKinematicsMap,
     ArticulatedEndEffectorKinematicsMap,
@@ -104,16 +98,16 @@ class CachedPR2ConstProvider(ABC):
             assert False
         return dof
 
+    @classmethod
+    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
+        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
+        return colfree
+
 
 class CachedRArmFixedPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
         return PR2Config(base_type=BaseType.FIXED)
-
-    @classmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
-        return colfree
 
 
 class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
@@ -121,34 +115,17 @@ class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
     def get_config(cls) -> PR2Config:
         return PR2Config(base_type=BaseType.PLANER)
 
-    @classmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
-        return colfree
-
 
 class CachedDualArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
         return PR2Config(base_type=BaseType.PLANER, control_arm="dual")
 
-    @classmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> IneqCompositeConst:
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
-        # selcolfree = cls.get_config().get_neural_selcol_const(cls.get_pr2())
-        return IneqCompositeConst([colfree])
-
 
 class CachedDualArmTorsoPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
         return PR2Config(base_type=BaseType.PLANER, control_arm="dual", use_torso=True)
-
-    @classmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> IneqCompositeConst:
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2())
-        # selcolfree = cls.get_config().get_neural_selcol_const(cls.get_pr2())
-        return IneqCompositeConst([colfree])
 
 
 t = np.array(
