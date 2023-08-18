@@ -7,7 +7,7 @@ from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
-from rpbench.articulated.vision import Camera, RayMarchingConfig
+from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton, CylinderSkelton
 from rpbench.interface import WorldBase
 from rpbench.utils import SceneWrapper
@@ -20,6 +20,7 @@ class Oven(CascadedCoords):
     size: np.ndarray
     thickness: float
     angle: float
+    target_region: BoxSkeleton
 
     def __init__(self, size: np.ndarray, thickness: float, angle: float):
         CascadedCoords.__init__(self)
@@ -62,9 +63,14 @@ class Oven(CascadedCoords):
             "back": back,
             "door": door,
         }
+
+        target_region = BoxSkeleton(size, [0, 0, 0.5 * h])
+        self.assoc(target_region, relative_coords="local")
+
         self.size = size
         self.thickness = thickness
         self.angle = angle
+        self.target_region = target_region
 
     @classmethod
     def sample(cls, standard: bool = False) -> "Oven":
@@ -179,60 +185,12 @@ class OvenWithContents(CascadedCoords):
         co = Coordinates(pos)
         return co
 
-        # return None
-
-        # idx = np.random.randint(len(self.contents))
-        # cylinder = self.contents[idx]
-        # co = cylinder.copy_worldcoords()
-        # rot_angle = np.random.rand() * np.pi - 0.5 * np.pi
-
-        # min_height = 0.07
-        # grasp_height = (
-        #     np.random.rand() * (cylinder.height - min_height) + min_height - cylinder.height * 0.5
-        # )
-        # co.rotate(rot_angle, "z")
-        # co.translate([-0.06 - cylinder.radius, 0.0, grasp_height])
-
-        # sdf = self.get_exact_sdf()
-        # dist = sdf(np.expand_dims(co.worldpos(), axis=0))[0]
-        # if dist < 0.05 or self.oven.is_outside(co.worldpos()):
-        #     return None
-
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
-        available_size = self.oven.size[:2] - 2 * self.oven.thickness
-        b_min_wrt_oven = -available_size * 0.5
-        b_max_wrt_oven = +available_size * 0.5
-        xlin = np.linspace(b_min_wrt_oven[0], b_max_wrt_oven[0], n_grid)
-        ylin = np.linspace(b_min_wrt_oven[1], b_max_wrt_oven[1], n_grid)
-        X, Y = np.meshgrid(xlin, ylin)
-        height_from_plane = 0.5
-        Z = np.zeros_like(X) + height_from_plane
-
-        points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-        points = self.transform_vector(points)
-        dirs = np.tile(np.array([0, 0, -1]), (len(points), 1))
-
-        # create sdf
-        sdfs = []
-        sdfs.append(self.oven.panels["bottom"].sdf)
-        for c in self.contents:
-            sdfs.append(c.sdf)
-        union_sdf = UnionSDF(sdfs)
-
-        conf = RayMarchingConfig()
-        dists = Camera.ray_marching(points, dirs, union_sdf, conf)
-        is_valid = dists < height_from_plane + 1e-3
-
-        dists_from_ground = height_from_plane - dists
-        dists_from_ground[~is_valid] = _HMAP_INF_SUBST
-        # points_hit = points + dists[:, None] * dirs
-        # points_hit_z = points_hit[:, 2]
-        # points_hit_z[~is_valid] = _HMAP_INF_SUBST
-
-        self._heightmap = dists_from_ground.reshape((n_grid, n_grid))
-        # from IPython import embed; embed()
-        return self._heightmap
-        # return points
+        hmap_config = HeightmapConfig(n_grid, n_grid)
+        hmap = LocatedHeightmap.by_raymarching(
+            self.oven.target_region, self.contents, conf=hmap_config
+        )
+        return hmap.heightmap
 
 
 @dataclass
@@ -240,6 +198,11 @@ class TabletopClutteredOvenWorld(WorldBase):
     table: BoxSkeleton
     oven_conts: OvenWithContents
     _heightmap: Optional[np.ndarray] = None  # lazy
+
+    def heightmap(self) -> np.ndarray:
+        if self._heightmap is None:
+            self._heightmap = self.oven_conts.create_heightmap()
+        return self._heightmap
 
     @classmethod
     def sample(cls, standard: bool = False) -> Optional["TabletopClutteredOvenWorld"]:
