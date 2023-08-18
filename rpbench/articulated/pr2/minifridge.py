@@ -96,17 +96,15 @@ class TabletopClutteredFridgeReachingTask(
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
-        assert False, "vector description is not implemented yet"
-        # world_dict["vector"] = self.world.vector_description
+        world_dict["vector"] = self.world.vector_dsecription
         world_dict["mesh"] = self.world.fridge_conts.create_heightmap()
 
         desc_dicts = []
         for desc in self.descriptions:
             desc_dict = {}
-            for idx, co in enumerate(desc):
-                pose = skcoords_to_pose_vec(co)
-                name = "target_pose-{}".format(idx)
-                desc_dict[name] = pose
+            target_pose, init_state = desc
+            desc_dict["target_pose"] = skcoords_to_pose_vec(target_pose)
+            desc_dict["init_state"] = init_state
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
 
