@@ -15,7 +15,7 @@ from rpbench.utils import SceneWrapper
 _HMAP_INF_SUBST = -1.0
 
 
-class Oven(CascadedCoords):
+class Fridge(CascadedCoords):
     panels: Dict[str, BoxSkeleton]
     size: np.ndarray
     thickness: float
@@ -73,7 +73,7 @@ class Oven(CascadedCoords):
         self.target_region = target_region
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "Oven":
+    def sample(cls, standard: bool = False) -> "Fridge":
         size = np.array([0.5, 0.5, 0.4])
         thickness = 0.06
         if standard:
@@ -101,28 +101,28 @@ class Oven(CascadedCoords):
         return val > 0.0
 
 
-class OvenWithContents(CascadedCoords):
-    oven: Oven
+class FridgeWithContents(CascadedCoords):
+    fridge: Fridge
     contents: List[CylinderSkelton]
 
-    def __init__(self, oven: Oven, contents: List[CylinderSkelton]):
+    def __init__(self, fridge: Fridge, contents: List[CylinderSkelton]):
         super().__init__()
-        self.assoc(oven, wrt="local")
+        self.assoc(fridge, wrt="local")
         for c in contents:
             self.assoc(c, wrt="local")
-        self.oven = oven
+        self.fridge = fridge
         self.contents = contents
 
     @classmethod
     def sample(cls, standard: bool = False):
-        oven = Oven.sample(standard)
+        fridge = Fridge.sample(standard)
 
         if standard:
             cylinder = CylinderSkelton(radius=0.02, height=0.12)
-            co = oven.copy_worldcoords()
-            co.translate([0.0, 0.0, 0.06 + oven.thickness])
+            co = fridge.copy_worldcoords()
+            co.translate([0.0, 0.0, 0.06 + fridge.thickness])
             cylinder.newcoords(co)
-            return cls(oven, [cylinder])
+            return cls(fridge, [cylinder])
         else:
             n_obs = np.random.randint(5) + 1
             contents: List[CylinderSkelton] = []
@@ -139,25 +139,25 @@ class OvenWithContents(CascadedCoords):
                 r = 0.5 * R
                 h = np.random.rand() * 0.2 + 0.1
 
-                available_size = oven.size[:2] - oven.thickness * 2 - r
-                pos2d_wrt_oven = np.random.rand(2) * available_size - available_size * 0.5
+                available_size = fridge.size[:2] - fridge.thickness * 2 - r
+                pos2d_wrt_fridge = np.random.rand(2) * available_size - available_size * 0.5
 
-                if not is_colliding(pos2d_wrt_oven, r):
+                if not is_colliding(pos2d_wrt_fridge, r):
                     c_new = CylinderSkelton(radius=r, height=h)
-                    co = oven.copy_worldcoords()
-                    co.translate(np.hstack([pos2d_wrt_oven, oven.thickness + 0.5 * h]))
+                    co = fridge.copy_worldcoords()
+                    co.translate(np.hstack([pos2d_wrt_fridge, fridge.thickness + 0.5 * h]))
                     c_new.newcoords(co)
                     contents.append(c_new)
-            return cls(oven, contents)
+            return cls(fridge, contents)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        self.oven.visualize(viewer)
+        self.fridge.visualize(viewer)
         for content in self.contents:
             viewer.add(content.to_visualizable((0, 255, 0, 150)))
 
     def get_exact_sdf(self) -> UnionSDF:
-        oven_sdf = self.oven.get_exact_sdf()
-        sdfs = [c.sdf for c in self.contents] + [oven_sdf]
+        fridge_sdf = self.fridge.get_exact_sdf()
+        sdfs = [c.sdf for c in self.contents] + [fridge_sdf]
         sdf = UnionSDF(sdfs)
         return sdf
 
@@ -165,10 +165,10 @@ class OvenWithContents(CascadedCoords):
         n_budget = 100
         sdf = self.get_exact_sdf()
         for _ in range(n_budget):
-            pos = np.random.rand(3) * self.oven.size - 0.5 * self.oven.size
+            pos = np.random.rand(3) * self.fridge.size - 0.5 * self.fridge.size
             pos_world = self.transform_vector(pos)
             sd_val = sdf(np.expand_dims(pos_world, axis=0))[0]
-            if sd_val > 0.05 and not self.oven.is_outside(pos_world):
+            if sd_val > 0.05 and not self.fridge.is_outside(pos_world):
                 co = Coordinates(pos_world)
                 co.rotation = self.rotation
                 angle = np.random.randn() * 0.2
@@ -188,47 +188,47 @@ class OvenWithContents(CascadedCoords):
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         hmap_config = HeightmapConfig(n_grid, n_grid)
         hmap = LocatedHeightmap.by_raymarching(
-            self.oven.target_region, self.contents, conf=hmap_config
+            self.fridge.target_region, self.contents, conf=hmap_config
         )
         return hmap.heightmap
 
 
 @dataclass
-class TabletopClutteredOvenWorld(WorldBase):
+class TabletopClutteredFridgeWorld(WorldBase):
     table: BoxSkeleton
-    oven_conts: OvenWithContents
+    fridge_conts: FridgeWithContents
     _heightmap: Optional[np.ndarray] = None  # lazy
 
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
-            self._heightmap = self.oven_conts.create_heightmap()
+            self._heightmap = self.fridge_conts.create_heightmap()
         return self._heightmap
 
     @classmethod
-    def sample(cls, standard: bool = False) -> Optional["TabletopClutteredOvenWorld"]:
+    def sample(cls, standard: bool = False) -> Optional["TabletopClutteredFridgeWorld"]:
         table_size = np.array([0.6, 3.0, 0.8])
         table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
 
-        oven_conts = OvenWithContents.sample(standard)
-        oven_conts.translate([0.0, 0.0, table_size[2]])
+        fridge_conts = FridgeWithContents.sample(standard)
+        fridge_conts.translate([0.0, 0.0, table_size[2]])
 
         slide = 0.6
         angle = 0.0
         table.translate([slide, 0.0, 0.0])
         table.rotate(angle, "z")
-        oven_conts.translate([slide, 0.0, 0.0])
-        oven_conts.rotate(angle, "z")
-        return cls(table, oven_conts)
+        fridge_conts.translate([slide, 0.0, 0.0])
+        fridge_conts.rotate(angle, "z")
+        return cls(table, fridge_conts)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        self.oven_conts.visualize(viewer)
+        self.fridge_conts.visualize(viewer)
         viewer.add(self.table.to_visualizable())
 
     def get_exact_sdf(self) -> UnionSDF:
-        oven_conts_sdf = self.oven_conts.get_exact_sdf()
-        sdf = UnionSDF([oven_conts_sdf, self.table.sdf])
+        fridge_conts_sdf = self.fridge_conts.get_exact_sdf()
+        sdf = UnionSDF([fridge_conts_sdf, self.table.sdf])
         return sdf
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
-        return self.oven_conts.sample_pregrasp_coords()
+        return self.fridge_conts.sample_pregrasp_coords()

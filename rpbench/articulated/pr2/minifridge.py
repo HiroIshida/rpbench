@@ -18,21 +18,21 @@ from rpbench.articulated.pr2.common import (
     CachedRArmFixedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
-from rpbench.articulated.world.oven import TabletopClutteredOvenWorld
+from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
 from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 
-class TabletopClutteredOvenReachingTask(
-    TaskBase[TabletopClutteredOvenWorld, Tuple[Coordinates, np.ndarray], RobotModel]
+class TabletopClutteredFridgeReachingTask(
+    TaskBase[TabletopClutteredFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
 ):
     config_provider: ClassVar[
         Type[CachedRArmFixedPR2ConstProvider]
     ] = CachedRArmFixedPR2ConstProvider
 
     @staticmethod
-    def get_world_type() -> Type[TabletopClutteredOvenWorld]:
-        return TabletopClutteredOvenWorld
+    def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
+        return TabletopClutteredFridgeWorld
 
     @staticmethod
     def get_robot_model() -> RobotModel:
@@ -44,7 +44,7 @@ class TabletopClutteredOvenReachingTask(
 
     @classmethod
     def sample_descriptions(
-        cls, world: TabletopClutteredOvenWorld, n_sample: int, standard: bool = False
+        cls, world: TabletopClutteredFridgeWorld, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, np.ndarray]]:
 
         if standard:
@@ -91,14 +91,14 @@ class TabletopClutteredOvenReachingTask(
         return intrinsic_descs
 
     @staticmethod
-    def create_cache(world: TabletopClutteredOvenWorld, robot_model: RobotModel) -> None:
+    def create_cache(world: TabletopClutteredFridgeWorld, robot_model: RobotModel) -> None:
         return None
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
         assert False, "vector description is not implemented yet"
         # world_dict["vector"] = self.world.vector_description
-        world_dict["mesh"] = self.world.oven_conts.create_heightmap()
+        world_dict["mesh"] = self.world.fridge_conts.create_heightmap()
 
         desc_dicts = []
         for desc in self.descriptions:
