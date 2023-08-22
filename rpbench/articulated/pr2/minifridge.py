@@ -96,7 +96,7 @@ class TabletopClutteredFridgeReachingTask(
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
-        world_dict["vector"] = self.world.vector_dsecription
+        world_dict["vector"] = self.world.export_intrinsic_description()
         world_dict["mesh"] = self.world.fridge_conts.create_heightmap()
 
         desc_dicts = []

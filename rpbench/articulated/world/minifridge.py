@@ -199,8 +199,7 @@ class TabletopClutteredFridgeWorld(WorldBase):
     fridge_conts: FridgeWithContents
     _heightmap: Optional[np.ndarray] = None  # lazy
 
-    @property
-    def vector_dsecription(self) -> np.ndarray:
+    def export_intrinsic_description(self) -> np.ndarray:
         return np.array([self.fridge_conts.fridge.angle])
 
     def heightmap(self) -> np.ndarray:
