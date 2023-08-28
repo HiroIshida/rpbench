@@ -440,6 +440,10 @@ class PlanningDataset(Generic[TaskT]):
     task_type: Type[TaskT]
     time_stamp: float
 
+    def resample_trajectory(self, n_wp: int) -> None:
+        for i, (task, traj) in enumerate(self.pairs):
+            self.pairs[i] = (task, traj.resample(n_wp))
+
     @staticmethod
     def create_inner(
         task_type: Type[TaskT], n_data: int, q: multiprocessing.Queue, with_bar: bool
