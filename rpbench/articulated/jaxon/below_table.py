@@ -18,7 +18,7 @@ from skrobot.coordinates import Coordinates
 from skrobot.model.robot_model import RobotModel
 from skrobot.sdf.signed_distance_function import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
-from tinyfk import BaseType
+from tinyfk import BaseType, RotationType
 
 from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
 from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
@@ -178,6 +178,11 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
     def sample_target_poses(cls, world: BelowTableWorldT, standard: bool) -> Tuple[Coordinates]:
         ...
 
+    @staticmethod
+    @abstractmethod
+    def rarm_rot_type() -> RotationType:
+        ...
+
     @classmethod
     def sample_descriptions(
         cls, world: BelowTableWorldT, n_sample: int, standard: bool = False
@@ -223,7 +228,9 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
 
         problems = []
         for desc in self.descriptions:
-            goal_eq_const = provider.get_dual_legs_pose_const(jaxon, co_rarm=desc[0])
+            goal_eq_const = provider.get_dual_legs_pose_const(
+                jaxon, co_rarm=desc[0], arm_rot_type=self.rarm_rot_type()
+            )
 
             problem = Problem(
                 q_start,
@@ -288,6 +295,10 @@ class HumanoidTableReachingTask(HumanoidTableReachingTaskBase[BelowTableSingleOb
     def get_world_type() -> Type[BelowTableSingleObstacleWorld]:
         return BelowTableSingleObstacleWorld
 
+    @staticmethod
+    def rarm_rot_type() -> RotationType:
+        return RotationType.XYZW
+
     def export_table(self) -> DescriptionTable:
         assert len(self.world.obstacles) == 1
         world_dict = {}
@@ -333,7 +344,9 @@ class HumanoidTableReachingTask(HumanoidTableReachingTaskBase[BelowTableSingleOb
         assert False
 
 
-class HumanoidTableClutteredReachingTask(HumanoidTableReachingTaskBase[BelowTableClutteredWorld]):
+class HumanoidTableClutteredReachingTaskBase(
+    HumanoidTableReachingTaskBase[BelowTableClutteredWorld]
+):
     @staticmethod
     def get_world_type() -> Type[BelowTableClutteredWorld]:
         return BelowTableClutteredWorld
@@ -385,3 +398,15 @@ class HumanoidTableClutteredReachingTask(HumanoidTableReachingTaskBase[BelowTabl
         # because no way to sample,
         co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
         return (co,)
+
+
+class HumanoidTableClutteredReachingTask(HumanoidTableClutteredReachingTaskBase):
+    @staticmethod
+    def rarm_rot_type() -> RotationType:
+        return RotationType.XYZW
+
+
+class HumanoidTableClutteredReachingTask2(HumanoidTableClutteredReachingTaskBase):
+    @staticmethod
+    def rarm_rot_type() -> RotationType:
+        return RotationType.IGNORE
