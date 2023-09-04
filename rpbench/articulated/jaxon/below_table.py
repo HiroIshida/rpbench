@@ -290,14 +290,12 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
         return intrinsic_descs
 
 
-class HumanoidTableReachingTask(HumanoidTableReachingTaskBase[BelowTableSingleObstacleWorld]):
+class HumanoidTableNotClutteredReachingTaskBase(
+    HumanoidTableReachingTaskBase[BelowTableSingleObstacleWorld]
+):
     @staticmethod
     def get_world_type() -> Type[BelowTableSingleObstacleWorld]:
         return BelowTableSingleObstacleWorld
-
-    @staticmethod
-    def rarm_rot_type() -> RotationType:
-        return RotationType.XYZW
 
     def export_table(self) -> DescriptionTable:
         assert len(self.world.obstacles) == 1
@@ -342,6 +340,18 @@ class HumanoidTableReachingTask(HumanoidTableReachingTaskBase[BelowTableSingleOb
                 co.rotate(-0.5 * np.pi, "y")
                 return (co,)
         assert False
+
+
+class HumanoidTableReachingTask(HumanoidTableNotClutteredReachingTaskBase):
+    @staticmethod
+    def rarm_rot_type() -> RotationType:
+        return RotationType.XYZW
+
+
+class HumanoidTableReachingTask2(HumanoidTableNotClutteredReachingTaskBase):
+    @staticmethod
+    def rarm_rot_type() -> RotationType:
+        return RotationType.IGNORE
 
 
 class HumanoidTableClutteredReachingTaskBase(
