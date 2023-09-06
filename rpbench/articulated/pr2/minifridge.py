@@ -146,14 +146,6 @@ class TabletopClutteredFridgeReachingTask(
         ...
 
     def create_viewer(self, mode: str) -> Any:
-        cls: Type[SolutionVisualizerBase]
-        if mode == "static":
-            cls = StaticSolutionVisualizer
-        elif mode == "interactive":
-            cls = InteractiveSolutionVisualizer
-        else:
-            assert False
-
         assert len(self.descriptions) == 1
         target_co, base_pose = self.descriptions[0]
         geometries = [Axis.from_coords(target_co)]
@@ -165,7 +157,21 @@ class TabletopClutteredFridgeReachingTask(
         def robot_updator(robot, q):
             set_robot_state(pr2, config._get_control_joint_names(), q, config.base_type)
 
-        obj = cls(pr2, geometry=geometries, visualizable=self.world, robot_updator=robot_updator)
+        cls: Type[SolutionVisualizerBase]
+        if mode == "static":
+            obj = StaticSolutionVisualizer(
+                pr2,
+                geometry=geometries,
+                visualizable=self.world,
+                robot_updator=robot_updator,
+                show_wireframe=True,
+            )
+        elif mode == "interactive":
+            obj = InteractiveSolutionVisualizer(
+                pr2, geometry=geometries, visualizable=self.world, robot_updator=robot_updator
+            )
+        else:
+            assert False
 
         t = np.array(
             [
