@@ -1,25 +1,35 @@
+from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Type
+from typing import List, Optional, Tuple, Type, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import cm
 from scipy.interpolate import RegularGridInterpolator
 from scipy.stats import gaussian_kde
 from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
 from skmp.solver.interface import AbstractScratchSolver, Problem
 from skmp.trajectory import Trajectory
 
-from rpbench.interface import DescriptionTable, TaskBase, WorldBase
+from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
 from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
 
+DummyWorldT = TypeVar("DummyWorldT", bound="DummyWorldBase")
+
 
 @dataclass
-class DummyWorld(WorldBase):
+class DummyWorldBase(WorldBase):
     kde: gaussian_kde
     b_min: np.ndarray
     b_max: np.ndarray
 
+    @abstractmethod
+    def visualize(self, fax) -> None:
+        ...
+
+
+class DummyWorld(DummyWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "DummyWorld":
         with temp_seed(100, True):
@@ -67,6 +77,58 @@ class DummyWorld(WorldBase):
         # plt.colorbar(cf)
 
 
+class ProbDummyWorld(DummyWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> "ProbDummyWorld":
+        with temp_seed(2, True):
+            width = np.array([0.6, 1.0])
+            margin = 0.15
+            points = np.random.rand(10, 2) * (width - margin * 2) + margin
+            kde = gaussian_kde(points.T)
+        return cls(kde, np.array([-0.2, 0.0]), width)
+
+    def get_grid(self) -> Grid2d:
+        return Grid2d(self.b_min, self.b_max, (50, 50))
+
+    def get_exact_sdf(self) -> SDFProtocol:
+        def sdf(X: np.ndarray) -> np.ndarray:
+            r = 0.25
+            ret1 = (X[:, 0] / 1.0) ** 2 + ((X[:, 1] - 0.5) / 0.5) ** 2 - r**2
+            ret2 = ((X[:, 0] - 0.6) / 1.0) ** 2 + ((X[:, 1] - 0.3) / 0.5) ** 2 - r**2
+            return np.minimum(ret1, ret2)
+
+        return sdf
+
+    def visualize(self, fax):
+        fig, ax = fax
+
+        x = np.linspace(0, 0.6, 100)
+        y = np.linspace(0, 1, 100)
+        X, Y = np.meshgrid(x, y)
+        pts = np.vstack([X.ravel(), Y.ravel()]).T
+        Z = self.kde.evaluate(pts.T).reshape(X.shape)
+        ax.contourf(X, Y, Z, 20, cmap=cm.Reds)
+
+        sdf = self.get_exact_sdf()
+        Z_infeasible = sdf(pts).reshape(X.shape)
+
+        ax.set_xlim([0, 0.6])
+        ax.set_ylim([0, 1.0])
+        ax.set_aspect("equal", adjustable="box")
+        ax.contourf(X, Y, Z, 20, cmap=cm.Reds)
+
+        contourf_kwargs = {
+            "colors": ["gray"],
+            "alpha": 0.0,
+            "hatches": ["////"],
+            "edgecolor": "r",
+            "facecolor": "blue",
+            "color": "red",
+        }
+        ax.contourf(X, Y, Z_infeasible, levels=[-np.inf, 0], **contourf_kwargs)
+        ax.contour(X, Y, Z_infeasible, levels=[0], colors="black")
+
+
 @dataclass
 class DummyConfig:
     n_max_call: int
@@ -106,6 +168,11 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         q_end_init = guiding_traj.numpy()[-1]
         assert self.problem is not None
         assert isinstance(self.problem.goal_const, ConfigPointConst)
+
+        if self.problem.global_ineq_const is not None:
+            if not self.problem.global_ineq_const.is_valid(self.problem.goal_const.desired_angles):
+                return DummyResult.abnormal()
+
         q_end_target = self.problem.goal_const.desired_angles
         dist = np.linalg.norm(q_end_target - q_end_init)
         n_call = int(dist * 1000) + 1
@@ -122,39 +189,16 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         return DummyResult(traj, None, n_call)
 
 
-class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
-    @staticmethod
-    def get_world_type() -> Type[DummyWorld]:
-        return DummyWorld
-
+class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     @staticmethod
     def get_robot_model() -> None:
         return None
 
     @staticmethod
-    def create_cache(world: DummyWorld, robot_model: None) -> Grid2dSDF:
-        return world.get_exact_sdf()
-
-    @classmethod
-    def sample_descriptions(
-        cls, world: DummyWorld, n_sample: int, standard: bool = False
-    ) -> List[np.ndarray]:
-
-        sdf = world.get_exact_sdf()
-
-        if standard:
-            assert n_sample == 1
-            return [np.zeros(2)]
-        else:
-            descs: List[np.ndarray] = []
-            while len(descs) < n_sample:
-                p = np.random.rand(2) * (world.b_max - world.b_min) + world.b_min
-                if sdf(np.expand_dims(p, axis=0))[0] > 0:
-                    descs.append(p)
-            return descs
+    def create_cache(world: DummyWorldT, robot_model: None) -> None:
+        return None
 
     def export_table(self) -> DescriptionTable:
-        assert self.cache is not None
         wd = {}  # type: ignore
         wcd_list = []  # type: ignore
         for desc in self.descriptions:
@@ -166,6 +210,11 @@ class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
         x0 = problem.start
         assert isinstance(problem.goal_const, ConfigPointConst)
         x1 = problem.goal_const.desired_angles
+
+        if problem.global_ineq_const is not None:
+            if not problem.global_ineq_const.is_valid(x1):
+                return DummyResult.abnormal()
+
         assert np.linalg.norm(x1 - x0) < 1e-3
         dummy_traj = Trajectory.from_two_points(x0, x1, 2)
         return DummyResult(dummy_traj, 1.0, 3000)  # whatever
@@ -192,3 +241,50 @@ class DummyTask(TaskBase[DummyWorld, np.ndarray, None]):
         for goal in self.descriptions:
             ax.scatter(goal[0], goal[1], label="point", c="red")
         return fig, ax
+
+
+class DummyTask(DummyTaskBase[DummyWorld]):
+    @staticmethod
+    def get_world_type() -> Type[DummyWorld]:
+        return DummyWorld
+
+    @classmethod
+    def sample_descriptions(
+        cls, world: DummyWorld, n_sample: int, standard: bool = False
+    ) -> List[np.ndarray]:
+
+        sdf = world.get_exact_sdf()
+
+        if standard:
+            assert n_sample == 1
+            return [np.zeros(2)]
+        else:
+            descs: List[np.ndarray] = []
+            while len(descs) < n_sample:
+                p = np.random.rand(2) * (world.b_max - world.b_min) + world.b_min
+                if sdf(np.expand_dims(p, axis=0))[0] > 0:
+                    descs.append(p)
+            return descs
+
+
+class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):
+    @staticmethod
+    def get_world_type() -> Type[ProbDummyWorld]:
+        return ProbDummyWorld
+
+    @classmethod
+    def sample_descriptions(
+        cls, world: ProbDummyWorld, n_sample: int, standard: bool = False
+    ) -> List[np.ndarray]:
+
+        world.get_exact_sdf()
+
+        if standard:
+            assert n_sample == 1
+            return [np.zeros(2)]
+        else:
+            descs: List[np.ndarray] = []
+            while len(descs) < n_sample:
+                p = world.kde.resample(1).flatten()
+                descs.append(p)
+            return descs

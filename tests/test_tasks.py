@@ -202,6 +202,34 @@ def test_dummy_task():
     assert res.traj is None
 
 
+def test_prob_dummy_task():
+    conf = DummyConfig(10000, random=False)  # large enough
+    online_solver = DummySolver.init(conf)
+
+    for i in range(100):
+        task = DummyTask.sample(1)
+        sdf = task.world.get_exact_sdf()
+        val = sdf(np.array(task.descriptions))[0]
+        is_feasible_problem = val > 0
+
+        task.solve_default()[0]
+
+        while True:  # just sample guiding traj
+            res = DummyTask.sample(1).solve_default()[0]
+            if res.traj is not None:
+                guiding_traj = res.traj
+                break
+        online_solver.setup(task.export_problems()[0])
+        res_replan = online_solver.solve(guiding_traj)
+
+        if is_feasible_problem:
+            assert res.traj is not None
+            assert res_replan is not None
+        else:
+            assert res.traj is None
+            assert res_replan is None
+
+
 if __name__ == "__main__":
     # test_tabletop_task()
     # test_maze_solving_task()
