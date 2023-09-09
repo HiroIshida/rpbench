@@ -1,12 +1,23 @@
 from abc import abstractmethod
 from dataclasses import dataclass, fields
-from typing import ClassVar, List, Optional, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    ClassVar,
+    List,
+    Literal,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 import numpy as np
 from scipy.stats import lognorm
 from skmp.constraint import CollFreeConst, IneqCompositeConst, PoseConstraint
 from skmp.robot.jaxon import Jaxon
-from skmp.robot.utils import get_robot_state
+from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.satisfy import SatisfactionConfig
 from skmp.solver.myrrt_solver import MyRRTConfig, MyRRTConnectSolver, MyRRTResult
 from skmp.solver.nlp_solver.sqp_based_solver import (
@@ -14,7 +25,13 @@ from skmp.solver.nlp_solver.sqp_based_solver import (
     SQPBasedSolverConfig,
     SQPBasedSolverResult,
 )
+from skmp.visualization.solution_visualizer import (
+    InteractiveSolutionVisualizer,
+    SolutionVisualizerBase,
+    StaticSolutionVisualizer,
+)
 from skrobot.coordinates import Coordinates
+from skrobot.model.primitives import Axis
 from skrobot.model.robot_model import RobotModel
 from skrobot.sdf.signed_distance_function import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
@@ -55,7 +72,8 @@ class BelowTableWorldBase(WorldBase):
         viewer.add(self.table.to_visualizable())
         for obs in self.obstacles:
             skobs = obs.to_visualizable()
-            skobs.visual_mesh.visual.face_colors = [255, 0, 0, 150]
+            # skobs.visual_mesh.visual.face_colors = [255, 0, 0, 150]
+            skobs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
             viewer.add(skobs)
 
     @staticmethod
@@ -288,6 +306,65 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
             intrinsic_desc = np.hstack(vecs)
             intrinsic_descs.append(intrinsic_desc)
         return intrinsic_descs
+
+    @overload
+    def create_viewer(self, mode: Literal["static"]) -> StaticSolutionVisualizer:
+        ...
+
+    @overload
+    def create_viewer(self, mode: Literal["interactive"]) -> InteractiveSolutionVisualizer:
+        ...
+
+    def create_viewer(self, mode: str) -> Any:
+        assert len(self.descriptions) == 1
+        target_co = self.descriptions[0][0]
+        geometries = [Axis.from_coords(target_co)]
+
+        config = self.config_provider.get_config()  # type: ignore[attr-defined]
+        jaxon = self.config_provider.get_jaxon()
+        colkin = config.get_collision_kin()
+        sdf = self.world.get_exact_sdf()
+
+        def robot_updator(robot, q):
+            set_robot_state(robot, config._get_control_joint_names(), q, BaseType.FLOATING)
+
+        cls: Type[SolutionVisualizerBase]
+        if mode == "static":
+            obj = StaticSolutionVisualizer(
+                jaxon,
+                geometry=geometries,
+                visualizable=self.world,
+                robot_updator=robot_updator,
+                show_wireframe=False,
+            )
+        elif mode == "interactive":
+            obj = InteractiveSolutionVisualizer(
+                jaxon,
+                geometry=geometries,
+                visualizable=self.world,
+                robot_updator=robot_updator,
+                enable_colvis=True,
+                colkin=colkin,
+                sdf=sdf,
+            )
+        else:
+            assert False
+
+        # side
+        # t = np.array([[ 0.989917  ,  0.0582524 , -0.12911616,  0.12857397],
+        #     [-0.12970017,  0.00634257, -0.99153297, -3.63181173],
+        #     [-0.05694025,  0.99828174,  0.01383397,  0.95512276],
+        #     [ 0.        ,  0.        ,  0.        ,  1.        ]])
+        t = np.array(
+            [
+                [0.57710263, 0.149482, -0.80287464, -2.3424832],
+                [-0.81327753, 0.0156558, -0.58166533, -2.13427884],
+                [-0.07437885, 0.98864049, 0.13060536, 1.38784946],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+        obj.viewer.camera_transform = t
+        return obj
 
 
 class HumanoidTableNotClutteredReachingTaskBase(
