@@ -328,9 +328,8 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
         def robot_updator(robot, q):
             set_robot_state(robot, config._get_control_joint_names(), q, BaseType.FLOATING)
 
-        cls: Type[SolutionVisualizerBase]
         if mode == "static":
-            obj = StaticSolutionVisualizer(
+            obj: SolutionVisualizerBase = StaticSolutionVisualizer(
                 jaxon,
                 geometry=geometries,
                 visualizable=self.world,

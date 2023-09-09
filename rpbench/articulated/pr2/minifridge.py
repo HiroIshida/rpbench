@@ -157,9 +157,8 @@ class TabletopClutteredFridgeReachingTask(
         def robot_updator(robot, q):
             set_robot_state(pr2, config._get_control_joint_names(), q, config.base_type)
 
-        cls: Type[SolutionVisualizerBase]
         if mode == "static":
-            obj = StaticSolutionVisualizer(
+            obj: SolutionVisualizerBase = StaticSolutionVisualizer(
                 pr2,
                 geometry=geometries,
                 visualizable=self.world,
