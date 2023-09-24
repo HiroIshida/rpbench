@@ -1,19 +1,125 @@
+import time
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, Type, TypeVar, Union
+from typing import List, Optional, Tuple, Type, TypeVar, Union
 
+import disbmp
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy.sparse as sparse
+from disbmp import BoundingBox, FastMarchingTree, State
 from scipy.interpolate import RegularGridInterpolator
-from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
-from skmp.solver.interface import Problem, ResultProtocol
-from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
-from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
-from skmp.trajectory import Trajectory
+from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
+from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
+import rpbench.two_dimensional.double_integrator_trajopt as diopt
 from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
+from rpbench.two_dimensional.double_integrator_trajopt import (
+    TrajectoryBound,
+    TrajectoryCostFunction,
+    TrajectoryDifferentialConstraint,
+    TrajectoryEndPointConstraint,
+    TrajectoryObstacleAvoidanceConstraint,
+)
 from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
+
+
+@dataclass
+class DoubleIntegratorPlanningProblem:
+    start: np.ndarray
+    goal: np.ndarray
+    sdf: SDFProtocol
+    tbound: TrajectoryBound
+    dt: float
+
+    def check_init_feasibility(self) -> bool:
+        return True, "always_ok"
+
+
+@dataclass
+class DoubleIntegratorPlanningConfig:
+    n_wp: int
+    n_max_call: int
+    timeout: Optional[int] = None
+
+
+@dataclass
+class DoubleIntegratorPlanningResult:
+    traj: Optional[diopt.Trajectory]
+    time_elapsed: Optional[float]
+    n_call: int
+
+
+@dataclass
+class DoubleIntegratorOptimizationSolver(
+    AbstractScratchSolver[DoubleIntegratorPlanningConfig, DoubleIntegratorPlanningResult]
+):
+    config: DoubleIntegratorPlanningConfig
+    problem: Optional[DoubleIntegratorPlanningProblem]
+    traj_conf: Optional[diopt.TrajectoryConfig]
+    osqp_solver: Optional[OsqpSqpSolver]
+
+    def get_result_type(self) -> DoubleIntegratorPlanningResult:
+        return DoubleIntegratorPlanningResult
+
+    @classmethod
+    def init(cls, conf: DoubleIntegratorPlanningConfig) -> "DoubleIntegratorOptimizationSolver":
+        return cls(conf, None, None, None)
+
+    def _setup(self, problem: DoubleIntegratorPlanningProblem) -> None:
+        # setup optimization problem by direct transcription
+        traj_conf = diopt.TrajectoryConfig(2, self.config.n_wp, problem.dt)
+
+        eq_consts: List[Differentiable] = []
+        diff_const = TrajectoryDifferentialConstraint(traj_conf)
+        eq_consts.append(diff_const)
+
+        end_const = TrajectoryEndPointConstraint(traj_conf, problem.start, problem.goal)
+        eq_consts.append(end_const)
+
+        def eq_const(traj: np.ndarray) -> Tuple[np.ndarray, sparse.csc_matrix]:
+            vals = []
+            jacs = []
+            for c in eq_consts:
+                val, jac = c(traj)
+                vals.append(val)
+                jacs.append(jac)
+            val = np.hstack(vals)
+            jac = sparse.vstack(jacs)
+            return val, jac
+
+        ineq_const = TrajectoryObstacleAvoidanceConstraint(traj_conf, problem.sdf)
+
+        cost_fun = TrajectoryCostFunction(traj_conf)
+        lb = problem.tbound.lower_bound(traj_conf.n_steps)
+        ub = problem.tbound.upper_bound(traj_conf.n_steps)
+
+        osqp_solver = OsqpSqpSolver(cost_fun.cost_matrix, eq_const, ineq_const, lb, ub)
+        self.traj_conf = traj_conf
+        self.osqp_solver = osqp_solver
+
+    def _solve(self, guiding_traj: Optional[disbmp.Trajectory]) -> DoubleIntegratorPlanningResult:
+        assert self.problem is not None
+        assert self.traj_conf is not None
+        assert self.osqp_solver is not None
+
+        if guiding_traj is None:
+            traj_guess = diopt.Trajectory.from_two_points(
+                self.problem.start, self.problem.goal, self.traj_conf
+            )
+        else:
+            times = np.linspace(0, guiding_traj.get_duration(), self.config.n_wp)
+            states = np.array([guiding_traj.interpolate(t) for t in times])
+            traj_guess = diopt.Trajectory.from_X_and_V(states[:, :2], states[:, 2:], self.traj_conf)
+
+        osqp_conf = OsqpSqpConfig(n_max_eval=self.config.n_max_call)
+        ret = self.osqp_solver.solve(traj_guess.to_array(), osqp_conf)
+        if ret.success:
+            traj = diopt.Trajectory.from_array(ret.x, self.traj_conf)
+            return DoubleIntegratorPlanningResult(traj, None, ret.nit)
+        else:
+            return DoubleIntegratorPlanningResult(None, None, ret.nit)
 
 
 @dataclass
@@ -87,6 +193,18 @@ class BubblyWorldBase(WorldBase):
 
     def get_grid(self) -> Grid2d:
         return Grid2d(np.zeros(2), np.ones(2), (112, 112))
+
+    def get_grid_map(self) -> np.ndarray:
+        grid = self.get_grid()
+
+        xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
+        X, Y = np.meshgrid(xlin, ylin)
+        pts = np.array(list(zip(X.flatten(), Y.flatten())))
+
+        sdf = self.get_exact_sdf()
+        vals = sdf.__call__(pts)
+        grid_map = vals.reshape(grid.sizes).T
+        return grid_map
 
     def get_exact_sdf(self, for_visualize: bool = False) -> SDFProtocol:
         margin = 0.0 if for_visualize else self.get_margin()
@@ -172,17 +290,33 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
             wcd_list.append(wcd)
         return DescriptionTable(wd, wcd_list)
 
-    def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ompl_sovler = OMPLSolver.init(OMPLSolverConfig(n_max_call=10000, simplify=True))
-        ompl_sovler.setup(problem)
-        ompl_res = ompl_sovler.solve()
-        if ompl_res.traj is None:
-            return ompl_res
+    @dataclass
+    class _FMTResult:
+        traj: Optional[disbmp.Trajectory]
+        time_elapsed: float
+        n_call: int
 
-        nlp_solver = SQPBasedSolver.init(SQPBasedSolverConfig(n_wp=30))
-        nlp_solver.setup(problem)
-        res = nlp_solver.solve(ompl_res.traj)
-        return res
+    def solve_default_each(self, problem: DoubleIntegratorPlanningProblem) -> ResultProtocol:
+        s_min = np.hstack([problem.tbound.x_min, problem.tbound.v_min])
+        s_max = np.hstack([problem.tbound.x_max, problem.tbound.v_max])
+        bbox = BoundingBox(s_min, s_max)
+        s_start = State(np.hstack([problem.start, np.zeros(2)]))
+        s_goal = State(np.hstack([problem.goal, np.zeros(2)]))
+
+        def is_obstacle_free(state: State) -> bool:
+            x = state.to_vector()[:2]
+            return problem.sdf(np.expand_dims(x, axis=0))[0] > 0.0
+
+        N = 1000
+        ts = time.time()
+        fmt = FastMarchingTree(s_start, s_goal, is_obstacle_free, bbox, problem.dt, 1.0, N)
+        is_solved = fmt.solve(N)
+        time_elapsed = time.time() - ts
+        if is_solved:
+            traj = fmt.get_solution()
+            return self._FMTResult(traj, time_elapsed, 0)  # 0 is dummy
+        else:
+            return self._FMTResult(None, time_elapsed, 0)  # 0 is dummy
 
     @classmethod
     def get_dof(cls) -> int:
@@ -194,16 +328,20 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         else:
             sdf = self.cache
 
+        tbound = TrajectoryBound(
+            np.ones(2) * 0.0,
+            np.ones(2) * 1.0,
+            np.ones(2) * -0.3,
+            np.ones(2) * 0.3,
+            np.ones(2) * -0.1,
+            np.ones(2) * 0.1,
+        )
+
         probs = []
         for desc in self.descriptions:
             start, goal = desc
-
-            box = BoxConst(np.zeros(self.get_dof()), np.ones(self.get_dof()))
-            goal_const = ConfigPointConst(goal)
-            prob = Problem(
-                start, box, goal_const, PointCollFreeConst(sdf), None, motion_step_box_=0.03
-            )
-            probs.append(prob)
+            problem = DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
+            probs.append(problem)
         return probs
 
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
@@ -219,18 +357,12 @@ class WithoutGridSDFMixin:
 class WithGridSDFMixin:
     @staticmethod
     def create_cache(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
+        # TODO: redundant implementation with world.get_grid_map()
         grid = world.get_grid()
-
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
-        X, Y = np.meshgrid(xlin, ylin)
-        pts = np.array(list(zip(X.flatten(), Y.flatten())))
-
-        sdf = world.get_exact_sdf()
-        vals = sdf.__call__(pts)
-
-        itp = RegularGridInterpolator(
-            (xlin, ylin), vals.reshape(grid.sizes).T, bounds_error=False, fill_value=10.0
-        )
+        grid_map = world.get_grid_map()
+        itp = RegularGridInterpolator((xlin, ylin), grid_map, bounds_error=False, fill_value=10.0)
+        vals = grid_map.flatten()
         return Grid2dSDF(vals, world.get_grid(), itp)
 
 
@@ -279,15 +411,16 @@ class Taskvisualizer:
         for start, goal in task.descriptions:
             ax.scatter(start[0], start[1], c="k")
             ax.scatter(goal[0], goal[1], c="r")
-        ax.set_xlim([0, 1])
-        ax.set_ylim([0, 1])
+        ax.set_xlim([-0.1, 1.1])
+        ax.set_ylim([-0.1, 1.1])
+        ax.plot([0, 0, 1, 1, 0], [0, 1, 1, 0, 0], c="k")
         self.fax = (fig, ax)
 
-    def visualize_trajectories(self, trajs: Union[List[Trajectory], Trajectory]) -> None:
+    def visualize_trajectories(
+        self, trajs: Union[List[diopt.Trajectory], diopt.Trajectory], **kwargs
+    ) -> None:
         fig, ax = self.fax
-        if isinstance(trajs, Trajectory):
+        if isinstance(trajs, diopt.Trajectory):
             trajs = [trajs]
-
         for traj in trajs:
-            arr = traj.numpy()
-            ax.plot(arr[:, 0], arr[:, 1])
+            ax.plot(traj.X[:, 0], traj.X[:, 1], **kwargs)
