@@ -192,7 +192,8 @@ class BubblyWorldBase(WorldBase):
         return np.hstack([obs.as_vector() for obs in self.obstacles])
 
     def get_grid(self) -> Grid2d:
-        return Grid2d(np.zeros(2), np.ones(2), (112, 112))
+        # return Grid2d(np.zeros(2), np.ones(2), (112, 112))
+        return Grid2d(np.zeros(2), np.ones(2), (56, 56))
 
     def get_grid_map(self) -> np.ndarray:
         grid = self.get_grid()
@@ -361,7 +362,9 @@ class WithGridSDFMixin:
         grid = world.get_grid()
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
         grid_map = world.get_grid_map()
-        itp = RegularGridInterpolator((xlin, ylin), grid_map, bounds_error=False, fill_value=10.0)
+        itp = RegularGridInterpolator(
+            (xlin, ylin), grid_map, bounds_error=False, fill_value=10.0, method="cubic"
+        )
         vals = grid_map.flatten()
         return Grid2dSDF(vals, world.get_grid(), itp)
 
