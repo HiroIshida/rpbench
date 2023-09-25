@@ -50,6 +50,10 @@ class DoubleIntegratorPlanningResult:
     time_elapsed: Optional[float]
     n_call: int
 
+    @classmethod
+    def abnormal(cls) -> "DoubleIntegratorPlanningResult":
+        return cls(None, None, -1)
+
 
 @dataclass
 class DoubleIntegratorOptimizationSolver(
@@ -169,6 +173,10 @@ class BubblyWorldBase(WorldBase):
         r_min = meta_param.circle_r_min
         r_max = meta_param.circle_r_max
 
+        if n_obs == 0:
+            dummy_circle = CircleObstacle(np.ones(2) * 0.5, 0.0)
+            return cls([dummy_circle])
+
         obstacles = []
         start_pos = np.ones(2) * 0.1
         standard_goal_pos = np.ones(2) * 0.95
@@ -235,10 +243,24 @@ class BubblyWorldBase(WorldBase):
 
 
 @dataclass
+class BubblyWorldEmpty(BubblyWorldBase):
+    @classmethod
+    def get_meta_parameter(cls) -> BubblyMetaParameter:
+        return BubblyMetaParameter(0, np.inf, np.inf)
+
+
+@dataclass
 class BubblyWorldSimple(BubblyWorldBase):
     @classmethod
     def get_meta_parameter(cls) -> BubblyMetaParameter:
         return BubblyMetaParameter(10, 0.05, 0.2)
+
+
+@dataclass
+class BubblyWorldModerate(BubblyWorldBase):
+    @classmethod
+    def get_meta_parameter(cls) -> BubblyMetaParameter:
+        return BubblyMetaParameter(20, 0.04, 0.16)
 
 
 @dataclass
@@ -308,7 +330,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
             x = state.to_vector()[:2]
             return problem.sdf(np.expand_dims(x, axis=0))[0] > 0.0
 
-        N = 1000
+        N = 3000
         ts = time.time()
         fmt = FastMarchingTree(s_start, s_goal, is_obstacle_free, bbox, problem.dt, 1.0, N)
         is_solved = fmt.solve(N)
@@ -369,10 +391,22 @@ class WithGridSDFMixin:
         return Grid2dSDF(vals, world.get_grid(), itp)
 
 
+class EmptyWorldProviderMixin:
+    @staticmethod
+    def get_world_type() -> Type[BubblyWorldEmpty]:
+        return BubblyWorldEmpty
+
+
 class SimpleWorldProviderMixin:
     @staticmethod
     def get_world_type() -> Type[BubblyWorldSimple]:
         return BubblyWorldSimple
+
+
+class ModerateWorldProviderMixin:
+    @staticmethod
+    def get_world_type() -> Type[BubblyWorldModerate]:
+        return BubblyWorldModerate
 
 
 class ComplexWorldProviderMixin:
@@ -381,8 +415,8 @@ class ComplexWorldProviderMixin:
         return BubblyWorldComplex
 
 
-class BubblySimplePointConnectTask(
-    SimpleWorldProviderMixin, WithoutGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldSimple]
+class BubblyEmptyMeshPointConnectTask(
+    EmptyWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldEmpty]
 ):
     ...
 
@@ -393,14 +427,14 @@ class BubblySimpleMeshPointConnectTask(
     ...
 
 
-class BubblyComplexPointConnectTask(
-    ComplexWorldProviderMixin, WithoutGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
+class BubblyComplexMeshPointConnectTask(
+    ComplexWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
 ):
     ...
 
 
-class BubblyComplexMeshPointConnectTask(
-    ComplexWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
+class BubblyModerateMeshPointConnectTask(
+    ModerateWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldModerate]
 ):
     ...
 
