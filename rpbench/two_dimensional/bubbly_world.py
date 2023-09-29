@@ -347,9 +347,8 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
 
     def export_problems(self) -> List[Problem]:
         if self.cache is None:
-            sdf = self.world.get_exact_sdf()
-        else:
-            sdf = self.cache
+            self.cache = self.create_cache(self.world, None)
+        sdf = self.cache
 
         tbound = TrajectoryBound(
             np.ones(2) * 0.0,
@@ -370,14 +369,6 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
         return [self.world.export_intrinsic_description()] * self.n_inner_task
 
-
-class WithoutGridSDFMixin:
-    @staticmethod
-    def create_cache(world: BubblyWorldBase, robot_model: None) -> None:
-        return None
-
-
-class WithGridSDFMixin:
     @staticmethod
     def create_cache(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
         # TODO: redundant implementation with world.get_grid_map()
@@ -416,25 +407,25 @@ class ComplexWorldProviderMixin:
 
 
 class BubblyEmptyMeshPointConnectTask(
-    EmptyWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldEmpty]
+    EmptyWorldProviderMixin, BubblyPointConnectTaskBase[BubblyWorldEmpty]
 ):
     ...
 
 
 class BubblySimpleMeshPointConnectTask(
-    SimpleWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldSimple]
+    SimpleWorldProviderMixin, BubblyPointConnectTaskBase[BubblyWorldSimple]
 ):
     ...
 
 
 class BubblyComplexMeshPointConnectTask(
-    ComplexWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
+    ComplexWorldProviderMixin, BubblyPointConnectTaskBase[BubblyWorldComplex]
 ):
     ...
 
 
 class BubblyModerateMeshPointConnectTask(
-    ModerateWorldProviderMixin, WithGridSDFMixin, BubblyPointConnectTaskBase[BubblyWorldModerate]
+    ModerateWorldProviderMixin, BubblyPointConnectTaskBase[BubblyWorldModerate]
 ):
     ...
 
