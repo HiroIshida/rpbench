@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from skrobot.coordinates import CascadedCoords
+from skrobot.coordinates import CascadedCoords, Coordinates
+from skrobot.model.primitives import Axis
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
@@ -23,14 +24,14 @@ class FridgeParameter:
     upper_H: float = 0.65
     container_w: float = 0.48
     container_h: float = 0.62
-    container_d: float = 0.45
+    container_d: float = 0.49
     panel_d: float = 0.29
     panel_t: float = 0.01
-    panel_hights: Tuple[float, ...] = (0.14, 0.285, 0.48)
+    panel_hights: Tuple[float, ...] = (0.12, 0.26, 0.46)
     door_D = 0.05
     lower_H = 0.81
     joint_x = -0.035
-    joint_y = -0.015
+    joint_y = +0.015
     t_bump = 0.02
     d_bump = 0.06
 
@@ -50,6 +51,7 @@ class FridgeModel(CascadedCoords):
     param: FridgeParameter
     links: List[BoxSkeleton]
     regions: List[Region]
+    joint_angle: float
 
     def __init__(self, joint_angle: float = 1.3, param: Optional[FridgeParameter] = None):
 
@@ -154,6 +156,7 @@ class FridgeModel(CascadedCoords):
         self.param = param
         self.links = links
         self.regions = regions
+        self.joint_angle = joint_angle
 
     def add(self, v: TrimeshSceneViewer) -> None:
         for link in self.links:
@@ -165,7 +168,6 @@ class FridgeModel(CascadedCoords):
 
 def randomize_region(region: Region, n_obstacles: int = 5):
     D, W, H = region.box._extents
-    print(D, W, H)
     obstacle_h_max = H - 0.05
     obstacle_h_min = 0.1
 
@@ -205,12 +207,10 @@ class JskFridgeWorld(WorldBase):
 
     @classmethod
     def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld"]:
-        angle_min = np.pi * 0.4
-        angle_max = np.pi * 0.9
-        angle = 1.8 if standard else np.random.rand() * (angle_max - angle_min) + angle_min
-        fridge = FridgeModel(joint_angle=angle)
+        fridge = FridgeModel(joint_angle=np.pi * 0.9)
         if not standard:
-            randomize_region(fridge.regions[2])
+            n_obstacles = np.random.randint(1, 6)
+            randomize_region(fridge.regions[2], n_obstacles)
         return cls(fridge, None)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -226,6 +226,30 @@ class JskFridgeWorld(WorldBase):
         sdf = UnionSDF(sdfs)
         return sdf
 
+    def sample_pose(self) -> Coordinates:
+        region = self.fridge.regions[2]
+        D, W, H = region.box.extents
+        horizontal_margin = 0.08
+        depth_margin = 0.03
+        width_effective = np.array([D - 2 * depth_margin, W - 2 * horizontal_margin])
+        sdf = self.get_exact_sdf()
+        while True:
+            trans = np.random.rand(2) * width_effective - 0.5 * width_effective
+            trans = np.hstack([trans, -0.5 * H * 0.1])
+            co = region.box.copy_worldcoords()
+            co.translate(trans)
+            if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
+                continue
+            co.rotate(np.random.uniform(-(1.0 / 6.0) * np.pi, (1.0 / 6.0) * np.pi), "z")
+            co_dummy = co.copy_worldcoords()
+            co_dummy.translate([-0.07, 0.0, 0.0])
+            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+                continue
+            co_dummy.translate([-0.07, 0.0, 0.0])
+            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+                continue
+            return co
+
 
 if __name__ == "__main__":
     from skrobot.viewers import TrimeshSceneViewer
@@ -233,6 +257,10 @@ if __name__ == "__main__":
     world = JskFridgeWorld.sample()
     v = TrimeshSceneViewer()
     world.visualize(v)
+    for _ in range(100):
+        pose = world.sample_pose()
+        axis = Axis.from_coords(pose, axis_radius=0.001, axis_length=0.03)
+        v.add(axis)
     v.show()
     import time
 
