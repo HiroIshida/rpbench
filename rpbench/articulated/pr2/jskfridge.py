@@ -104,7 +104,6 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
-        world_dict["vector"] = self.world.export_intrinsic_description()
         world_dict["mesh"] = self.world.heightmap()
 
         desc_dicts = []
