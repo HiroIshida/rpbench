@@ -27,7 +27,7 @@ class FridgeParameter:
     container_d: float = 0.49
     panel_d: float = 0.29
     panel_t: float = 0.01
-    panel_hights: Tuple[float, ...] = (0.12, 0.26, 0.46)
+    panel_hights: Tuple[float, ...] = (0.15, 0.29, 0.46)
     door_D = 0.05
     lower_H = 0.81
     joint_x = -0.035
