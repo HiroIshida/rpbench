@@ -86,127 +86,6 @@ class FridgeModel(CascadedCoords):
         )
         upper_container_co.assoc(back_panel, relative_coords="world")
 
-        links = [side_panel_left, side_panel_right, top_panel, back_panel]
-
-        for panel_h in param.panel_hights:
-            panel = BoxSkeleton(
-                [param.panel_d, param.container_w, param.panel_t],
-                pos=(param.container_d - 0.5 * param.panel_d, 0.0, panel_h),
-            )
-            upper_container_co.assoc(panel, relative_coords="world")
-            links.append(panel)
-
-        # define regions
-        regions: List[Region] = []
-        tmp = np.array([0.0] + list(param.panel_hights) + [param.container_h])
-        lowers, uppers = tmp[:-1], tmp[1:]
-        for lower, upper in zip(lowers, uppers):
-            box = BoxSkeleton(
-                [param.panel_d, param.container_w, upper - lower],
-                pos=(param.container_d - 0.5 * param.panel_d, 0.0, lower + 0.5 * (upper - lower)),
-            )
-            upper_container_co.assoc(box, relative_coords="world")
-            regions.append(Region(box, []))
-
-        # define joint
-        joint = CascadedCoords(pos=(param.joint_x, -0.5 * param.W + param.joint_y, 0.0))
-        upper_container_co.assoc(joint, relative_coords="world")
-
-        # define door
-        door = BoxSkeleton(
-            [param.door_D, param.W, param.upper_H],
-            pos=(-0.5 * param.door_D, 0.0, 0.5 * param.upper_H),
-        )
-        bump_left = BoxSkeleton(
-            [param.d_bump, param.t_bump, param.container_h],
-            pos=(
-                +0.5 * param.d_bump,
-                0.5 * param.container_w - 0.5 * param.t_bump,
-                0.5 * param.container_h,
-            ),
-        )
-        bump_right = BoxSkeleton(
-            [param.d_bump, param.t_bump, param.container_h],
-            pos=(
-                +0.5 * param.d_bump,
-                -0.5 * param.container_w + 0.5 * param.t_bump,
-                0.5 * param.container_h,
-            ),
-        )
-        joint.assoc(door, relative_coords="world")
-        door.assoc(bump_left, relative_coords="world")
-        door.assoc(bump_right, relative_coords="world")
-        joint.rotate(joint_angle, "z")
-
-        links.append(door)
-        links.append(bump_left)
-        links.append(bump_right)
-
-        # define lower box
-        lower_box = BoxSkeleton(
-            [param.D, param.W, param.lower_H], pos=(0.5 * param.D, 0.0, -0.5 * param.lower_H)
-        )
-        lower_box.assoc(upper_container_co, relative_coords="world")
-        links.append(lower_box)
-        lower_box.translate([0, 0, param.lower_H])
-
-        # define base
-        self.assoc(lower_box, relative_coords="world")
-
-        self.param = param
-        self.links = links
-        self.regions = regions
-        self.joint_angle = joint_angle
-
-    def add(self, v: TrimeshSceneViewer) -> None:
-        for link in self.links:
-            v.add(link.to_visualizable((240, 240, 225, 255)))
-        for region in self.regions:
-            for obstacle in region.obstacles:
-                v.add(obstacle.to_visualizable((197, 245, 187, 255)))
-
-
-class FridgeModel2(CascadedCoords):  # delete later
-    param: FridgeParameter
-    links: List[BoxSkeleton]
-    body_links: List[BoxSkeleton]
-    door_links: List[BoxSkeleton]
-    regions: List[Region]
-    joint_angle: float
-
-    def __init__(self, joint_angle: float = 1.3, param: Optional[FridgeParameter] = None):
-
-        super().__init__()
-        if param is None:
-            param = FridgeParameter()
-
-        # define upper container
-        t_side = 0.5 * (param.W - param.container_w)
-        upper_container_co = CascadedCoords()
-        side_panel_left = BoxSkeleton(
-            [param.container_d, t_side, param.upper_H],
-            pos=(0.5 * param.container_d, 0.5 * param.W - 0.5 * t_side, 0.5 * param.upper_H),
-        )
-        side_panel_right = BoxSkeleton(
-            [param.container_d, t_side, param.upper_H],
-            pos=(0.5 * param.container_d, -0.5 * param.W + 0.5 * t_side, 0.5 * param.upper_H),
-        )
-        upper_container_co.assoc(side_panel_left, relative_coords="world")
-        upper_container_co.assoc(side_panel_right, relative_coords="world")
-
-        t_top = param.upper_H - param.container_h
-        top_panel = BoxSkeleton(
-            [param.container_d, param.container_w, t_top],
-            pos=(0.5 * param.container_d, 0.0, param.upper_H - 0.5 * t_top),
-        )
-        upper_container_co.assoc(top_panel, relative_coords="world")
-
-        t_back = param.D - param.container_d
-        back_panel = BoxSkeleton(
-            [t_back, param.W, param.upper_H], pos=(param.D - 0.5 * t_back, 0.0, 0.5 * param.upper_H)
-        )
-        upper_container_co.assoc(back_panel, relative_coords="world")
-
         ditch = BoxSkeleton(
             [0.035, 0.32, 0.08],
             pos=(param.container_d - 0.5 * 0.032, 0.0, param.panel_hights[0] + 0.5 * 0.08),
@@ -275,6 +154,13 @@ class FridgeModel2(CascadedCoords):  # delete later
         body_links.append(lower_box)
         lower_box.translate([0, 0, param.lower_H])
 
+        # define side shelf
+        side_shelf = BoxSkeleton(
+            [1.0, 1.0, 1.13], pos=(0.5 - param.door_D, 0.5 * param.W + 0.5 + 0.02, 0.565)
+        )
+        lower_box.assoc(side_shelf, relative_coords="world")
+        body_links.append(side_shelf)
+
         # define base
         self.assoc(lower_box, relative_coords="world")
 
@@ -287,7 +173,7 @@ class FridgeModel2(CascadedCoords):  # delete later
 
     def add(self, v: TrimeshSceneViewer) -> None:
         for link in self.links:
-            v.add(link.to_visualizable((240, 240, 225, 180)))
+            v.add(link.to_visualizable((240, 240, 225, 255)))
         for region in self.regions:
             for obstacle in region.obstacles:
                 v.add(obstacle.to_visualizable((197, 245, 187, 255)))

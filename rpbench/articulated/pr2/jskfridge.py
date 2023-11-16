@@ -46,12 +46,16 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
     @staticmethod
     def get_robot_model() -> RobotModel:
         pr2 = CachedRArmFixedPR2ConstProvider.get_pr2()
-        pr2.r_shoulder_pan_joint.joint_angle(0.0)
-        pr2.r_upper_arm_roll_joint.joint_angle(-0.6)
-        pr2.r_wrist_flex_joint.joint_angle(-0.6)
-        pr2.r_elbow_flex_joint.joint_angle(-2.0)
-        pr2.torso_lift_joint.joint_angle(0.32)
+        # this configuration hide the arm from kinect so that
+        # fridge recognition is easire
+        # also, with this configuration, robot can get closer to the fridge
+        pr2.r_shoulder_pan_joint.joint_angle(-2.0)
+        pr2.l_shoulder_pan_joint.joint_angle(+2.0)
+        pr2.r_wrist_flex_joint.joint_angle(-1.5)
+        pr2.l_wrist_flex_joint.joint_angle(-1.5)
 
+        # so that see the inside of the fridge better
+        pr2.head_tilt_joint.joint_angle(0.9)
         return pr2
 
     @classmethod
