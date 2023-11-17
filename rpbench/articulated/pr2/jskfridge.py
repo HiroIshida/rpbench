@@ -152,7 +152,7 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
             yield problem
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        solcon = OMPLSolverConfig(n_max_call=40000, n_max_satisfaction_trial=40, simplify=True)
+        solcon = OMPLSolverConfig(n_max_call=40000, n_max_satisfaction_trial=100, simplify=True)
 
         ompl_solver = OMPLSolver.init(solcon)
         ompl_solver.setup(problem)
