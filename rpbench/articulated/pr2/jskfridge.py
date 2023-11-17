@@ -49,10 +49,20 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
         # this configuration hide the arm from kinect so that
         # fridge recognition is easire
         # also, with this configuration, robot can get closer to the fridge
-        pr2.r_shoulder_pan_joint.joint_angle(-2.0)
-        pr2.l_shoulder_pan_joint.joint_angle(+2.0)
-        pr2.r_wrist_flex_joint.joint_angle(-1.5)
-        pr2.l_wrist_flex_joint.joint_angle(-1.5)
+        pr2.r_upper_arm_roll_joint.joint_angle(-1.4842047205551403)
+        pr2.r_shoulder_pan_joint.joint_angle(-0.10780237973830653)
+        pr2.r_shoulder_lift_joint.joint_angle(1.1548898902227176)
+        pr2.r_forearm_roll_joint.joint_angle(0.47479469282041364)
+        pr2.r_elbow_flex_joint.joint_angle(-1.976093417223845)
+        pr2.r_wrist_flex_joint.joint_angle(-1.254902952073706)
+        pr2.r_wrist_roll_joint.joint_angle(6.250323641384378)
+        pr2.l_upper_arm_roll_joint.joint_angle(2.124180832597487)
+        pr2.l_shoulder_pan_joint.joint_angle(1.6304653141178242)
+        pr2.l_shoulder_lift_joint.joint_angle(1.2242577271684127)
+        pr2.l_forearm_roll_joint.joint_angle(2.913237145917637)
+        pr2.l_elbow_flex_joint.joint_angle(-1.9041423736661933)
+        pr2.l_wrist_flex_joint.joint_angle(-1.5152339138194952)
+        pr2.l_wrist_roll_joint.joint_angle(-0.5311941899356818)
 
         # so that see the inside of the fridge better
         pr2.head_tilt_joint.joint_angle(0.9)
