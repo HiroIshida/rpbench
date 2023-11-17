@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords, Coordinates
-from skrobot.model.primitives import Axis
+from skrobot.model.primitives import Axis, Link
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
@@ -51,7 +51,11 @@ class FridgeModel(CascadedCoords):
     param: FridgeParameter
     links: List[BoxSkeleton]
     regions: List[Region]
+    joint: CascadedCoords
+    shelf: BoxSkeleton
+    lower_box: BoxSkeleton
     joint_angle: float
+    _visualizable_list: Optional[List[Link]]
 
     def __init__(self, joint_angle: float = 1.3, param: Optional[FridgeParameter] = None):
 
@@ -165,18 +169,41 @@ class FridgeModel(CascadedCoords):
         self.assoc(lower_box, relative_coords="world")
 
         self.param = param
+        self.joint = joint
         self.links = body_links + door_links
         self.body_links = body_links
         self.door_links = door_links
+        self.shelf = side_shelf
+        self.lower_box = lower_box
         self.regions = regions
+        self.joint_angle = joint_angle
+        self._visualizable_list = None
+
+    def reset_joint_angle(self, joint_angle: float) -> None:
+        # adhoc. maybe cumurate error
+        diff = joint_angle - self.joint_angle
+        self.joint.rotate(diff, "z")
         self.joint_angle = joint_angle
 
     def add(self, v: TrimeshSceneViewer) -> None:
+        assert self._visualizable_list is None, "already added"
+        visualizable_list = []
         for link in self.links:
-            v.add(link.to_visualizable((240, 240, 225, 255)))
+            visualizable = link.to_visualizable((240, 240, 225, 150))
+            v.add(visualizable)
+            visualizable_list.append(visualizable)
         for region in self.regions:
             for obstacle in region.obstacles:
-                v.add(obstacle.to_visualizable((197, 245, 187, 255)))
+                visualizable = obstacle.to_visualizable((197, 245, 187, 255))
+                v.add(visualizable)
+                visualizable_list.append(visualizable)
+        self._visualizable_list = visualizable_list
+
+    def delete_from(self, v: TrimeshSceneViewer) -> None:
+        assert self._visualizable_list is not None, "not added"
+        print(self._visualizable_list)
+        for visualizable in self._visualizable_list:
+            v.delete(visualizable)
 
 
 def randomize_region(region: Region, n_obstacles: int = 5):
