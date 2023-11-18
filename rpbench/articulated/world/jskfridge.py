@@ -27,7 +27,8 @@ class FridgeParameter:
     container_d: float = 0.49
     panel_d: float = 0.29
     panel_t: float = 0.01
-    panel_hights: Tuple[float, ...] = (0.15, 0.29, 0.46)
+    # panel_hights: Tuple[float, ...] = (0.15, 0.29, 0.46)  # default panel
+    panel_hights: Tuple[float, ...] = (0.15, 0.34, 0.46)  # slide up to upper slot
     door_D = 0.05
     lower_H = 0.81
     joint_x = -0.035
@@ -267,7 +268,7 @@ class JskFridgeWorld(WorldBase):
         return sdf
 
     def sample_pose(self) -> Coordinates:
-        region = self.fridge.regions[2]
+        region = self.fridge.regions[1]
         D, W, H = region.box.extents
         horizontal_margin = 0.08
         depth_margin = 0.03
@@ -275,7 +276,7 @@ class JskFridgeWorld(WorldBase):
         sdf = self.get_exact_sdf()
         while True:
             trans = np.random.rand(2) * width_effective - 0.5 * width_effective
-            trans = np.hstack([trans, -0.5 * H * 0.1])
+            trans = np.hstack([trans, -0.5 * H + 0.08])
             co = region.box.copy_worldcoords()
             co.translate(trans)
             if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
