@@ -11,7 +11,7 @@ from typing import (
 )
 
 import numpy as np
-from skmp.constraint import CollFreeConst
+from skmp.constraint import CollFreeConst, IneqCompositeConst
 from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 from skmp.visualization.solution_visualizer import (
@@ -67,7 +67,7 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
 
         # so that see the inside of the fridge better
         pr2.head_pan_joint.joint_angle(-0.026808257310632896)
-        pr2.head_tilt_joint.joint_angle(0.7719940347421318)
+        pr2.head_tilt_joint.joint_angle(0.82)
         return pr2
 
     @classmethod
@@ -132,14 +132,16 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
         return DescriptionTable(world_dict, desc_dicts)
 
     def export_problems(self) -> Iterator[Problem]:
+        pr2 = self.get_robot_model()
+
         provider = self.config_provider
         q_start = provider.get_start_config()
         box_const = provider.get_box_const()
 
         sdf = self.world.get_exact_sdf()
-        ineq_const = provider.get_collfree_const(sdf)
-
-        pr2 = self.get_robot_model()
+        collfree_const = provider.get_collfree_const(sdf)
+        selfcollfree_const = provider.get_config().get_pairwise_selcol_consts(pr2)
+        ineq_const = IneqCompositeConst([collfree_const, selfcollfree_const])
 
         for target_pose, base_pose in self.descriptions:
             set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
