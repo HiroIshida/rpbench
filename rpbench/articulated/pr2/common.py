@@ -111,6 +111,12 @@ class CachedRArmPR2ConstProvider(CachedPR2ConstProvider):
         return PR2Config(base_type=BaseType.PLANER)
 
 
+class CachedLArmFixedPR2ConstProvider(CachedPR2ConstProvider):
+    @classmethod
+    def get_config(cls) -> PR2Config:
+        return PR2Config(base_type=BaseType.FIXED, control_arm="larm")
+
+
 class CachedDualArmPR2ConstProvider(CachedPR2ConstProvider):
     @classmethod
     def get_config(cls) -> PR2Config:
