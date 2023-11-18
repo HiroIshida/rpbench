@@ -251,7 +251,7 @@ class JskFridgeWorld(WorldBase):
         fridge = FridgeModel(joint_angle=np.pi * 0.9)
         if not standard:
             n_obstacles = np.random.randint(1, 6)
-            randomize_region(fridge.regions[2], n_obstacles)
+            randomize_region(fridge.regions[1], n_obstacles)
         return cls(fridge, None)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -276,7 +276,7 @@ class JskFridgeWorld(WorldBase):
         sdf = self.get_exact_sdf()
         while True:
             trans = np.random.rand(2) * width_effective - 0.5 * width_effective
-            trans = np.hstack([trans, -0.5 * H + 0.08])
+            trans = np.hstack([trans, -0.5 * H + 0.09])
             co = region.box.copy_worldcoords()
             co.translate(trans)
             if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:

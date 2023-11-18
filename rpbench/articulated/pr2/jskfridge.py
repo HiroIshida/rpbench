@@ -24,7 +24,7 @@ from skrobot.model.primitives import Axis
 from skrobot.model.robot_model import RobotModel
 from tinyfk import BaseType
 
-from rpbench.articulated.pr2.common import CachedRArmFixedPR2ConstProvider
+from rpbench.articulated.pr2.common import CachedLArmFixedPR2ConstProvider
 from rpbench.articulated.world.jskfridge import JskFridgeWorld
 from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
 from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
@@ -36,8 +36,8 @@ DescriptionT = TypeVar("DescriptionT")
 class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarray], RobotModel]):
 
     config_provider: ClassVar[
-        Type[CachedRArmFixedPR2ConstProvider]
-    ] = CachedRArmFixedPR2ConstProvider
+        Type[CachedLArmFixedPR2ConstProvider]
+    ] = CachedLArmFixedPR2ConstProvider
 
     @staticmethod
     def get_world_type() -> Type[JskFridgeWorld]:
@@ -45,7 +45,7 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
 
     @staticmethod
     def get_robot_model() -> RobotModel:
-        pr2 = CachedRArmFixedPR2ConstProvider.get_pr2()
+        pr2 = CachedLArmFixedPR2ConstProvider.get_pr2()
         # this configuration hide the arm from kinect so that
         # fridge recognition is easire
         # also, with this configuration, robot can get closer to the fridge
@@ -95,15 +95,15 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
 
             base_pos_list: List[np.ndarray] = []
             pr2 = cls.get_robot_model()
-            colkin = CachedRArmFixedPR2ConstProvider.get_colkin()
+            colkin = CachedLArmFixedPR2ConstProvider.get_colkin()
             sdf = world.get_exact_sdf()
             collfree_const = CollFreeConst(colkin, sdf, pr2)
 
             while len(base_pos_list) < n_sample:
                 base_pos = np.array(
                     [
-                        np.random.uniform(-0.6, -0.3),
-                        np.random.uniform(-0.1, 0.2),
+                        np.random.uniform(-0.6, -0.4),
+                        np.random.uniform(-0.45, -0.1),
                         np.random.uniform(-0.1 * np.pi, 0.1 * np.pi),
                     ]
                 )
