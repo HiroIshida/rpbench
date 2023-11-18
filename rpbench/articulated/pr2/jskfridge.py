@@ -24,7 +24,7 @@ from skrobot.model.primitives import Axis
 from skrobot.model.robot_model import RobotModel
 from tinyfk import BaseType
 
-from rpbench.articulated.pr2.common import CachedRArmFixedPR2ConstProvider
+from rpbench.articulated.pr2.common import CachedLArmFixedPR2ConstProvider
 from rpbench.articulated.world.jskfridge import JskFridgeWorld
 from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
 from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
@@ -36,8 +36,8 @@ DescriptionT = TypeVar("DescriptionT")
 class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarray], RobotModel]):
 
     config_provider: ClassVar[
-        Type[CachedRArmFixedPR2ConstProvider]
-    ] = CachedRArmFixedPR2ConstProvider
+        Type[CachedLArmFixedPR2ConstProvider]
+    ] = CachedLArmFixedPR2ConstProvider
 
     @staticmethod
     def get_world_type() -> Type[JskFridgeWorld]:
@@ -45,27 +45,29 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
 
     @staticmethod
     def get_robot_model() -> RobotModel:
-        pr2 = CachedRArmFixedPR2ConstProvider.get_pr2()
+        pr2 = CachedLArmFixedPR2ConstProvider.get_pr2()
         # this configuration hide the arm from kinect so that
         # fridge recognition is easire
         # also, with this configuration, robot can get closer to the fridge
-        pr2.r_upper_arm_roll_joint.joint_angle(-1.4842047205551403)
-        pr2.r_shoulder_pan_joint.joint_angle(-0.10780237973830653)
-        pr2.r_shoulder_lift_joint.joint_angle(1.1548898902227176)
-        pr2.r_forearm_roll_joint.joint_angle(0.47479469282041364)
-        pr2.r_elbow_flex_joint.joint_angle(-1.976093417223845)
-        pr2.r_wrist_flex_joint.joint_angle(-1.254902952073706)
-        pr2.r_wrist_roll_joint.joint_angle(6.250323641384378)
-        pr2.l_upper_arm_roll_joint.joint_angle(2.124180832597487)
-        pr2.l_shoulder_pan_joint.joint_angle(1.6304653141178242)
-        pr2.l_shoulder_lift_joint.joint_angle(1.2242577271684127)
-        pr2.l_forearm_roll_joint.joint_angle(2.913237145917637)
-        pr2.l_elbow_flex_joint.joint_angle(-1.9041423736661933)
-        pr2.l_wrist_flex_joint.joint_angle(-1.5152339138194952)
-        pr2.l_wrist_roll_joint.joint_angle(-0.5311941899356818)
+        pr2.torso_lift_joint.joint_angle(0.11444855356985413)
+        pr2.r_upper_arm_roll_joint.joint_angle(-1.9933312942796328)
+        pr2.r_shoulder_pan_joint.joint_angle(-1.9963322165144708)
+        pr2.r_shoulder_lift_joint.joint_angle(1.2966709813458699)
+        pr2.r_forearm_roll_joint.joint_angle(9.692626501089645 - 4 * np.pi)
+        pr2.r_elbow_flex_joint.joint_angle(-1.8554994146413022)
+        pr2.r_wrist_flex_joint.joint_angle(-1.6854605316990736)
+        pr2.r_wrist_roll_joint.joint_angle(3.30539700424134 - 2 * np.pi)
+        pr2.l_upper_arm_roll_joint.joint_angle(1.5329525877715957)
+        pr2.l_shoulder_pan_joint.joint_angle(0.07248416074420472)
+        pr2.l_shoulder_lift_joint.joint_angle(1.148629865912984)
+        pr2.l_forearm_roll_joint.joint_angle(18.428520031103822 - 6 * np.pi)
+        pr2.l_elbow_flex_joint.joint_angle(-1.884887869052174)
+        pr2.l_wrist_flex_joint.joint_angle(-1.2825311163369357)
+        pr2.l_wrist_roll_joint.joint_angle(-3.1761884606289694 + 2 * np.pi)
 
         # so that see the inside of the fridge better
-        pr2.head_tilt_joint.joint_angle(0.9)
+        pr2.head_pan_joint.joint_angle(-0.026808257310632896)
+        pr2.head_tilt_joint.joint_angle(0.7719940347421318)
         return pr2
 
     @classmethod
@@ -93,15 +95,15 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarra
 
             base_pos_list: List[np.ndarray] = []
             pr2 = cls.get_robot_model()
-            colkin = CachedRArmFixedPR2ConstProvider.get_colkin()
+            colkin = CachedLArmFixedPR2ConstProvider.get_colkin()
             sdf = world.get_exact_sdf()
             collfree_const = CollFreeConst(colkin, sdf, pr2)
 
             while len(base_pos_list) < n_sample:
                 base_pos = np.array(
                     [
-                        np.random.uniform(-0.6, -0.3),
-                        np.random.uniform(-0.1, 0.2),
+                        np.random.uniform(-0.6, -0.4),
+                        np.random.uniform(-0.45, -0.1),
                         np.random.uniform(-0.1 * np.pi, 0.1 * np.pi),
                     ]
                 )
