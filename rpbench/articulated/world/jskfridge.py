@@ -202,7 +202,6 @@ class FridgeModel(CascadedCoords):
 
     def delete_from(self, v: TrimeshSceneViewer) -> None:
         assert self._visualizable_list is not None, "not added"
-        print(self._visualizable_list)
         for visualizable in self._visualizable_list:
             v.delete(visualizable)
 
