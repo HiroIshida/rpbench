@@ -62,6 +62,7 @@ class CachedPR2ConstProvider(ABC):
     def get_pr2(cls) -> PR2:
         pr2 = PR2(use_tight_joint_limit=False)
         pr2.reset_manip_pose()
+        pr2.newcoords(Coordinates())
         return pr2
 
     @classmethod
