@@ -33,7 +33,7 @@ from rpbench.utils import skcoords_to_pose_vec, temp_seed
 DescriptionT = TypeVar("DescriptionT")
 
 
-class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[np.ndarray, np.ndarray], RobotModel]):
+class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]):
 
     config_provider: ClassVar[
         Type[CachedLArmFixedPR2ConstProvider]
