@@ -95,8 +95,8 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarr
 
             base_pos_list: List[np.ndarray] = []
             pr2 = cls.get_robot_model()
-            colkin = CachedLArmFixedPR2ConstProvider.get_colkin()
             sdf = world.get_exact_sdf()
+            colkin = CachedLArmFixedPR2ConstProvider.get_whole_body_colkin()
             collfree_const = CollFreeConst(colkin, sdf, pr2)
 
             while len(base_pos_list) < n_sample:
