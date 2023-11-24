@@ -273,7 +273,9 @@ class JskFridgeWorld(WorldBase):
         depth_margin = 0.03
         width_effective = np.array([D - 2 * depth_margin, W - 2 * horizontal_margin])
         sdf = self.get_exact_sdf()
-        while True:
+
+        n_max_trial = 100
+        for _ in range(n_max_trial):
             trans = np.random.rand(2) * width_effective - 0.5 * width_effective
             trans = np.hstack([trans, -0.5 * H + 0.09])
             co = region.box.copy_worldcoords()
@@ -289,6 +291,7 @@ class JskFridgeWorld(WorldBase):
             if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
                 continue
             return co
+        return co  # invalid one but no choice
 
 
 if __name__ == "__main__":
