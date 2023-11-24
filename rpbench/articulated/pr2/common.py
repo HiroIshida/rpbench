@@ -79,6 +79,12 @@ class CachedPR2ConstProvider(ABC):
 
     @classmethod
     @lru_cache
+    def get_whole_body_colkin(cls) -> ArticulatedCollisionKinematicsMap:
+        config = cls.get_config()
+        return config.get_collision_kin(whole_body=True)
+
+    @classmethod
+    @lru_cache
     def get_dof(cls) -> int:
         config = cls.get_config()
         names = config._get_control_joint_names()
@@ -92,11 +98,18 @@ class CachedPR2ConstProvider(ABC):
         return dof
 
     @classmethod
-    def get_collfree_const(cls, sdf: Callable[[np.ndarray], np.ndarray]) -> CollFreeConst:
+    def get_collfree_const(
+        cls, sdf: Callable[[np.ndarray], np.ndarray], whole_body: bool = False
+    ) -> CollFreeConst:
         # NOTE: for pr2 planning, using closest feature speeds up the planning and also
         # success rate will be improved.
         # (But is not the case for humanoid from my experience))
-        colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2(), only_closest_feature=True)
+        if whole_body:
+            colfree = CollFreeConst(
+                cls.get_whole_body_colkin(), sdf, cls.get_pr2(), only_closest_feature=True
+            )
+        else:
+            colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2(), only_closest_feature=True)
         return colfree
 
 
