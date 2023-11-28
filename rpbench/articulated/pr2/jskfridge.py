@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import (
     Any,
     ClassVar,
@@ -33,7 +34,9 @@ from rpbench.utils import skcoords_to_pose_vec, temp_seed
 DescriptionT = TypeVar("DescriptionT")
 
 
-class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]):
+class JskFridgeReachingTaskBase(
+    TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
+):
 
     config_provider: ClassVar[
         Type[CachedLArmFixedPR2ConstProvider]
@@ -78,6 +81,11 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarr
     def create_cache(world: TabletopClutteredFridgeWorld, robot_model: RobotModel) -> None:
         return None  # do not crete cache
 
+    @staticmethod
+    @abstractmethod
+    def sample_pose(world: TabletopClutteredFridgeWorld) -> Coordinates:
+        ...
+
     @classmethod
     def sample_descriptions(
         cls, world: JskFridgeWorld, n_sample: int, standard: bool = False
@@ -89,7 +97,7 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarr
         with temp_seed(0, use_tempseed=standard):
             pose_list: List[Coordinates] = []
             while len(pose_list) < n_sample:
-                pose = world.sample_pose()
+                pose = cls.sample_pose(world)
                 if pose is not None:
                     pose_list.append(pose)
 
@@ -217,3 +225,15 @@ class JskFridgeReachingTask(TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarr
 
         obj.viewer.camera_transform = t
         return obj
+
+
+class JskFridgeReachingTask(JskFridgeReachingTaskBase):
+    @staticmethod
+    def sample_pose(world: JskFridgeWorld) -> Coordinates:
+        return world.sample_pose()
+
+
+class JskFridgeVerticalReachingTask(JskFridgeReachingTaskBase):
+    @staticmethod
+    def sample_pose(world: JskFridgeWorld) -> Coordinates:
+        return world.sample_pose_vertical()

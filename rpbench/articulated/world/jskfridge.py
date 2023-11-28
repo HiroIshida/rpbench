@@ -293,6 +293,37 @@ class JskFridgeWorld(WorldBase):
             return co
         return co  # invalid one but no choice
 
+    def sample_pose_vertical(self) -> Coordinates:
+        # NOTE: unlike sample pose height is also sampled
+        region = self.fridge.regions[1]
+        D, W, H = region.box.extents
+        horizontal_margin = 0.08
+        depth_margin = 0.03
+        height_margin = 0.06
+        width_effective = np.array(
+            [D - 2 * depth_margin, W - 2 * horizontal_margin, H - 2 * height_margin]
+        )
+        sdf = self.get_exact_sdf()
+
+        n_max_trial = 100
+        for _ in range(n_max_trial):
+            trans = np.random.rand(3) * width_effective - 0.5 * width_effective
+            co = region.box.copy_worldcoords()
+            co.translate(trans)
+            if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
+                continue
+            co.rotate(np.random.uniform(-(1.0 / 6.0) * np.pi, (1.0 / 6.0) * np.pi), "z")
+            co.rotate(0.5 * np.pi, "x")
+            co_dummy = co.copy_worldcoords()
+            co_dummy.translate([-0.07, 0.0, 0.0])
+            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+                continue
+            co_dummy.translate([-0.07, 0.0, 0.0])
+            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+                continue
+            return co
+        return co  # invalid one but no choice
+
 
 if __name__ == "__main__":
     from skrobot.viewers import TrimeshSceneViewer
@@ -301,7 +332,7 @@ if __name__ == "__main__":
     v = TrimeshSceneViewer()
     world.visualize(v)
     for _ in range(100):
-        pose = world.sample_pose()
+        pose = world.sample_pose_for_cup_grasp()
         axis = Axis.from_coords(pose, axis_radius=0.001, axis_length=0.03)
         v.add(axis)
     v.show()
