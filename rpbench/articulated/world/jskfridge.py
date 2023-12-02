@@ -25,12 +25,12 @@ class FridgeParameter:
     container_w: float = 0.48
     container_h: float = 0.62
     container_d: float = 0.49
-    panel_d: float = 0.29
+    panel_d: float = 0.32
     panel_t: float = 0.01
-    # panel_hights: Tuple[float, ...] = (0.15, 0.29, 0.46)  # default panel
-    panel_hights: Tuple[float, ...] = (0.15, 0.34, 0.46)  # slide up to upper slot
+    # panel_hights: Tuple[float, ...] = (0.15, 0.34, 0.46)  # uncalibrated
+    panel_hights: Tuple[float, ...] = (0.15, 0.34, 0.48)
     door_D = 0.05
-    lower_H = 0.81
+    lower_H = 0.81 + 0.02  # 0.02 if use calibrated
     joint_x = -0.035
     joint_y = +0.015
     t_bump = 0.02
