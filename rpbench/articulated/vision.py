@@ -187,6 +187,7 @@ class LocatedHeightmap:
         conf: HeightmapConfig = HeightmapConfig(),
         raymarching_conf: RayMarchingConfig = RayMarchingConfig(),
         create_debug_points: bool = False,
+        height_lower_cutoff: float = 0.0,
     ) -> "LocatedHeightmap":
         # although height map can be reated by rule-based method. But because
         # python is slow in loops thus, we resort to raymarching which can
@@ -221,6 +222,7 @@ class LocatedHeightmap:
             debug_points = None
 
         heightmap = dists_from_ground.reshape((conf.resol_x, conf.resol_y))
+        heightmap[heightmap < height_lower_cutoff] = height_lower_cutoff
         return cls(heightmap, target_region, conf, debug_points)
 
     @property
