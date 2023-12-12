@@ -55,7 +55,7 @@ class JskFridgeReachingTaskBase(
         pr2.torso_lift_joint.joint_angle(0.11444855356985413)
         pr2.r_upper_arm_roll_joint.joint_angle(-1.9933312942796328)
         pr2.r_shoulder_pan_joint.joint_angle(-1.9963322165144708)
-        pr2.r_shoulder_lift_joint.joint_angle(1.2966709813458699)
+        pr2.r_shoulder_lift_joint.joint_angle(1.1966709813458699)
         pr2.r_forearm_roll_joint.joint_angle(9.692626501089645 - 4 * np.pi)
         pr2.r_elbow_flex_joint.joint_angle(-1.8554994146413022)
         pr2.r_wrist_flex_joint.joint_angle(-1.6854605316990736)

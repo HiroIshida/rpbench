@@ -208,8 +208,8 @@ class FridgeModel(CascadedCoords):
 
 def randomize_region(region: Region, n_obstacles: int = 5):
     D, W, H = region.box._extents
-    obstacle_h_max = H - 0.05
-    obstacle_h_min = 0.1
+    obstacle_h_max = H - 0.03
+    obstacle_h_min = 0.05
 
     # determine pos-r pairs
     pairs = []
