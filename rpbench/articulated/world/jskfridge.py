@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import ClassVar, List, Optional, Tuple, Union
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords, Coordinates
@@ -236,13 +236,14 @@ def randomize_region(region: Region, n_obstacles: int = 5):
 class JskFridgeWorld(WorldBase):
     fridge: FridgeModel
     _heightmap: Optional[np.ndarray] = None  # lazy
+    attention_region_index: ClassVar[int] = 1
 
     def export_intrinsic_description(self) -> np.ndarray:
         raise NotImplementedError
 
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
-            self._heightmap = self.fridge.regions[2].create_heightmap()
+            self._heightmap = self.fridge.regions[self.attention_region_index].create_heightmap()
         return self._heightmap
 
     @classmethod
@@ -250,7 +251,7 @@ class JskFridgeWorld(WorldBase):
         fridge = FridgeModel(joint_angle=np.pi * 0.9)
         if not standard:
             n_obstacles = np.random.randint(1, 6)
-            randomize_region(fridge.regions[1], n_obstacles)
+            randomize_region(fridge.regions[cls.attention_region_index], n_obstacles)
         return cls(fridge, None)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -267,7 +268,7 @@ class JskFridgeWorld(WorldBase):
         return sdf
 
     def sample_pose(self) -> Coordinates:
-        region = self.fridge.regions[1]
+        region = self.fridge.regions[self.attention_region_index]
         D, W, H = region.box.extents
         horizontal_margin = 0.08
         depth_margin = 0.03
@@ -295,7 +296,7 @@ class JskFridgeWorld(WorldBase):
 
     def sample_pose_vertical(self) -> Coordinates:
         # NOTE: unlike sample pose height is also sampled
-        region = self.fridge.regions[1]
+        region = self.fridge.regions[self.attention_region_index]
         D, W, H = region.box.extents
         horizontal_margin = 0.08
         depth_margin = 0.03
@@ -326,16 +327,18 @@ class JskFridgeWorld(WorldBase):
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     from skrobot.viewers import TrimeshSceneViewer
 
     world = JskFridgeWorld.sample()
     v = TrimeshSceneViewer()
     world.visualize(v)
     for _ in range(100):
-        pose = world.sample_pose_for_cup_grasp()
+        pose = world.sample_pose_vertical()
         axis = Axis.from_coords(pose, axis_radius=0.001, axis_length=0.03)
         v.add(axis)
     v.show()
-    import time
-
-    time.sleep(1000)
+    hmap = world.heightmap()
+    fig, ax = plt.subplots()
+    ax.imshow(hmap)
+    plt.show()
