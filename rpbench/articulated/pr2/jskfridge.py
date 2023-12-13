@@ -60,13 +60,14 @@ class JskFridgeReachingTaskBase(
         pr2.r_elbow_flex_joint.joint_angle(-1.8554994146413022)
         pr2.r_wrist_flex_joint.joint_angle(-1.6854605316990736)
         pr2.r_wrist_roll_joint.joint_angle(3.30539700424134 - 2 * np.pi)
-        pr2.l_upper_arm_roll_joint.joint_angle(1.5329525877715957)
-        pr2.l_shoulder_pan_joint.joint_angle(0.07248416074420472)
-        pr2.l_shoulder_lift_joint.joint_angle(1.148629865912984)
-        pr2.l_forearm_roll_joint.joint_angle(18.428520031103822 - 6 * np.pi)
-        pr2.l_elbow_flex_joint.joint_angle(-1.884887869052174)
-        pr2.l_wrist_flex_joint.joint_angle(-1.2825311163369357)
-        pr2.l_wrist_roll_joint.joint_angle(-3.1761884606289694 + 2 * np.pi)
+
+        pr2.l_upper_arm_roll_joint.joint_angle(0.6)
+        pr2.l_shoulder_pan_joint.joint_angle(+1.5)
+        pr2.l_shoulder_lift_joint.joint_angle(-0.3)
+        pr2.l_forearm_roll_joint.joint_angle(0.0)
+        pr2.l_elbow_flex_joint.joint_angle(-1.8554994146413022)
+        pr2.l_wrist_flex_joint.joint_angle(-1.6854605316990736)
+        pr2.l_wrist_roll_joint.joint_angle(-3.30539700424134 + 2 * np.pi)
 
         # so that see the inside of the fridge better
         pr2.head_pan_joint.joint_angle(-0.026808257310632896)
