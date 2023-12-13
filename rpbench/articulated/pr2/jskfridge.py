@@ -152,6 +152,28 @@ class JskFridgeReachingTaskBase(
         selfcollfree_const = provider.get_config().get_pairwise_selcol_consts(pr2)
         ineq_const = IneqCompositeConst([collfree_const, selfcollfree_const])
 
+        joint_names = provider.get_config()._get_control_joint_names()
+        assert joint_names == [
+            "l_shoulder_pan_joint",
+            "l_shoulder_lift_joint",
+            "l_upper_arm_roll_joint",
+            "l_elbow_flex_joint",
+            "l_forearm_roll_joint",
+            "l_wrist_flex_joint",
+            "l_wrist_roll_joint",
+        ]
+        motion_step_box = np.array(
+            [
+                0.05,  # l_shoulder_pan_joint
+                0.05,  # l_shoulder_lift_joint
+                0.1,  # l_upper_arm_roll_joint
+                0.1,  # l_elbow_flex_joint
+                0.2,  # l_forearm_roll_joint
+                0.2,  # l_wrist_flex_joint
+                0.5,  # l_wrist_roll_joint
+            ]
+        )
+
         for target_pose, base_pose in self.descriptions:
             set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
             pose_const = provider.get_pose_const([target_pose])
@@ -160,7 +182,7 @@ class JskFridgeReachingTaskBase(
             ineq_const.reflect_skrobot_model(pr2)
 
             problem = Problem(
-                q_start, box_const, pose_const, ineq_const, None, motion_step_box_=0.05
+                q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
             )
             yield problem
 
