@@ -37,8 +37,8 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
         CascadedCoords.__init__(self, pos=pos)
         self._extents = extents
 
-        sdf = BoxSDF(np.zeros(3), extents)
-        self.assoc(sdf.coords, relative_coords="local")
+        sdf = BoxSDF(extents)
+        self.assoc(sdf, relative_coords="local")
         self.sdf = sdf
 
     @property
@@ -66,8 +66,8 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
         CascadedCoords.__init__(self, pos=pos)
         self.radius = radius
         self.height = height
-        sdf = CylinderSDF(np.zeros(3), height, radius)
-        self.assoc(sdf.coords, relative_coords="local")
+        sdf = CylinderSDF(height, radius)
+        self.assoc(sdf, relative_coords="local")
         self.sdf = sdf
 
     def _to_skrobot_primitive(self) -> Cylinder:
