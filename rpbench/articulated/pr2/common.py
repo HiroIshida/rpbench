@@ -3,7 +3,12 @@ from functools import lru_cache
 from typing import Callable, List, Type, TypeVar
 
 import numpy as np
-from skmp.constraint import BoxConst, CollFreeConst, PoseConstraint
+from skmp.constraint import (
+    BoxConst,
+    CollFreeConst,
+    PairWiseSelfCollFreeConst,
+    PoseConstraint,
+)
 from skmp.kinematics import (
     ArticulatedCollisionKinematicsMap,
     ArticulatedEndEffectorKinematicsMap,
@@ -111,6 +116,12 @@ class CachedPR2ConstProvider(ABC):
         else:
             colfree = CollFreeConst(cls.get_colkin(), sdf, cls.get_pr2(), only_closest_feature=True)
         return colfree
+
+    @classmethod
+    @lru_cache
+    def get_self_collision_free_const(cls) -> PairWiseSelfCollFreeConst:
+        selfcollfree_const = cls.get_config().get_pairwise_selcol_consts(cls.get_pr2())
+        return selfcollfree_const
 
 
 class CachedRArmFixedPR2ConstProvider(CachedPR2ConstProvider):

@@ -149,7 +149,7 @@ class JskFridgeReachingTaskBase(
 
         sdf = self.world.get_exact_sdf()
         collfree_const = provider.get_collfree_const(sdf)
-        selfcollfree_const = provider.get_config().get_pairwise_selcol_consts(pr2)
+        selfcollfree_const = provider.get_self_collision_free_const()
         ineq_const = IneqCompositeConst([collfree_const, selfcollfree_const])
 
         joint_names = provider.get_config()._get_control_joint_names()
