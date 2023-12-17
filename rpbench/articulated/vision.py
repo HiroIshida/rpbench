@@ -205,7 +205,7 @@ class LocatedHeightmap:
         dirs = np.tile(np.array([0, 0, -1]), (len(points_wrt_world), 1))
 
         # we must consider "ground" as obstacle
-        ground = copy.deepcopy(target_region)
+        ground = target_region.detach_clone()
         ground.translate([0.0, 0.0, -ground.extents[2]])
 
         union_sdf = UnionSDF([o.sdf for o in objects] + [ground.sdf])

@@ -57,6 +57,11 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
         else:
             return self.transform_vector(points_local)
 
+    def detach_clone(self) -> "BoxSkeleton":
+        b = BoxSkeleton(self.extents)
+        b.newcoords(self.copy_worldcoords())
+        return b
+
 
 class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
     radius: float
