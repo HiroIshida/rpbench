@@ -311,17 +311,21 @@ class JskFridgeWorld(WorldBase):
             trans = np.random.rand(3) * width_effective - 0.5 * width_effective
             co = region.box.copy_worldcoords()
             co.translate(trans)
-            if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
+            if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.02:
                 continue
             co.rotate(np.random.uniform(-(1.0 / 6.0) * np.pi, (1.0 / 6.0) * np.pi), "z")
             co.rotate(0.5 * np.pi, "x")
-            co_dummy = co.copy_worldcoords()
-            co_dummy.translate([-0.07, 0.0, 0.0])
-            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
-                continue
-            co_dummy.translate([-0.07, 0.0, 0.0])
-            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
-                continue
+
+            # NOTE: these conditions are effective to exclude collision poses
+            # but it's reduce the "domain" size, which becomes problematic
+            # to detect infeasible pose.
+            # co_dummy = co.copy_worldcoords()
+            # co_dummy.translate([-0.07, 0.0, 0.0])
+            # if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+            #     continue
+            # co_dummy.translate([-0.07, 0.0, 0.0])
+            # if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+            #     continue
             return co
         return co  # invalid one but no choice
 
