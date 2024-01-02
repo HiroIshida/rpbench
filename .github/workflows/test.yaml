@@ -36,6 +36,13 @@ jobs:
                   git clone git@github.com:iory/scikit-robot.git
                   cd scikit-robot
                   pip3 install -e .
+            - name: install diplan
+              run: |
+                  sudo apt install libeigen3-dev
+                  git clone git@github.com:HiroIshida/diplan-cpp.git
+                  cd diplan-cpp
+                  git submodule update --init --recursive --recommend-shallow --depth 1
+                  pip3 install -e .
             - name: install skmp
               run: |
                   sudo apt-get update && sudo apt install libunwind-dev libgoogle-glog-dev libeigen3-dev
