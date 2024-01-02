@@ -122,6 +122,7 @@ class Camera(Axis):
 
             active_ratio = np.sum(active_flags) / n_point
             if active_ratio < rm_config.terminate_active_rate_threshold:
+                active_indices = np.where(active_flags)[0]
                 break
 
         frying_dists[active_indices] = rm_config.max_dist  # type: ignore

@@ -29,6 +29,17 @@ def genrate_camera_pcloud_pairs(
     return pairs
 
 
+def test_ray_marching():
+    conf = RayMarchingConfig(max_dist=3.0)
+    sphere = Sphere(1.0, with_sdf=True)
+
+    pts_starts = np.random.normal(size=(100, 3))
+    pts_starts = 2 * pts_starts / np.linalg.norm(pts_starts, axis=1)[:, np.newaxis]
+    direction_arr_unit = -pts_starts / np.linalg.norm(pts_starts, axis=1)[:, np.newaxis]
+    dists = Camera.ray_marching(pts_starts, direction_arr_unit, sphere.sdf, conf)
+    np.testing.assert_almost_equal(dists, 1.0)
+
+
 def test_generate_point_cloud():
     sphere = Sphere(0.2, pos=(0.2, 0.2, 0.2), with_sdf=True)
     assert sphere.sdf is not None
