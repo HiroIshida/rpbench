@@ -283,7 +283,7 @@ class JskFridgeWorld(WorldBase):
             co.translate(trans)
             if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
                 continue
-            co.rotate(np.random.uniform(-(1.0 / 6.0) * np.pi, (1.0 / 6.0) * np.pi), "z")
+            co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
             co_dummy = co.copy_worldcoords()
             co_dummy.translate([-0.07, 0.0, 0.0])
             if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
@@ -318,21 +318,25 @@ class JskFridgeWorld(WorldBase):
     def sample_pose_vertical(self) -> Coordinates:
         # NOTE: unlike sample pose height is also sampled
         region = self.fridge.regions[self.attention_region_index]
-        D, W, H = region.box.extents
+        b_min = - 0.5 * region.box.extents
+        b_max = + 0.5 * region.box.extents
+
         horizontal_margin = 0.08
-        depth_margin = 0.03
         height_margin = 0.06
-        width_effective = np.array(
-            [D - 2 * depth_margin, W - 2 * horizontal_margin, H - 2 * height_margin]
-        )
+        b_max[0] -= horizontal_margin
+        b_min[2] += height_margin
+        b_max[2] -= height_margin
+
         sdf = self.get_exact_sdf()
 
         n_max_trial = 100
         for _ in range(n_max_trial):
-            trans = np.random.rand(3) * width_effective - 0.5 * width_effective
+            trans = np.random.rand(3) * (b_max - b_min) + b_min
             co = region.box.copy_worldcoords()
             co.translate(trans)
-            co.rotate(np.random.uniform(-(1.0 / 6.0) * np.pi, (1.0 / 6.0) * np.pi), "z")
+            co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
+            if self.is_obviously_infeasible(sdf, co):
+                continue
             co.rotate(0.5 * np.pi, "x")
             if self.is_obviously_infeasible(sdf, co):
                 continue
@@ -358,7 +362,7 @@ if __name__ == "__main__":
     world = JskFridgeWorld.sample()
     v = TrimeshSceneViewer()
     world.visualize(v)
-    for _ in range(100):
+    for _ in range(300):
         pose = world.sample_pose_vertical()
         axis = Axis.from_coords(pose, axis_radius=0.001, axis_length=0.03)
         v.add(axis)
