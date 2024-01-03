@@ -298,6 +298,21 @@ class JskFridgeWorld(WorldBase):
     def is_obviously_infeasible(sdf, co: Coordinates) -> bool:
         if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.02:
             return True
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.05, -0.05, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.02:
+            return True
+
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.05, 0.05, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.02:
+            return True
+
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.1, 0.0, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+            return True
+
         return False
 
     def sample_pose_vertical(self) -> Coordinates:
@@ -317,10 +332,10 @@ class JskFridgeWorld(WorldBase):
             trans = np.random.rand(3) * width_effective - 0.5 * width_effective
             co = region.box.copy_worldcoords()
             co.translate(trans)
-            if self.is_obviously_infeasible(sdf, co):
-                continue
             co.rotate(np.random.uniform(-(1.0 / 6.0) * np.pi, (1.0 / 6.0) * np.pi), "z")
             co.rotate(0.5 * np.pi, "x")
+            if self.is_obviously_infeasible(sdf, co):
+                continue
 
             # NOTE: these conditions are effective to exclude collision poses
             # but it's reduce the "domain" size, which becomes problematic
