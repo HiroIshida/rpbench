@@ -7,6 +7,7 @@ from skrobot.model.primitives import Box, Cylinder
 from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction
 
 PrimitiveT = TypeVar("PrimitiveT")
+SelfT = TypeVar("SlefT", bound="PrimitiveSkelton")
 
 
 class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
@@ -26,6 +27,10 @@ class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
 
     @abstractmethod
     def _to_skrobot_primitive(self) -> PrimitiveT:
+        ...
+
+    @abstractmethod
+    def detach_clone(self: SelfT) -> SelfT:
         ...
 
 
@@ -79,3 +84,8 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
         cylidner = Cylinder(self.radius, self.height)
         cylidner.newcoords(self.copy_worldcoords())
         return cylidner
+
+    def detach_clone(self) -> "CylinderSkelton":
+        c = CylinderSkelton(self.radius, self.height)
+        c.newcoords(self.copy_worldcoords())
+        return c
