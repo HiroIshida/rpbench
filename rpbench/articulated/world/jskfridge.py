@@ -318,12 +318,14 @@ class JskFridgeWorld(WorldBase):
     def sample_pose_vertical(self) -> Coordinates:
         # NOTE: unlike sample pose height is also sampled
         region = self.fridge.regions[self.attention_region_index]
-        b_min = - 0.5 * region.box.extents
-        b_max = + 0.5 * region.box.extents
+        b_min = -0.5 * region.box.extents
+        b_max = +0.5 * region.box.extents
 
         horizontal_margin = 0.05
         height_margin = 0.06
-        b_min[0] -= horizontal_margin  # - is not a mistake. this makes it possible to pose be slightly outside
+        b_min[
+            0
+        ] -= horizontal_margin  # - is not a mistake. this makes it possible to pose be slightly outside
         b_max[0] -= horizontal_margin
         b_min[2] += height_margin
         b_max[2] -= height_margin
