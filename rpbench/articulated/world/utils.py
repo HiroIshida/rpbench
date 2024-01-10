@@ -3,10 +3,10 @@ from typing import Generic, Literal, Optional, Tuple, TypeVar
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords
-from skrobot.model.primitives import Box, Cylinder
+from skrobot.model.primitives import Box, Cylinder, Link
 from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction
 
-PrimitiveT = TypeVar("PrimitiveT")
+PrimitiveT = TypeVar("PrimitiveT", bound=Link)
 SelfT = TypeVar("SlefT", bound="PrimitiveSkelton")
 
 
@@ -22,7 +22,7 @@ class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
     def to_visualizable(self, color: Optional[Tuple[int, int, int, int]] = None) -> PrimitiveT:
         primitive = self._to_skrobot_primitive()
         if color is not None:
-            primitive.visual_mesh.visual.face_colors = color  # type: ignore
+            primitive.set_color(color)
         return primitive
 
     @abstractmethod
