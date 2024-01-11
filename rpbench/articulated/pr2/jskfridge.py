@@ -201,7 +201,7 @@ class JskFridgeReachingTaskBase(
     def create_viewer(self, mode: Literal["interactive"]) -> InteractiveSolutionVisualizer:
         ...
 
-    def create_viewer(self, mode: str) -> Any:
+    def create_viewer(self, mode: str, show_wireframe: bool = False) -> Any:
         # copied from rpbench.articulated.pr2.minifridge
         assert len(self.descriptions) == 1
         target_co, base_pose = self.descriptions[0]
@@ -220,7 +220,7 @@ class JskFridgeReachingTaskBase(
                 geometry=geometries,
                 visualizable=self.world,
                 robot_updator=robot_updator,
-                show_wireframe=True,
+                show_wireframe=show_wireframe,
             )
         elif mode == "interactive":
             colkin = self.config_provider.get_colkin()  # type: ignore[attr-defined]
@@ -231,7 +231,6 @@ class JskFridgeReachingTaskBase(
                 visualizable=self.world,
                 robot_updator=robot_updator,
                 colkin=colkin,
-                enable_colvis=True,
                 sdf=sdf,
             )
         else:
@@ -239,10 +238,10 @@ class JskFridgeReachingTaskBase(
 
         t = np.array(
             [
-                [-0.74452768, 0.59385861, -0.30497620, -0.28438419],
-                [-0.66678662, -0.68392597, 0.29604201, 0.80949977],
-                [-0.03277405, 0.42376552, 0.90517879, 3.65387983],
-                [0.0, 0.0, 0.0, 1.0],
+                [-7.37651916e-02, 4.05048811e-01, -9.11314522e-01, -1.64011619e00],
+                [-9.96711581e-01, 7.86646061e-04, 8.10271856e-02, 4.48154882e-01],
+                [3.35368471e-02, 9.14294724e-01, 4.03658814e-01, 1.49644830e00],
+                [0.00000000e00, 0.00000000e00, 0.00000000e00, 1.00000000e00],
             ]
         )
 
