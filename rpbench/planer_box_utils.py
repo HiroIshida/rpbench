@@ -26,8 +26,22 @@ def rotation_matrix_2d(angle: float) -> np.ndarray:
     return rotmat
 
 
+class Primitive2d:
+    ...
+
+
 @dataclass
-class Box2d:
+class Circle(Primitive2d):
+    center: np.ndarray
+    radius: float
+
+    def visualize(self, fax, color="red") -> None:
+        fig, ax = fax
+        ax.add_patch(plt.Circle(self.center, self.radius, color=color, fill=False))
+
+
+@dataclass
+class Box2d(Primitive2d):
     extent: np.ndarray
     coords: PlanerCoords
 
@@ -67,7 +81,10 @@ class Box2d:
         n_pts, _ = points.shape
         half_extent = self.extent * 0.5
 
-        pts_from_center = points - self.coords.pos
+        # pts_from_center = points - self.coords.pos
+        # consider yaw
+        mat = rotation_matrix_2d(-self.coords.angle)
+        pts_from_center = mat.dot((points - self.coords.pos).T).T
         sd_vals_each_axis = np.abs(pts_from_center) - half_extent[None, :]
 
         positive_dists_each_axis = np.maximum(sd_vals_each_axis, 0.0)
@@ -79,7 +96,7 @@ class Box2d:
         sd_vals = positive_dists + negative_dists
         return sd_vals
 
-    def is_colliding(self, other: "Box2d") -> bool:
+    def collides_with_box(self, other: "Box2d") -> bool:
         def is_separating(edge: Tuple[np.ndarray, np.ndarray]):
             v0, v1 = edge
             vec_self = v1 - v0
@@ -94,8 +111,41 @@ class Box2d:
                 return False
         return True
 
+    def contains(self, other: Primitive2d) -> bool:
+        if isinstance(other, Box2d):
+            return np.all(self.sd(other.verts) < 0.0)
+        elif isinstance(other, Circle):
+            sdist = self.sd(np.expand_dims(other.center, axis=0))[0]
+            return sdist < -other.radius
+        else:
+            raise NotImplementedError
 
-def sample_box(
+    def sample_point(self) -> np.ndarray:
+        half_extent = self.extent * 0.5
+        x = np.random.uniform(-half_extent[0], half_extent[0])
+        y = np.random.uniform(-half_extent[1], half_extent[1])
+        return self.coords.pos + rotation_matrix_2d(self.coords.angle).dot(np.array([x, y]))
+
+
+def is_colliding(shape1: Primitive2d, shape2: Primitive2d) -> bool:
+
+    if isinstance(shape1, Circle) and isinstance(shape2, Circle):
+        dist = np.linalg.norm(shape1.center - shape2.center)
+        return dist < shape1.radius + shape2.radius
+
+    elif isinstance(shape1, Box2d) and isinstance(shape2, Box2d):
+        if np.any(shape1.sd(shape2.verts) < 0.0) or np.any(shape2.sd(shape1.verts) < 0.0):
+            return True
+
+    elif isinstance(shape1, Box2d) and isinstance(shape2, Circle):
+        return shape1.sd(np.expand_dims(shape2.center, axis=0))[0] < shape2.radius
+    elif isinstance(shape1, Circle) and isinstance(shape2, Box2d):
+        return shape2.sd(np.expand_dims(shape1.center, axis=0))[0] < shape1.radius
+    else:
+        raise NotImplementedError
+
+
+def sample_shape(
     table_extent: np.ndarray, box_extent: np.ndarray, obstacles: List[Box2d], n_budget: int = 30
 ) -> Optional[Box2d]:
     table = Box2d(table_extent, PlanerCoords.standard())
@@ -117,3 +167,36 @@ def sample_box(
         if is_valid(box_cand):
             return box_cand
     return None
+
+
+if __name__ == "__main__":
+    # example of sampling boxes and spheres
+    table_extent = np.array([1.0, 1.0])
+    table = Box2d(table_extent, PlanerCoords.standard())
+    objects = []
+
+    for _ in range(100):
+        center = table.sample_point()
+        use_circle = np.random.rand() < 0.5
+        if use_circle:
+            radius = np.random.uniform(0.05, 0.1)
+            cand = Circle(center, radius)
+        else:
+            yaw = np.random.uniform(0, 0.25 * np.pi)
+            w, d = np.random.uniform(0.05, 0.2, size=2)
+            cand = Box2d(np.array([w, d]), PlanerCoords(center, yaw))
+        if table.contains(cand):
+            collision_free = np.all([not is_colliding(cand, obj) for obj in objects])
+            if collision_free:
+                objects.append(cand)
+
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots()
+    for box in objects:
+        box.visualize((fig, ax))
+    ax.set_aspect("equal")
+    # lim is [0, 1] x [0, 1]
+    ax.set_xlim([-0.5, 0.5])
+    ax.set_ylim([-0.5, 0.5])
+    plt.show()
