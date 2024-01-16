@@ -3,7 +3,6 @@ from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords, Coordinates
-from skrobot.model.primitives import Axis
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
@@ -14,6 +13,7 @@ from rpbench.articulated.world.utils import (
     PrimitiveSkelton,
 )
 from rpbench.interface import WorldBase
+from rpbench.planer_box_utils import Box2d, Circle, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
 
@@ -202,6 +202,7 @@ class FridgeModel(CascadedCoords):
 
 
 def randomize_region(region: Region, n_obstacles: int = 5):
+    # randomize using only cylinder
     D, W, H = region.box._extents
     obstacle_h_max = H - 0.03
     obstacle_h_min = 0.05
@@ -227,8 +228,50 @@ def randomize_region(region: Region, n_obstacles: int = 5):
         region.obstacles.append(obstacle)
 
 
+def randomize_region2(region: Region, n_obstacles: int = 5):
+    # randomize using both cylinder and box
+    D, W, H = region.box._extents
+    obstacle_h_max = H - 0.03
+    obstacle_h_min = 0.05
+
+    region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
+
+    obj2d_list = []
+    while len(obj2d_list) < n_obstacles:
+        center = region2d.sample_point()
+        sample_circle = np.random.rand() < 0.5
+        if sample_circle:
+            r = np.random.rand() * 0.03 + 0.02
+            obj2d = Circle(center, r)
+        else:
+            w = np.random.uniform(0.05, 0.1)
+            d = np.random.uniform(0.05, 0.1)
+            yaw = np.random.uniform(0.0, np.pi)
+            obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))
+
+        if not region2d.contains(obj2d):
+            continue
+        if any([is_colliding(obj2d, o) for o in obj2d_list]):
+            continue
+        obj2d_list.append(obj2d)
+
+    for obj2d in obj2d_list:
+        h = np.random.rand() * (obstacle_h_max - obstacle_h_min) + obstacle_h_min
+        if isinstance(obj2d, Box2d):
+            extent = np.hstack([obj2d.extent, h])
+            obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
+            obj.rotate(obj2d.coords.angle, "z")
+        elif isinstance(obj2d, Circle):
+            obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
+        else:
+            assert False
+        obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
+        region.box.assoc(obj, relative_coords="local")
+        region.obstacles.append(obj)
+
+
 @dataclass
-class JskFridgeWorld(WorldBase):
+class JskFridgeWorldBase(WorldBase):
     fridge: FridgeModel
     _heightmap: Optional[np.ndarray] = None  # lazy
     attention_region_index: ClassVar[int] = 1
@@ -240,14 +283,6 @@ class JskFridgeWorld(WorldBase):
         if self._heightmap is None:
             self._heightmap = self.fridge.regions[self.attention_region_index].create_heightmap()
         return self._heightmap
-
-    @classmethod
-    def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld"]:
-        fridge = FridgeModel(joint_angle=np.pi * 0.9)
-        if not standard:
-            n_obstacles = np.random.randint(1, 6)
-            randomize_region(fridge.regions[cls.attention_region_index], n_obstacles)
-        return cls(fridge, None)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge.add(viewer)  # type: ignore
@@ -353,17 +388,33 @@ class JskFridgeWorld(WorldBase):
         return co  # invalid one but no choice
 
 
+class JskFridgeWorld(JskFridgeWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld"]:
+        fridge = FridgeModel(joint_angle=np.pi * 0.9)
+        if not standard:
+            n_obstacles = np.random.randint(1, 6)
+            randomize_region(fridge.regions[cls.attention_region_index], n_obstacles)
+        return cls(fridge, None)
+
+
+class JskFridgeWorld2(JskFridgeWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld2"]:
+        fridge = FridgeModel(joint_angle=np.pi * 0.9)
+        if not standard:
+            n_obstacles = np.random.randint(1, 6)
+            randomize_region2(fridge.regions[cls.attention_region_index], n_obstacles)
+        return cls(fridge, None)
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from skrobot.viewers import TrimeshSceneViewer
 
-    world = JskFridgeWorld.sample()
+    world = JskFridgeWorld2.sample()
     v = TrimeshSceneViewer()
     world.visualize(v)
-    for _ in range(300):
-        pose = world.sample_pose_vertical()
-        axis = Axis.from_coords(pose, axis_radius=0.001, axis_length=0.03)
-        v.add(axis)
     v.show()
     hmap = world.heightmap()
     fig, ax = plt.subplots()

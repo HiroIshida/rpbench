@@ -26,8 +26,11 @@ from skrobot.model.robot_model import RobotModel
 from tinyfk import BaseType
 
 from rpbench.articulated.pr2.common import CachedLArmFixedPR2ConstProvider
-from rpbench.articulated.world.jskfridge import JskFridgeWorld
-from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
+from rpbench.articulated.world.jskfridge import (
+    JskFridgeWorld,
+    JskFridgeWorld2,
+    JskFridgeWorldBase,
+)
 from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
@@ -35,16 +38,12 @@ DescriptionT = TypeVar("DescriptionT")
 
 
 class JskFridgeReachingTaskBase(
-    TaskBase[JskFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
+    TaskBase[JskFridgeWorldBase, Tuple[Coordinates, np.ndarray], RobotModel]
 ):
 
     config_provider: ClassVar[
         Type[CachedLArmFixedPR2ConstProvider]
     ] = CachedLArmFixedPR2ConstProvider
-
-    @staticmethod
-    def get_world_type() -> Type[JskFridgeWorld]:
-        return JskFridgeWorld
 
     @staticmethod
     def get_robot_model() -> RobotModel:
@@ -79,12 +78,12 @@ class JskFridgeReachingTaskBase(
         return cls.config_provider.get_dof()
 
     @staticmethod
-    def create_cache(world: TabletopClutteredFridgeWorld, robot_model: RobotModel) -> None:
+    def create_cache(world: JskFridgeWorldBase, robot_model: RobotModel) -> None:
         return None  # do not crete cache
 
     @staticmethod
     @abstractmethod
-    def sample_pose(world: TabletopClutteredFridgeWorld) -> Coordinates:
+    def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
         ...
 
     @classmethod
@@ -245,17 +244,44 @@ class JskFridgeReachingTaskBase(
             ]
         )
 
+        t = np.array(
+            [
+                [-0.05759581, 0.62366497, -0.77956701, -1.6860403],
+                [-0.99674649, -0.08002414, 0.00962095, 0.19343155],
+                [-0.05638393, 0.77758481, 0.62624493, 2.13690459],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+
         obj.viewer.camera_transform = t
         return obj
 
 
 class JskFridgeReachingTask(JskFridgeReachingTaskBase):
     @staticmethod
-    def sample_pose(world: JskFridgeWorld) -> Coordinates:
+    def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
         return world.sample_pose()
+
+    @staticmethod
+    def get_world_type() -> Type[JskFridgeWorldBase]:
+        return JskFridgeWorld
 
 
 class JskFridgeVerticalReachingTask(JskFridgeReachingTaskBase):
     @staticmethod
-    def sample_pose(world: JskFridgeWorld) -> Coordinates:
+    def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
         return world.sample_pose_vertical()
+
+    @staticmethod
+    def get_world_type() -> Type[JskFridgeWorld]:
+        return JskFridgeWorld
+
+
+class JskFridgeVerticalReachingTask2(JskFridgeReachingTaskBase):
+    @staticmethod
+    def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
+        return world.sample_pose_vertical()
+
+    @staticmethod
+    def get_world_type() -> Type[JskFridgeWorldBase]:
+        return JskFridgeWorld2

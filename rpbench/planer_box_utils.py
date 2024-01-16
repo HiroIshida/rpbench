@@ -2,6 +2,7 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -113,7 +114,7 @@ class Box2d(Primitive2d):
 
     def contains(self, other: Primitive2d) -> bool:
         if isinstance(other, Box2d):
-            return np.all(self.sd(other.verts) < 0.0)
+            return bool(np.all(self.sd(other.verts) < 0.0))
         elif isinstance(other, Circle):
             sdist = self.sd(np.expand_dims(other.center, axis=0))[0]
             return sdist < -other.radius
@@ -131,12 +132,12 @@ def is_colliding(shape1: Primitive2d, shape2: Primitive2d) -> bool:
 
     if isinstance(shape1, Circle) and isinstance(shape2, Circle):
         dist = np.linalg.norm(shape1.center - shape2.center)
-        return dist < shape1.radius + shape2.radius
+        return bool(dist < shape1.radius + shape2.radius)
 
     elif isinstance(shape1, Box2d) and isinstance(shape2, Box2d):
         if np.any(shape1.sd(shape2.verts) < 0.0) or np.any(shape2.sd(shape1.verts) < 0.0):
             return True
-
+        return False
     elif isinstance(shape1, Box2d) and isinstance(shape2, Circle):
         return shape1.sd(np.expand_dims(shape2.center, axis=0))[0] < shape2.radius
     elif isinstance(shape1, Circle) and isinstance(shape2, Box2d):
@@ -169,34 +170,25 @@ def sample_shape(
     return None
 
 
-if __name__ == "__main__":
-    # example of sampling boxes and spheres
-    table_extent = np.array([1.0, 1.0])
+def sample_box(
+    table_extent: np.ndarray, box_extent: np.ndarray, obstacles: List[Box2d], n_budget: int = 30
+) -> Optional[Box2d]:
     table = Box2d(table_extent, PlanerCoords.standard())
-    objects = []
 
-    for _ in range(100):
-        center = table.sample_point()
-        use_circle = np.random.rand() < 0.5
-        if use_circle:
-            radius = np.random.uniform(0.05, 0.1)
-            cand = Circle(center, radius)
-        else:
-            yaw = np.random.uniform(0, 0.25 * np.pi)
-            w, d = np.random.uniform(0.05, 0.2, size=2)
-            cand = Box2d(np.array([w, d]), PlanerCoords(center, yaw))
-        if table.contains(cand):
-            collision_free = np.all([not is_colliding(cand, obj) for obj in objects])
-            if collision_free:
-                objects.append(cand)
+    for _ in range(n_budget):
+        box_pos_cand = -0.5 * table_extent + table_extent * np.random.rand(2)
+        angle_cand = -0.5 * np.pi + np.random.rand() * np.pi
+        box_cand = Box2d(box_extent, PlanerCoords(box_pos_cand, angle_cand))
 
-    import matplotlib.pyplot as plt
+        def is_valid(box_cand):
+            is_inside = np.all(table.sd(box_cand.verts) < 0.0)
+            if is_inside:
+                for obs in obstacles:
+                    if box_cand.is_colliding(obs):
+                        return False
+                return True
+            return False
 
-    fig, ax = plt.subplots()
-    for box in objects:
-        box.visualize((fig, ax))
-    ax.set_aspect("equal")
-    # lim is [0, 1] x [0, 1]
-    ax.set_xlim([-0.5, 0.5])
-    ax.set_ylim([-0.5, 0.5])
-    plt.show()
+        if is_valid(box_cand):
+            return box_cand
+    return None
