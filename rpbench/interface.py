@@ -5,6 +5,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from hashlib import md5
 from pathlib import Path
 from typing import (
     Any,
@@ -36,7 +37,7 @@ from skmp.solver.interface import (
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
 
-from rpbench.utils import skcoords_to_pose_vec
+from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 SamplableT = TypeVar("SamplableT", bound="SamplableBase")
@@ -332,6 +333,21 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     @classmethod
     def cast_from(cls: Type[SamplableT], obj: OtherSamplableT) -> SamplableT:
         raise NotImplementedError()
+
+    @classmethod
+    def compute_distribution_hash(cls: Type[SamplableT]) -> str:
+        # Although it is difficult to exactly check the identity of the
+        # distribution defined by the calss, we can approximate it by
+        # checking the hash value of the sampled data.
+
+        # dont know why this dry run is needed...
+        # but it is needed to get the consistent hash value
+        cls.sample(10, False).export_table()
+
+        with temp_seed(0, True):
+            data = [cls.sample(10, False).export_table() for _ in range(10)]
+            data_str = pickle.dumps(data)
+        return md5(data_str).hexdigest()
 
 
 @dataclass

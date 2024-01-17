@@ -7,6 +7,18 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
+from rpbench.articulated.jaxon.below_table import (
+    HumanoidTableClutteredReachingTask,
+    HumanoidTableClutteredReachingTask2,
+    HumanoidTableReachingTask,
+    HumanoidTableReachingTask2,
+)
+from rpbench.articulated.pr2.jskfridge import (
+    JskFridgeVerticalReachingTask,
+    JskFridgeVerticalReachingTask2,
+    JskFridgeVerticalReachingTask3,
+)
+from rpbench.articulated.pr2.minifridge import TabletopClutteredFridgeReachingTask
 from rpbench.articulated.pr2.tabletop import (
     TabletopOvenDualArmReachingTask,
     TabletopOvenDualArmReachingTaskBase,
@@ -173,3 +185,24 @@ def test_prob_dummy_task():
         else:
             assert res.traj is None
             assert res_replan is None
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        HumanoidTableReachingTask2,
+        HumanoidTableReachingTask,
+        HumanoidTableClutteredReachingTask,
+        JskFridgeVerticalReachingTask,
+        HumanoidTableClutteredReachingTask2,
+        JskFridgeVerticalReachingTask2,
+        TabletopClutteredFridgeReachingTask,
+        JskFridgeVerticalReachingTask3,
+    ],
+)
+def test_task_hash(task_type: Type[TabletopTaskBase]):
+    hval = task_type.compute_distribution_hash()
+    for _ in range(5):
+        hval2 = task_type.compute_distribution_hash()
+        HumanoidTableReachingTask2,
+        assert hval == hval2
