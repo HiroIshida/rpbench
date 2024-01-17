@@ -1,6 +1,6 @@
 import copy
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords, Coordinates
@@ -8,8 +8,13 @@ from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 
 from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
-from rpbench.articulated.world.utils import BoxSkeleton, CylinderSkelton
+from rpbench.articulated.world.utils import (
+    BoxSkeleton,
+    CylinderSkelton,
+    PrimitiveSkelton,
+)
 from rpbench.interface import WorldBase
+from rpbench.planer_box_utils import Box2d, Circle, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
 _HMAP_INF_SUBST = -1.0
@@ -64,7 +69,7 @@ class Fridge(CascadedCoords):
             "door": door,
         }
 
-        target_region = BoxSkeleton(size, [0, 0, 0.5 * h])
+        target_region = BoxSkeleton(size - 2 * thickness, [0, 0, 0.5 * h])
         self.assoc(target_region, relative_coords="local")
 
         self.size = size
@@ -103,13 +108,13 @@ class Fridge(CascadedCoords):
 
 class FridgeWithContents(CascadedCoords):
     fridge: Fridge
-    contents: List[CylinderSkelton]
+    contents: List[PrimitiveSkelton]
 
-    def __init__(self, fridge: Fridge, contents: List[CylinderSkelton]):
+    def __init__(self, fridge: Fridge, contents: List[PrimitiveSkelton]):
         super().__init__()
         self.assoc(fridge, wrt="local")
         for c in contents:
-            self.assoc(c, wrt="local")
+            self.assoc(c, wrt="local", force=True)
         self.fridge = fridge
         self.contents = contents
 
@@ -123,32 +128,47 @@ class FridgeWithContents(CascadedCoords):
             co.translate([0.0, 0.0, 0.06 + fridge.thickness])
             cylinder.newcoords(co)
             return cls(fridge, [cylinder])
-        else:
-            n_obs = np.random.randint(5) + 1
-            contents: List[CylinderSkelton] = []
+        n_obstacles = np.random.randint(1, 6)
 
-            def is_colliding(pos2d, radius):
-                for c in contents:
-                    dist = np.linalg.norm(pos2d - c.worldpos()[:2])
-                    if dist < (c.radius + radius):
-                        return True
-                return False
+        D, W, H = fridge.target_region._extents
+        obstacle_h_max = H - 0.03
+        obstacle_h_min = 0.05
+        region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
 
-            while len(contents) < n_obs:
-                R = np.random.rand() * 0.05 + 0.05
-                r = 0.5 * R
-                h = np.random.rand() * 0.2 + 0.1
+        obj2d_list = []  # type: ignore
+        while len(obj2d_list) < n_obstacles:
+            center = region2d.sample_point()
+            sample_circle = np.random.rand() < 0.5
+            if sample_circle:
+                r = np.random.rand() * 0.03 + 0.02
+                obj2d = Circle(center, r)
+            else:
+                w = np.random.uniform(0.05, 0.1)
+                d = np.random.uniform(0.05, 0.1)
+                yaw = np.random.uniform(0.0, np.pi)
+                obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))  # type: ignore
 
-                available_size = fridge.size[:2] - fridge.thickness * 2 - r
-                pos2d_wrt_fridge = np.random.rand(2) * available_size - available_size * 0.5
+            if not region2d.contains(obj2d):
+                continue
+            if any([is_colliding(obj2d, o) for o in obj2d_list]):
+                continue
+            obj2d_list.append(obj2d)
 
-                if not is_colliding(pos2d_wrt_fridge, r):
-                    c_new = CylinderSkelton(radius=r, height=h)
-                    co = fridge.copy_worldcoords()
-                    co.translate(np.hstack([pos2d_wrt_fridge, fridge.thickness + 0.5 * h]))
-                    c_new.newcoords(co)
-                    contents.append(c_new)
-            return cls(fridge, contents)
+        contents: List[Any] = []
+        for obj2d in obj2d_list:
+            h = np.random.rand() * (obstacle_h_max - obstacle_h_min) + obstacle_h_min
+            if isinstance(obj2d, Box2d):
+                extent = np.hstack([obj2d.extent, h])
+                obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
+                obj.rotate(obj2d.coords.angle, "z")
+            elif isinstance(obj2d, Circle):
+                obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
+            else:
+                assert False
+            obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
+            fridge.target_region.assoc(obj, relative_coords="local")
+            contents.append(obj)
+        return cls(fridge, contents)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge.visualize(viewer)
