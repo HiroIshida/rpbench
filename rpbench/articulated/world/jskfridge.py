@@ -465,31 +465,3 @@ class JskFridgeWorld3(JskFridgeWorldBase):
             n_obstacles = np.random.randint(1, 6)
             randomize_region3(fridge.regions[cls.attention_region_index], n_obstacles)
         return cls(fridge, None)
-
-
-if __name__ == "__main__":
-    import time
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from skrobot.sdf import UnionSDF
-    from skrobot.viewers import TrimeshSceneViewer
-
-    np.random.seed(0)
-    from pyinstrument import Profiler
-
-    profiler = Profiler()
-    profiler.start()
-    world = JskFridgeWorld3.sample()
-    profiler.stop()
-    print(profiler.output_text(unicode=True, color=True, show_all=True))
-
-    v = TrimeshSceneViewer()
-    world.visualize(v)
-    v.show()
-    ts = time.time()
-    hmap = world.heightmap()
-    print(time.time() - ts)
-    fig, ax = plt.subplots()
-    ax.imshow(hmap)
-    plt.show()
