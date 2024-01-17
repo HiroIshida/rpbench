@@ -7,19 +7,13 @@ import pytest
 from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.articulated.pr2.kivapod import KivapodEmptyReachingTask
-from rpbench.articulated.pr2.shelf import ShelfBoxSandwitchingTask
 from rpbench.articulated.pr2.tabletop import (
     TabletopOvenDualArmReachingTask,
     TabletopOvenDualArmReachingTaskBase,
     TabletopOvenRightArmReachingTask,
-    TabletopOvenVoxbloxDualArmReachingTask,
-    TabletopOvenVoxbloxRightArmReachingTask,
     TabletopOvenWorldWrap,
     TabletopTaskBase,
-    VoxbloxGridSDFCreator,
 )
-from rpbench.two_dimensional.bubbly_world import BubblyComplexMeshPointConnectTask
 from rpbench.two_dimensional.dummy import DummyConfig, DummySolver, DummyTask
 
 np.random.seed(0)
@@ -53,9 +47,7 @@ def test_tabletop_samplable():
     "task_type",
     [
         TabletopOvenRightArmReachingTask,
-        TabletopOvenVoxbloxRightArmReachingTask,
         TabletopOvenDualArmReachingTask,
-        TabletopOvenVoxbloxDualArmReachingTask,
     ],
 )
 def test_tabletop_task(task_type: Type[TabletopTaskBase]):
@@ -64,15 +56,13 @@ def test_tabletop_task(task_type: Type[TabletopTaskBase]):
     # export_table function beforehand
     task_standard = task_type.sample(1, True)
 
-    # NOTE: voxblox sdf generation is not deterministic so ignore
-    if not issubclass(task_type, VoxbloxGridSDFCreator):
+    table = task_standard.export_table()
+    value = md5(pickle.dumps(table)).hexdigest()
+    for _ in range(5):
+        task_standard = task_type.sample(1, True)
         table = task_standard.export_table()
-        value = md5(pickle.dumps(table)).hexdigest()
-        for _ in range(5):
-            task_standard = task_type.sample(1, True)
-            table = task_standard.export_table()
-            value_test = md5(pickle.dumps(table)).hexdigest()
-            assert value == value_test
+        value_test = md5(pickle.dumps(table)).hexdigest()
+        assert value == value_test
 
     n_desc = 10
     task = task_type.sample(n_desc)
@@ -135,47 +125,6 @@ def test_tabletop_task(task_type: Type[TabletopTaskBase]):
     assert result.traj is not None
 
 
-def test_kivapot_planning_task():
-    task = KivapodEmptyReachingTask.sample(10, False)
-    desc_table = task.export_table()
-    assert desc_table.get_mesh() is None
-
-    dic = desc_table.wcond_desc_dicts[0]
-    assert dic["target_pose-0"].shape == (6,)
-
-    # check if standard task can be solved
-    task = KivapodEmptyReachingTask.sample(1, True)
-    res = task.solve_default()[0]
-    assert res.traj is not None
-
-    # check pickle-depickle
-    dumped = pickle.dumps(task)
-    byte_size = len(dumped)
-    assert byte_size < 8 * 10**6
-
-    task_again: KivapodEmptyReachingTask = pickle.loads(dumped)
-
-    # check that sdf object is not copied through pickle-depickle
-    assert task_again.world.kivapod_mesh.sdf.itp is task.world.kivapod_mesh.sdf.itp
-
-    res = task_again.solve_default()[0]
-    assert res.traj is not None
-
-
-def test_bubbly_world_point_connecting_task():
-    # check solvability of standard problem
-    task_type = BubblyComplexMeshPointConnectTask
-    task = task_type.sample(1, True)
-    result = task.solve_default()[0]
-    assert result.traj is not None
-
-
-def test_ShelfBoxSandwitchingTask():
-    task = ShelfBoxSandwitchingTask.sample(1, True)
-    result = task.solve_default()[0]
-    assert result.traj is not None
-
-
 def test_dummy_task():
     task = DummyTask.sample(1, standard=True)
     res_off = task.solve_default()[0]
@@ -224,9 +173,3 @@ def test_prob_dummy_task():
         else:
             assert res.traj is None
             assert res_replan is None
-
-
-if __name__ == "__main__":
-    # test_tabletop_task()
-    # test_maze_solving_task()
-    test_kivapot_planning_task()
