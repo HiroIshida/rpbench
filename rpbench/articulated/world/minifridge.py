@@ -161,25 +161,50 @@ class FridgeWithContents(CascadedCoords):
         sdf = UnionSDF(sdfs)
         return sdf
 
+    @staticmethod
+    def is_obviously_infeasible(sdf, co: Coordinates) -> bool:
+        if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.02:
+            return True
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.05, -0.05, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.02:
+            return True
+
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.05, 0.05, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.02:
+            return True
+
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.1, 0.0, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+            return True
+
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.14, 0.0, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+            return True
+
+        co_dummy = co.copy_worldcoords()
+        co_dummy.translate([-0.18, 0.0, 0.0])
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+            return True
+
+        return False
+
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
+        region = self.fridge.target_region
         n_budget = 100
         sdf = self.get_exact_sdf()
         for _ in range(n_budget):
-            pos = np.random.rand(3) * self.fridge.size - 0.5 * self.fridge.size
-            pos_world = self.transform_vector(pos)
-            sd_val = sdf(np.expand_dims(pos_world, axis=0))[0]
-            if sd_val > 0.05 and not self.fridge.is_outside(pos_world):
-                co = Coordinates(pos_world)
-                co.rotation = self.rotation
-                angle = np.random.randn() * 0.2
-                co.rotate(angle, "z")
+            pos = region.sample_points(1)[0]
+            co = Coordinates(pos)
+            yaw = np.random.uniform(-0.3 * np.pi, 0.3 * np.pi)
+            co.rotate(yaw, "z")
+            co.rotate(0.5 * np.pi, "x")
 
-                co_back = co.copy_worldcoords()
-                co_back.translate([-0.1, 0.0, 0])
-
-                sd_val = sdf(np.expand_dims(co_back.worldpos(), axis=0))[0]
-                if sd_val > 0.05:
-                    return co
+            if not self.is_obviously_infeasible(sdf, co):
+                return co
 
         pos = self.transform_vector(np.zeros(3))
         co = Coordinates(pos)
