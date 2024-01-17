@@ -142,7 +142,7 @@ class TaskVisualizerBase(Generic[ViewerT], ABC):
                 viewer.add(axis)
 
         self.task = task
-        self.viewer = viewer
+        self.viewer = viewer  # type: ignore[assignment]
         self.robot_model = robot_model
         self._show_called = False
         t = np.array(

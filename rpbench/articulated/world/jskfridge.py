@@ -193,7 +193,7 @@ class FridgeModel(CascadedCoords):
 
     def add(self, v: TrimeshSceneViewer) -> None:
         assert len(self._visualizable_table) == 0, "already added"
-        table = {}
+        table = {}  # type: ignore
         for link in self.links:
             visualizable = link.to_visualizable((240, 240, 225, 100))
             v.add(visualizable)
@@ -202,7 +202,7 @@ class FridgeModel(CascadedCoords):
             for obstacle in region.obstacles:
                 visualizable = obstacle.to_visualizable((150, 150, 150, 255))
                 v.add(visualizable)
-                table[obstacle] = visualizable
+                table[obstacle] = visualizable  # type: ignore
         self._visualizable_table = table
 
 
@@ -213,7 +213,7 @@ def randomize_region(region: Region, n_obstacles: int = 5):
     obstacle_h_min = 0.05
 
     # determine pos-r pairs
-    pairs = []
+    pairs = []  # type: ignore
     while len(pairs) < n_obstacles:
         r = np.random.rand() * 0.03 + 0.02
         D_effective = D - 2 * r
@@ -241,7 +241,7 @@ def randomize_region2(region: Region, n_obstacles: int = 5):
 
     region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
 
-    obj2d_list = []
+    obj2d_list = []  # type: ignore
     while len(obj2d_list) < n_obstacles:
         center = region2d.sample_point()
         sample_circle = np.random.rand() < 0.5
@@ -252,7 +252,7 @@ def randomize_region2(region: Region, n_obstacles: int = 5):
             w = np.random.uniform(0.05, 0.1)
             d = np.random.uniform(0.05, 0.1)
             yaw = np.random.uniform(0.0, np.pi)
-            obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))
+            obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))  # type: ignore
 
         if not region2d.contains(obj2d):
             continue
@@ -291,7 +291,7 @@ def randomize_region3(region: Region, n_obstacles: int = 5):
     skelton_list = [MeshSkelton(mesh, fill_value=0.03, dim_grid=30) for mesh in mesh_list]
     box = region.box
 
-    obj_list = []
+    obj_list = []  # type: ignore
     while len(obj_list) < n_obstacles:
         skelton = copy.deepcopy(np.random.choice(skelton_list))
         assert isinstance(skelton, MeshSkelton)

@@ -9,7 +9,7 @@ from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction, trimesh2sdf
 from trimesh import Trimesh
 
 PrimitiveT = TypeVar("PrimitiveT", bound=Link)
-SelfT = TypeVar("SlefT", bound="PrimitiveSkelton")
+SelfT = TypeVar("SelfT", bound="PrimitiveSkelton")
 
 
 class PrimitiveSkelton(ABC, Generic[PrimitiveT]):

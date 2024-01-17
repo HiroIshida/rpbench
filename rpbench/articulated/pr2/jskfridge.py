@@ -89,7 +89,7 @@ class JskFridgeReachingTaskBase(
 
     @classmethod
     def sample_descriptions(
-        cls, world: JskFridgeWorld, n_sample: int, standard: bool = False
+        cls, world: JskFridgeWorldBase, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, np.ndarray]]:
 
         if standard:
