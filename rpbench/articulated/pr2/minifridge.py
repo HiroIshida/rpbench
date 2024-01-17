@@ -57,12 +57,7 @@ class TabletopClutteredFridgeReachingTask(
                 if pose is not None:
                     pose_list.append(pose)
 
-        # note that we temporaly use Planer base here
-        # but in the planning time the base is fixed
-        # colkin = CachedRArmPR2ConstProvider.get_colkin()
-        colkin = CachedRArmFixedPR2ConstProvider.get_colkin()
-        BaseType.PLANER
-
+        colkin = CachedRArmFixedPR2ConstProvider.get_whole_body_colkin()
         pr2 = CachedRArmPR2ConstProvider.get_pr2()
         sdf = world.get_exact_sdf()
         collfree_const = CollFreeConst(colkin, sdf, pr2)
