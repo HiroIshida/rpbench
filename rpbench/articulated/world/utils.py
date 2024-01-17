@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
+from functools import cached_property
 from typing import Generic, Literal, Optional, Tuple, TypeVar
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords
-from skrobot.model.primitives import Box, Cylinder, Link
-from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction
+from skrobot.model.primitives import Box, Cylinder, Link, MeshLink
+from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction, trimesh2sdf
+from trimesh import Trimesh
 
 PrimitiveT = TypeVar("PrimitiveT", bound=Link)
 SelfT = TypeVar("SlefT", bound="PrimitiveSkelton")
@@ -32,6 +34,41 @@ class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
     @abstractmethod
     def detach_clone(self: SelfT) -> SelfT:
         ...
+
+
+class MeshSkelton(CascadedCoords, PrimitiveSkelton[MeshLink]):
+    mesh: Trimesh
+
+    def __init__(self, mesh: Trimesh, **gridsdf_kwargs):
+        CascadedCoords.__init__(self)
+        self.mesh = mesh
+        mesh.metadata["origin"] = np.eye(4)
+        sdf = trimesh2sdf(mesh, **gridsdf_kwargs)
+        self.assoc(sdf, relative_coords="local")
+        self.sdf = sdf
+
+    def _to_skrobot_primitive(self) -> MeshLink:
+        mesh_link = MeshLink(self.mesh)
+        mesh_link.newcoords(self.copy_worldcoords())
+        return mesh_link
+
+    def detach_clone(self) -> "MeshSkelton":
+        m = MeshSkelton(self.mesh)
+        m.newcoords(self.copy_worldcoords())
+        return m
+
+    @cached_property
+    def surface_points(self):
+        return self.sdf.surface_points(n_sample=100)[0]
+
+    @property
+    def vertices(self) -> np.ndarray:
+        return self.transform_vector(self.mesh.vertices)
+
+    def bounds(self) -> Tuple[np.ndarray, np.ndarray]:
+        b_min = np.min(self.vertices, axis=0)
+        b_max = np.max(self.vertices, axis=0)
+        return b_min, b_max
 
 
 class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):

@@ -1,15 +1,20 @@
+import copy
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+import ycb_utils
 from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
+from trimesh import Trimesh
 
 from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import (
     BoxSkeleton,
     CylinderSkelton,
+    MeshSkelton,
     PrimitiveSkelton,
 )
 from rpbench.interface import WorldBase
@@ -270,6 +275,49 @@ def randomize_region2(region: Region, n_obstacles: int = 5):
         region.obstacles.append(obj)
 
 
+@lru_cache(maxsize=None)
+def ycb_utils_load_singleton(name: str, scale: float = 1.0) -> Trimesh:
+    return ycb_utils.load_with_scale(name, scale=scale)
+
+
+def randomize_region3(region: Region, n_obstacles: int = 5):
+
+    mesh_list = [
+        ycb_utils_load_singleton("006_mustard_bottle", scale=0.75),
+        ycb_utils_load_singleton("010_potted_meat_can"),
+        ycb_utils_load_singleton("013_apple"),
+        ycb_utils_load_singleton("019_pitcher_base", scale=0.6),
+    ]
+    skelton_list = [MeshSkelton(mesh, fill_value=0.03, dim_grid=30) for mesh in mesh_list]
+    box = region.box
+
+    obj_list = []
+    while len(obj_list) < n_obstacles:
+        skelton = copy.deepcopy(np.random.choice(skelton_list))
+        assert isinstance(skelton, MeshSkelton)
+        pos = box.sample_points(1)[0]
+        pos[2] = box.worldpos()[2] - 0.5 * box._extents[2] + 0.01
+        skelton.newcoords(Coordinates(pos))
+        yaw = np.random.uniform(0.0, 2 * np.pi)
+        skelton.rotate(yaw, "z")
+
+        values = box.sdf(skelton.surface_points)
+        is_containd = np.all(values < -0.005)
+        if not is_containd:
+            continue
+
+        is_colliding = False
+        for obj in obj_list:
+            if np.any(skelton.sdf(obj.surface_points) < 0.0):
+                is_colliding = True
+                break
+        if is_colliding:
+            continue
+        obj_list.append(skelton)
+        region.box.assoc(skelton, relative_coords="world")
+        region.obstacles.append(skelton)
+
+
 @dataclass
 class JskFridgeWorldBase(WorldBase):
     fridge: FridgeModel
@@ -408,15 +456,39 @@ class JskFridgeWorld2(JskFridgeWorldBase):
         return cls(fridge, None)
 
 
+class JskFridgeWorld3(JskFridgeWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld3"]:
+        fridge = FridgeModel(joint_angle=np.pi * 0.9)
+        if not standard:
+            n_obstacles = np.random.randint(1, 6)
+            randomize_region3(fridge.regions[cls.attention_region_index], n_obstacles)
+        return cls(fridge, None)
+
+
 if __name__ == "__main__":
+    import time
+
     import matplotlib.pyplot as plt
+    import numpy as np
+    from skrobot.sdf import UnionSDF
     from skrobot.viewers import TrimeshSceneViewer
 
-    world = JskFridgeWorld2.sample()
+    np.random.seed(0)
+    from pyinstrument import Profiler
+
+    profiler = Profiler()
+    profiler.start()
+    world = JskFridgeWorld3.sample()
+    profiler.stop()
+    print(profiler.output_text(unicode=True, color=True, show_all=True))
+
     v = TrimeshSceneViewer()
     world.visualize(v)
     v.show()
+    ts = time.time()
     hmap = world.heightmap()
+    print(time.time() - ts)
     fig, ax = plt.subplots()
     ax.imshow(hmap)
     plt.show()

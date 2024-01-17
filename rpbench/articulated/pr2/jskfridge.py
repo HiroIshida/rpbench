@@ -29,6 +29,7 @@ from rpbench.articulated.pr2.common import CachedLArmFixedPR2ConstProvider
 from rpbench.articulated.world.jskfridge import (
     JskFridgeWorld,
     JskFridgeWorld2,
+    JskFridgeWorld3,
     JskFridgeWorldBase,
 )
 from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
@@ -285,3 +286,13 @@ class JskFridgeVerticalReachingTask2(JskFridgeReachingTaskBase):
     @staticmethod
     def get_world_type() -> Type[JskFridgeWorldBase]:
         return JskFridgeWorld2
+
+
+class JskFridgeVerticalReachingTask3(JskFridgeReachingTaskBase):
+    @staticmethod
+    def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
+        return world.sample_pose_vertical()
+
+    @staticmethod
+    def get_world_type() -> Type[JskFridgeWorldBase]:
+        return JskFridgeWorld3
