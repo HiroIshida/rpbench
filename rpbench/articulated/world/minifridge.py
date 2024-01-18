@@ -183,31 +183,31 @@ class FridgeWithContents(CascadedCoords):
 
     @staticmethod
     def is_obviously_infeasible(sdf, co: Coordinates) -> bool:
-        if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.02:
+        if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
             return True
         co_dummy = co.copy_worldcoords()
         co_dummy.translate([-0.05, -0.05, 0.0])
-        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.02:
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
             return True
 
         co_dummy = co.copy_worldcoords()
         co_dummy.translate([-0.05, 0.05, 0.0])
-        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.02:
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
             return True
 
         co_dummy = co.copy_worldcoords()
         co_dummy.translate([-0.1, 0.0, 0.0])
-        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.05:
             return True
 
         co_dummy = co.copy_worldcoords()
         co_dummy.translate([-0.14, 0.0, 0.0])
-        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.05:
             return True
 
         co_dummy = co.copy_worldcoords()
         co_dummy.translate([-0.18, 0.0, 0.0])
-        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.03:
+        if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.05:
             return True
 
         return False
