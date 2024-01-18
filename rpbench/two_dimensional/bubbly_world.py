@@ -9,7 +9,12 @@ import numpy as np
 import scipy.sparse as sparse
 from disbmp import BoundingBox, FastMarchingTree, State
 from scipy.interpolate import RegularGridInterpolator
-from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
+from skmp.solver.interface import (
+    AbstractDataDrivenSolver,
+    AbstractScratchSolver,
+    Problem,
+    ResultProtocol,
+)
 from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
 import rpbench.two_dimensional.double_integrator_trajopt as diopt
@@ -124,6 +129,44 @@ class DoubleIntegratorOptimizationSolver(
             return DoubleIntegratorPlanningResult(traj, None, ret.nit)
         else:
             return DoubleIntegratorPlanningResult(None, None, ret.nit)
+
+
+@dataclass
+class DoubleIntegratorOptimizationDataDrivenSolver(
+    AbstractDataDrivenSolver[DoubleIntegratorPlanningConfig, DoubleIntegratorPlanningResult]
+):
+    config: DoubleIntegratorPlanningConfig
+    internal_solver: DoubleIntegratorOptimizationSolver
+    vec_descs: np.ndarray
+    trajectories: List[disbmp.Trajectory]
+
+    @classmethod
+    def init(
+        cls,
+        config: DoubleIntegratorPlanningConfig,
+        dataset: List[Tuple[np.ndarray, disbmp.Trajectory]],
+    ) -> "DoubleIntegratorOptimizationDataDrivenSolver":
+        vec_descs = np.array([p[0] for p in dataset])
+        trajectories = [p[1] for p in dataset]
+        internal_solver = DoubleIntegratorOptimizationSolver.init(config)
+        return cls(config, internal_solver, vec_descs, trajectories)
+
+    def _solve(self, query_desc: Optional[np.ndarray] = None) -> DoubleIntegratorPlanningResult:
+        if query_desc is not None:
+            sqdists = np.sum((self.vec_descs - query_desc) ** 2, axis=1)
+            idx_closest = np.argmin(sqdists)
+            reuse_traj = self.trajectories[idx_closest]
+        else:
+            reuse_traj = None
+        result = self.internal_solver._solve(reuse_traj)
+        return result
+
+    @classmethod
+    def get_result_type(cls) -> Type[DoubleIntegratorPlanningResult]:
+        return DoubleIntegratorPlanningResult
+
+    def _setup(self, problem: Problem) -> None:
+        self.internal_solver.setup(problem)
 
 
 @dataclass
@@ -367,7 +410,8 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         return probs
 
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        return [self.world.export_intrinsic_description()] * self.n_inner_task
+        # return [self.world.export_intrinsic_description()] * self.n_inner_task
+        return [np.hstack(desc) for desc in self.descriptions] * self.n_inner_task
 
     @staticmethod
     def create_cache(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
@@ -437,8 +481,8 @@ class Taskvisualizer:
         fig, ax = plt.subplots()
         task.world.visualize((fig, ax))
         for start, goal in task.descriptions:
-            ax.scatter(start[0], start[1], c="k")
-            ax.scatter(goal[0], goal[1], c="r")
+            ax.plot(start[0], start[1], "mo", markersize=10, label="start")
+            ax.plot(goal[0], goal[1], "m*", markersize=10, label="goal")
         ax.set_xlim([-0.1, 1.1])
         ax.set_ylim([-0.1, 1.1])
         ax.plot([0, 0, 1, 1, 0], [0, 1, 1, 0, 0], c="k")
@@ -452,3 +496,4 @@ class Taskvisualizer:
             trajs = [trajs]
         for traj in trajs:
             ax.plot(traj.X[:, 0], traj.X[:, 1], **kwargs)
+            ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
