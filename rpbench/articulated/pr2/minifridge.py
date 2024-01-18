@@ -113,6 +113,28 @@ class TabletopClutteredFridgeReachingTask(
 
         pr2 = provider.get_pr2()
 
+        joint_names = provider.get_config()._get_control_joint_names()
+        assert joint_names == [
+            "r_shoulder_pan_joint",
+            "r_shoulder_lift_joint",
+            "r_upper_arm_roll_joint",
+            "r_elbow_flex_joint",
+            "r_forearm_roll_joint",
+            "r_wrist_flex_joint",
+            "r_wrist_roll_joint",
+        ]
+        motion_step_box = np.array(
+            [
+                0.05,  # r_shoulder_pan_joint
+                0.05,  # r_shoulder_lift_joint
+                0.1,  # r_upper_arm_rolr_joint
+                0.1,  # r_elbow_flex_joint
+                0.2,  # r_forearm_rolr_joint
+                0.2,  # r_wrist_flex_joint
+                0.5,  # r_wrist_rolr_joint
+            ]
+        )
+
         for target_pose, base_pose in self.descriptions:
             set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
             pose_const = provider.get_pose_const([target_pose])
@@ -121,7 +143,7 @@ class TabletopClutteredFridgeReachingTask(
             ineq_const.reflect_skrobot_model(pr2)
 
             problem = Problem(
-                q_start, box_const, pose_const, ineq_const, None, motion_step_box_=0.05
+                q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
             )
             yield problem
 
