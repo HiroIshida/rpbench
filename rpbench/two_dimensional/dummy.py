@@ -230,7 +230,14 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         probs = []
         for desc in self.descriptions:
             goal_const = ConfigPointConst(desc)
-            prob = Problem(desc, box, goal_const, PointCollFreeConst(sdf), None)
+            prob = Problem(
+                desc,
+                box,
+                goal_const,
+                PointCollFreeConst(sdf),
+                None,
+                skip_init_feasibility_check=True,
+            )
             probs.append(prob)
         return probs
 
