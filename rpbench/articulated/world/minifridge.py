@@ -118,19 +118,9 @@ class FridgeWithContents(CascadedCoords):
         self.fridge = fridge
         self.contents = contents
 
-    @classmethod
-    def sample(cls, standard: bool = False):
-        fridge = Fridge.sample(standard)
-
-        if standard:
-            cylinder = CylinderSkelton(radius=0.02, height=0.12)
-            co = fridge.copy_worldcoords()
-            co.translate([0.0, 0.0, 0.06 + fridge.thickness])
-            cylinder.newcoords(co)
-            return cls(fridge, [cylinder])
-        n_obstacles = np.random.randint(1, 6)
-
-        D, W, H = fridge.target_region._extents
+    @staticmethod
+    def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
+        D, W, H = target_region._extents
         obstacle_h_max = H - 0.03
         obstacle_h_min = 0.05
         region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
@@ -166,8 +156,23 @@ class FridgeWithContents(CascadedCoords):
             else:
                 assert False
             obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
-            fridge.target_region.assoc(obj, relative_coords="local")
             contents.append(obj)
+        return contents
+
+    @classmethod
+    def sample(cls, standard: bool = False):
+        fridge = Fridge.sample(standard)
+
+        if standard:
+            cylinder = CylinderSkelton(radius=0.02, height=0.12)
+            co = fridge.copy_worldcoords()
+            co.translate([0.0, 0.0, 0.06 + fridge.thickness])
+            cylinder.newcoords(co)
+            return cls(fridge, [cylinder])
+        n_obstacles = np.random.randint(1, 6)
+        contents = cls.sample_contents(fridge.target_region, n_obstacles)
+        for content in contents:
+            fridge.target_region.assoc(content, relative_coords="local")
         return cls(fridge, contents)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
