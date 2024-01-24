@@ -429,6 +429,9 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         vals = grid_map.flatten()
         return Grid2dSDF(vals, world.get_grid(), itp)
 
+    def create_viewer(self) -> "Taskvisualizer":
+        return Taskvisualizer(self)
+
 
 class EmptyWorldProviderMixin:
     @staticmethod
@@ -491,6 +494,9 @@ class Taskvisualizer:
         ax.set_ylim([-0.1, 1.1])
         ax.plot([0, 0, 1, 1, 0], [0, 1, 1, 0, 0], c="k")
         self.fax = (fig, ax)
+
+    def show(self) -> None:
+        plt.show()
 
     def visualize_trajectories(
         self, trajs: Union[List[diopt.Trajectory], diopt.Trajectory], **kwargs
