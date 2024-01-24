@@ -17,7 +17,6 @@ from rpbench.articulated.jaxon.below_table import (
 from rpbench.articulated.pr2.jskfridge import (
     JskFridgeVerticalReachingTask,
     JskFridgeVerticalReachingTask2,
-    JskFridgeVerticalReachingTask3,
 )
 from rpbench.articulated.pr2.minifridge import TabletopClutteredFridgeReachingTask
 from rpbench.articulated.pr2.tabletop import (
@@ -199,7 +198,6 @@ def test_prob_dummy_task():
         HumanoidTableClutteredReachingTask2,
         JskFridgeVerticalReachingTask2,
         TabletopClutteredFridgeReachingTask,
-        JskFridgeVerticalReachingTask3,
     ],
 )
 def test_task_hash(task_type: Type[TabletopTaskBase]):

@@ -314,6 +314,7 @@ def randomize_region3(region: Region, n_obstacles: int = 5):
         if is_colliding:
             continue
         skelton.sdf.itp.fill_value = 1.0
+        raise NotImplementedError("itp affects hmap and robot sampling")
         obj_list.append(skelton)
         region.box.assoc(skelton, relative_coords="world")
         region.obstacles.append(skelton)

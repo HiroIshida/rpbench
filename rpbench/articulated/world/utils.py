@@ -70,6 +70,14 @@ class MeshSkelton(CascadedCoords, PrimitiveSkelton[MeshLink]):
         b_max = np.max(self.vertices, axis=0)
         return b_min, b_max
 
+    @property
+    def itp_fill_value(self) -> float:
+        return self.sdf.itp.fill_value
+
+    @itp_fill_value.setter
+    def itp_fill_value(self, value: float):
+        self.sdf.itp.fill_value = value
+
 
 class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
     # works as Box but does not have trimesh geometries

@@ -22,8 +22,6 @@ from rpbench.interface import WorldBase
 from rpbench.planer_box_utils import Box2d, Circle, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
-_HMAP_INF_SUBST = -1.0
-
 
 class Fridge(CascadedCoords):
     panels: Dict[str, BoxSkeleton]
@@ -138,6 +136,10 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         ...
 
+    @abstractmethod
+    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
+        ...
+
     @classmethod
     def sample(cls, standard: bool = False):
         fridge = Fridge.sample(standard)
@@ -201,13 +203,6 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
 
         return False
 
-    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
-        hmap_config = HeightmapConfig(n_grid, n_grid)
-        hmap = LocatedHeightmap.by_raymarching(
-            self.fridge.target_region, self.contents, conf=hmap_config
-        )
-        return hmap.heightmap
-
 
 class FridgeWithContents(FridgeWithContentsBase):
     @staticmethod
@@ -270,6 +265,13 @@ class FridgeWithContents(FridgeWithContentsBase):
         co = Coordinates(pos)
         return co
 
+    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
+        hmap_config = HeightmapConfig(n_grid, n_grid)
+        hmap = LocatedHeightmap.by_raymarching(
+            self.fridge.target_region, self.contents, conf=hmap_config
+        )
+        return hmap.heightmap
+
 
 class FridgeWithRealisticContents(FridgeWithContentsBase):
     # with domain gap
@@ -281,6 +283,7 @@ class FridgeWithRealisticContents(FridgeWithContentsBase):
         mesh_list = [
             ycb_utils_load_singleton("006_mustard_bottle", scale=1.0),
             ycb_utils_load_singleton("010_potted_meat_can"),
+            ycb_utils_load_singleton("013_apple"),
             ycb_utils_load_singleton("019_pitcher_base", scale=1.0),
         ]
         skelton_list = [MeshSkelton(mesh, fill_value=0.03, dim_grid=30) for mesh in mesh_list]
@@ -337,6 +340,18 @@ class FridgeWithRealisticContents(FridgeWithContentsBase):
         pos = self.transform_vector(np.zeros(3))
         co = Coordinates(pos)
         return co
+
+    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
+        hmap_config = HeightmapConfig(n_grid, n_grid)
+        for content in self.contents:
+            content.itp_fill_value = 0.03
+
+        hmap = LocatedHeightmap.by_raymarching(
+            self.fridge.target_region, self.contents, conf=hmap_config
+        )
+        for content in self.contents:
+            content.itp_fill_value = 1.0
+        return hmap.heightmap
 
 
 @dataclass
