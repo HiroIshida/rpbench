@@ -1,4 +1,5 @@
 import pickle
+import socket
 from hashlib import md5
 from typing import Any, Type
 
@@ -26,6 +27,7 @@ from rpbench.articulated.pr2.tabletop import (
     TabletopOvenWorldWrap,
     TabletopTaskBase,
 )
+from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
 from rpbench.two_dimensional.dummy import DummyConfig, DummySolver, DummyTask
 
 np.random.seed(0)
@@ -206,3 +208,30 @@ def test_task_hash(task_type: Type[TabletopTaskBase]):
         hval2 = task_type.compute_distribution_hash()
         HumanoidTableReachingTask2,
         assert hval == hval2
+
+
+def test_task_hash_value():
+    # these tasks are used in TRO submission or Phd thesis.
+    # if you change the task definition, you must change the hash value here.
+    if socket.gethostname() != "azarashi":
+        # somehow, the test fails on github actions
+        pytest.skip("this test is only for azarashi (my computer)")
+
+    assert (
+        HumanoidTableReachingTask.compute_distribution_hash() == "d49ee725d0f62d9382bccfa614c73b0a"
+    )
+    assert (
+        HumanoidTableReachingTask2.compute_distribution_hash() == "d49ee725d0f62d9382bccfa614c73b0a"
+    )
+    assert (
+        JskFridgeVerticalReachingTask.compute_distribution_hash()
+        == "6a138d57891b62785f3ae3ca02b7771d"
+    )
+    assert (
+        TabletopClutteredFridgeReachingTask.compute_distribution_hash()
+        == "fa3be78522599984748e07670907c3c7"
+    )
+    assert (
+        BubblySimpleMeshPointConnectTask.compute_distribution_hash()
+        == "50a20e5db0fc6e1140f51fc8b7e84069"
+    )
