@@ -29,6 +29,10 @@ from rpbench.two_dimensional.double_integrator_trajopt import (
 from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
 
+# NOTE: as double-integrator planning is quite different from other tasks
+# we violate the task and other protocols here. So there is not type checking
+# will be performed for this file.
+
 
 @dataclass
 class DoubleIntegratorPlanningProblem:
@@ -38,7 +42,7 @@ class DoubleIntegratorPlanningProblem:
     tbound: TrajectoryBound
     dt: float
 
-    def check_init_feasibility(self) -> bool:
+    def check_init_feasibility(self) -> Tuple[bool, str]:
         return True, "always_ok"
 
 
@@ -69,7 +73,7 @@ class DoubleIntegratorOptimizationSolver(
     traj_conf: Optional[diopt.TrajectoryConfig]
     osqp_solver: Optional[OsqpSqpSolver]
 
-    def get_result_type(self) -> DoubleIntegratorPlanningResult:
+    def get_result_type(self) -> Type[DoubleIntegratorPlanningResult]:
         return DoubleIntegratorPlanningResult
 
     @classmethod
