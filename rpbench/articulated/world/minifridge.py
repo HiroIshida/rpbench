@@ -168,11 +168,6 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
         contents = cls.sample_contents(fridge.target_region, n_obstacles)
         for content in contents:
             assert content.parent == fridge.target_region
-        # check if target_region has contets assoced
-
-        # contents = cls.sample_test_contents(fridge.target_region, n_obstacles)
-        # for content in contents:
-        #     fridge.assoc(content, relative_coords="world")
         return cls(fridge, contents)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -267,6 +262,22 @@ class FridgeWithContents(FridgeWithContentsBase):
             self.fridge.target_region, self.contents, conf=hmap_config
         )
         return hmap.heightmap
+
+
+class FridgeWithManyContents(FridgeWithContents):
+    @classmethod
+    def sample(cls, standard: bool = False):
+        fridge = Fridge.sample(standard)
+        if standard:
+            cylinder = CylinderSkelton(radius=0.02, height=0.12)
+            co = fridge.copy_worldcoords()
+            co.translate([0.0, 0.0, 0.06 + fridge.thickness])
+            cylinder.newcoords(co)
+            return cls(fridge, [cylinder])
+        contents = cls.sample_contents(fridge.target_region, 10)
+        for content in contents:
+            assert content.parent == fridge.target_region
+        return cls(fridge, contents)
 
 
 class FridgeWithRealisticContents(FridgeWithContentsBase):
@@ -380,6 +391,12 @@ class TabletopClutteredFridgeWorld(TabletopClutteredFridgeWorldBase):
     @classmethod
     def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
         return FridgeWithContents
+
+
+class TabletopClutteredFridgeWorldWithManyContents(TabletopClutteredFridgeWorldBase):
+    @classmethod
+    def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
+        return FridgeWithManyContents
 
 
 class TabletopClutteredFridgeWorldWithRealisticContents(TabletopClutteredFridgeWorldBase):

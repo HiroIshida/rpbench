@@ -20,6 +20,7 @@ from rpbench.articulated.pr2.common import (
 )
 from rpbench.articulated.world.minifridge import (
     TabletopClutteredFridgeWorld,
+    TabletopClutteredFridgeWorldWithManyContents,
     TabletopClutteredFridgeWorldWithRealisticContents,
 )
 from rpbench.interface import (
@@ -213,6 +214,14 @@ class TabletopClutteredFridgeReachingTask(
     @staticmethod
     def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
         return TabletopClutteredFridgeWorld
+
+
+class TabletopClutteredFridgeReachingManyContentsTask(
+    TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithManyContents]
+):
+    @staticmethod
+    def get_world_type() -> Type[TabletopClutteredFridgeWorldWithManyContents]:
+        return TabletopClutteredFridgeWorldWithManyContents
 
 
 class TabletopClutteredFridgeReachingRealisticTask(
