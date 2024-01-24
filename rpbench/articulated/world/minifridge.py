@@ -126,14 +126,28 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
         self.fridge = fridge
         self.contents = contents
 
+    def sample_pregrasp_coords(self) -> Optional[Coordinates]:
+        region = self.fridge.target_region
+        n_budget = 100
+        sdf = self.get_exact_sdf()
+        for _ in range(n_budget):
+            pos = region.sample_points(1)[0]
+            co = Coordinates(pos)
+            yaw = np.random.uniform(-0.3 * np.pi, 0.3 * np.pi)
+            co.rotate(yaw, "z")
+            co.rotate(0.5 * np.pi, "x")
+
+            if not self.is_obviously_infeasible(sdf, co):
+                return co
+
+        pos = self.transform_vector(np.zeros(3))
+        co = Coordinates(pos)
+        return co
+
     @staticmethod
     @abstractmethod
     def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
         # this is dirty but please assoc the contenets to target_region inside!!!!
-        ...
-
-    @abstractmethod
-    def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         ...
 
     @abstractmethod
@@ -247,24 +261,6 @@ class FridgeWithContents(FridgeWithContentsBase):
             target_region.assoc(obj, relative_coords="local")
         return contents
 
-    def sample_pregrasp_coords(self) -> Optional[Coordinates]:
-        region = self.fridge.target_region
-        n_budget = 100
-        sdf = self.get_exact_sdf()
-        for _ in range(n_budget):
-            pos = region.sample_points(1)[0]
-            co = Coordinates(pos)
-            yaw = np.random.uniform(-0.3 * np.pi, 0.3 * np.pi)
-            co.rotate(yaw, "z")
-            co.rotate(0.5 * np.pi, "x")
-
-            if not self.is_obviously_infeasible(sdf, co):
-                return co
-
-        pos = self.transform_vector(np.zeros(3))
-        co = Coordinates(pos)
-        return co
-
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         hmap_config = HeightmapConfig(n_grid, n_grid)
         hmap = LocatedHeightmap.by_raymarching(
@@ -316,30 +312,6 @@ class FridgeWithRealisticContents(FridgeWithContentsBase):
             obj_list.append(skelton)
             target_region.assoc(skelton, relative_coords="world")
         return obj_list
-
-    def sample_pregrasp_coords(self) -> Optional[Coordinates]:
-        region = self.fridge.target_region
-        region_center = region.worldpos()
-        n_budget = 100
-        sdf = self.get_exact_sdf()
-        for _ in range(n_budget):
-            pos = region.sample_points(1)[0]
-
-            # to make problem difficult
-            if pos[0] < region_center[0]:
-                continue
-
-            co = Coordinates(pos)
-            yaw = np.random.uniform(-0.3 * np.pi, 0.3 * np.pi)
-            co.rotate(yaw, "z")
-            co.rotate(0.5 * np.pi, "x")
-
-            if not self.is_obviously_infeasible(sdf, co):
-                return co
-
-        pos = self.transform_vector(np.zeros(3))
-        co = Coordinates(pos)
-        return co
 
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         hmap_config = HeightmapConfig(n_grid, n_grid)
