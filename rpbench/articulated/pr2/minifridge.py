@@ -18,21 +18,26 @@ from rpbench.articulated.pr2.common import (
     CachedRArmFixedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
-from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
-from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
+from rpbench.articulated.world.minifridge import (
+    TabletopClutteredFridgeWorld,
+    TabletopClutteredFridgeWorldWithRealisticContents,
+)
+from rpbench.interface import (
+    DescriptionTable,
+    Problem,
+    ResultProtocol,
+    TaskBase,
+    WorldT,
+)
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 
-class TabletopClutteredFridgeReachingTask(
-    TaskBase[TabletopClutteredFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
+class TabletopClutteredFridgeReachingTaskBase(
+    TaskBase[WorldT, Tuple[Coordinates, np.ndarray], RobotModel]
 ):
     config_provider: ClassVar[
         Type[CachedRArmFixedPR2ConstProvider]
     ] = CachedRArmFixedPR2ConstProvider
-
-    @staticmethod
-    def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
-        return TabletopClutteredFridgeWorld
 
     @staticmethod
     def get_robot_model() -> RobotModel:
@@ -200,3 +205,19 @@ class TabletopClutteredFridgeReachingTask(
 
         obj.viewer.camera_transform = t
         return obj
+
+
+class TabletopClutteredFridgeReachingTask(
+    TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorld]
+):
+    @staticmethod
+    def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
+        return TabletopClutteredFridgeWorld
+
+
+class TabletopClutteredFridgeReachingRealisticTask(
+    TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithRealisticContents]
+):
+    @staticmethod
+    def get_world_type() -> Type[TabletopClutteredFridgeWorldWithRealisticContents]:
+        return TabletopClutteredFridgeWorldWithRealisticContents
