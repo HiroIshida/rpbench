@@ -326,6 +326,10 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
         raise NotImplementedError()
 
+    def export_full_descriptions(self) -> List[np.ndarray]:
+        # dirty method for phd thesis
+        raise NotImplementedError()
+
     def __len__(self) -> int:
         """return number of descriptions"""
         return len(self.descriptions)
@@ -554,6 +558,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
     skmp_solver: AbstractDataDrivenSolver
     query_desc: Optional[np.ndarray]
     task_type: Type[TaskT]
+    use_full_desc: bool
 
     @classmethod
     def init(
@@ -562,6 +567,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         solver_config: ConfigT,
         dataset: PlanningDataset[TaskT],
         n_data_use: Optional[int] = None,
+        use_full_desc: bool = False,
     ) -> "DatadrivenTaskSolver[TaskT, ConfigT, ResultT]":
 
         if n_data_use is None:
@@ -574,7 +580,10 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         dim_desc = None
         for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]
-            desc = task.export_intrinsic_descriptions()[0]
+            if use_full_desc:
+                desc = task.export_full_descriptions()[0]
+            else:
+                desc = task.export_intrinsic_descriptions()[0]
             if dim_desc is None:
                 dim_desc = len(desc)
             else:
@@ -583,14 +592,17 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
             pairs_modified.append(pair)
         print("dim desc: {}".format(dim_desc))
         solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
-        return cls(solver, None, dataset.task_type)
+        return cls(solver, None, dataset.task_type, use_full_desc)
 
     def setup(self, task: TaskT) -> None:
         assert task.n_inner_task == 1
         probs = [p for p in task.export_problems()]
         prob = probs[0]
         self.skmp_solver.setup(prob)
-        self.query_desc = task.export_intrinsic_descriptions()[0]
+        if self.use_full_desc:
+            self.query_desc = task.export_full_descriptions()[0]
+        else:
+            self.query_desc = task.export_intrinsic_descriptions()[0]
 
     def solve(self) -> ResultT:
         assert self.query_desc is not None

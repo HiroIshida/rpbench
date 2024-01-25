@@ -387,10 +387,33 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
         return self.fridge_conts.sample_pregrasp_coords()
 
 
+_EXPORT_METHOD = {"method": None}
+
+
+def _get_method():
+    return _EXPORT_METHOD["method"]
+
+
+def set_export_method(whatever):  # TODO: what the hell is this
+    # if whatever is callbale: the interface shuld be np.ndarray -> np.ndarray
+    # where the input is 2d array of heightmap and the output is a 1d array
+    _EXPORT_METHOD["method"] = whatever
+
+
 class TabletopClutteredFridgeWorld(TabletopClutteredFridgeWorldBase):
     @classmethod
     def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
         return FridgeWithContents
+
+    def export_full_description(self) -> np.ndarray:
+        if _EXPORT_METHOD["method"] is None:
+            return np.zeros(0)  # nothing is exported
+        elif callable(_EXPORT_METHOD["method"]):
+            return _EXPORT_METHOD["method"](self)
+        elif _EXPORT_METHOD["method"] == "raw":
+            return self.heightmap().flatten()
+        else:
+            assert False
 
 
 class TabletopClutteredFridgeWorldWithManyContents(TabletopClutteredFridgeWorldBase):

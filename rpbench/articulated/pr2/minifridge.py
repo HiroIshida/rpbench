@@ -80,6 +80,17 @@ class TabletopClutteredFridgeReachingTaskBase(
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
 
+    def export_full_descriptions(self) -> List[np.ndarray]:
+        world_vec = self.world.export_intrinsic_description()
+        # duplication with export_intrinsic_descriptions
+        descs = []
+        for desc in self.descriptions:
+            target_pose, base_pose = desc
+            vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
+            descs = np.hstack(vecs)
+            descs.append(descs)
+        return descs
+
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
         world_vec = self.world.export_intrinsic_description()
 
