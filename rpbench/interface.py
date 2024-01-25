@@ -571,12 +571,17 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
             raise NotEnoughDataException(message)
 
         pairs_modified = []
-        for i in range(n_data_use):
+        dim_desc = None
+        for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]
             desc = task.export_intrinsic_descriptions()[0]
+            if dim_desc is None:
+                dim_desc = len(desc)
+            else:
+                assert dim_desc == len(desc)
             pair = (desc, traj)
             pairs_modified.append(pair)
-
+        print("dim desc: {}".format(dim_desc))
         solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
         return cls(solver, None, dataset.task_type)
 
