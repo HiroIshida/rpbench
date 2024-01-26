@@ -183,7 +183,7 @@ class TabletopClutteredFridgeReachingTaskBase(
         assert len(self.descriptions) == 1
         target_co, base_pose = self.descriptions[0]
         geometries = [Axis.from_coords(target_co)]
-
+        # geometries = []
         config = self.config_provider.get_config()  # type: ignore[attr-defined]
         pr2 = self.config_provider.get_pr2()  # type: ignore[attr-defined]
         set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
@@ -214,6 +214,12 @@ class TabletopClutteredFridgeReachingTaskBase(
                 [0.0, 0.0, 0.0, 1.0],
             ]
         )
+
+        # the below for specifically for visualizing the container contents
+        # t = np.array([[-0.00814724,  0.72166326, -0.69219633, -0.01127641],
+        #               [-0.99957574,  0.01348003,  0.02581901,  0.06577777],
+        #               [ 0.02796346,  0.69211302,  0.72124726,  1.52418492],
+        #               [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
         obj.viewer.camera_transform = t
         return obj
