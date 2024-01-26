@@ -274,10 +274,38 @@ class FridgeWithManyContents(FridgeWithContents):
             co.translate([0.0, 0.0, 0.06 + fridge.thickness])
             cylinder.newcoords(co)
             return cls(fridge, [cylinder])
-        contents = cls.sample_contents(fridge.target_region, 10)
+        contents = cls.sample_contents(fridge.target_region, 7)
         for content in contents:
             assert content.parent == fridge.target_region
         return cls(fridge, contents)
+
+    @staticmethod
+    def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
+        D, W, H = target_region._extents
+        obstacle_h_max = H - 0.03
+        region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
+
+        obj2d_list = []  # type: ignore
+        while len(obj2d_list) < n_obstacles:
+            center = region2d.sample_point()
+            np.random.rand() < 0.5
+            r = 0.015
+            obj2d = Circle(center, r)
+
+            if not region2d.contains(obj2d):
+                continue
+            if any([is_colliding(obj2d, o) for o in obj2d_list]):
+                continue
+            obj2d_list.append(obj2d)
+
+        contents: List[Any] = []
+        for obj2d in obj2d_list:
+            h = obstacle_h_max - 0.02
+            obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
+            obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
+            contents.append(obj)
+            target_region.assoc(obj, relative_coords="local")
+        return contents
 
 
 class FridgeWithRealisticContents(FridgeWithContentsBase):
