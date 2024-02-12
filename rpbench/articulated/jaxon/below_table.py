@@ -257,6 +257,7 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
                 ineq_const,
                 global_eq_const,
                 motion_step_box_=jaxon_config.get_motion_step_box() * 0.5,
+                skip_init_feasibility_check=True,
             )
             problems.append(problem)
         return problems
