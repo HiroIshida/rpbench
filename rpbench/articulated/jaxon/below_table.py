@@ -77,20 +77,24 @@ class BelowTableWorldBase(WorldBase):
             viewer.add(skobs)
 
     @staticmethod
-    def sample_table_and_target_region(standard: bool = False) -> Tuple[BoxSkeleton, BoxSkeleton]:
+    def sample_table_and_target_region(
+        standard: bool = False,
+    ) -> Tuple[BoxSkeleton, BoxSkeleton, np.ndarray]:
         if standard:
             table_position = np.array([0.8, 0.0, 0.8])
         else:
             table_position = np.array([0.7, 0.0, 0.6]) + np.random.rand(3) * np.array(
                 [0.5, 0.0, 0.4]
             )
+
         table = BoxSkeleton([1.0, 3.0, 0.1])
         table.translate(table_position)
 
         table_height = table_position[2]
         target_region = BoxSkeleton([0.8, 0.8, table_height])
         target_region.translate([0.6, -0.7, 0.5 * table_height])
-        return table, target_region
+        desc = table_position[[0, 2]]
+        return table, target_region, desc
 
 
 @dataclass
@@ -98,8 +102,8 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "BelowTableSingleObstacleWorld":
 
-        table, target_region = cls.sample_table_and_target_region(standard)
-        table_position = table.worldpos()
+        table, target_region, desc_table = cls.sample_table_and_target_region(standard)
+        table.worldpos()
 
         # determine obstacle
         if standard:
@@ -118,7 +122,10 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
             pos = np.hstack([pos2d, obs_height * 0.5])
             obs = BoxSkeleton(np.hstack([obs_width, obs_height]), pos=pos)
 
-        return cls(target_region, table, [obs], table_position)
+        desc_obstacle = np.hstack([obs.extents, obs.worldpos()[:2]])
+        desc_world = np.hstack([desc_table, desc_obstacle])
+
+        return cls(target_region, table, [obs], desc_world)
 
 
 @dataclass

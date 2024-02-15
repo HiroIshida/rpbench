@@ -233,3 +233,21 @@ def test_task_hash_value():
         BubblySimpleMeshPointConnectTask.compute_distribution_hash()
         == "50a20e5db0fc6e1140f51fc8b7e84069"
     )
+
+
+# test specific tasks (covered in journal) below
+
+
+def test_humanoid_table_reaching2_description():
+    descs = []
+    for _ in range(10):
+        task = HumanoidTableReachingTask2.sample(1)
+        desc = task.export_intrinsic_descriptions()[0]
+        assert len(desc) == (2 + 5 + 6)
+        descs.append(desc)
+    descs = np.array(descs)
+
+    descs_rpy = descs[:, -3:]
+    assert np.all(descs_rpy[:, 0] == descs_rpy[0, 0])
+    assert np.all(descs_rpy[:, 1] == descs_rpy[0, 1])
+    assert np.all(descs_rpy[:, 2] == descs_rpy[0, 2])
