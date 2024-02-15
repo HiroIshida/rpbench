@@ -1,5 +1,5 @@
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
-from skmp.solver.ompl_solver import OMPLDataDrivenSolver, OMPLSolver, OMPLSolverConfig
+from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.articulated.pr2.tabletop import TabletopOvenRightArmReachingTask
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset, SkmpTaskSolver
@@ -21,7 +21,7 @@ def test_task_sovler():
     assert res.traj is not None
     dataset = PlanningDataset([(task, res.traj)], task_type, 0.0)
 
-    lightning = DatadrivenTaskSolver.init(OMPLDataDrivenSolver, OMPLSolverConfig(), dataset)  # type: ignore
+    lightning = DatadrivenTaskSolver.init(OMPLSolver, OMPLSolverConfig(), dataset)  # type: ignore
     solvers.append(lightning)  # type: ignore[arg-type]
 
     # create sqpbased

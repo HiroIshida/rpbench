@@ -26,9 +26,9 @@ import numpy as np
 import threadpoolctl
 import tqdm
 from skmp.solver.interface import (
-    AbstractDataDrivenSolver,
     AbstractScratchSolver,
     ConfigT,
+    NearestNeigborSolver,
     ParallelSolver,
     Problem,
     ResultProtocol,
@@ -555,7 +555,7 @@ class NotEnoughDataException(Exception):
 
 @dataclass
 class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
-    skmp_solver: AbstractDataDrivenSolver
+    skmp_solver: NearestNeigborSolver
     query_desc: Optional[np.ndarray]
     task_type: Type[TaskT]
     use_full_desc: bool
@@ -563,11 +563,12 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
     @classmethod
     def init(
         cls,
-        skmp_dd_solver_type: Type[AbstractDataDrivenSolver[ConfigT, ResultT]],
+        skmp_solver_type: Type[AbstractScratchSolver[ConfigT, ResultT]],
         solver_config: ConfigT,
         dataset: PlanningDataset[TaskT],
         n_data_use: Optional[int] = None,
         use_full_desc: bool = False,
+        knn: int = 1,
     ) -> "DatadrivenTaskSolver[TaskT, ConfigT, ResultT]":
 
         if n_data_use is None:
@@ -591,7 +592,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
             pair = (desc, traj)
             pairs_modified.append(pair)
         print("dim desc: {}".format(dim_desc))
-        solver = skmp_dd_solver_type.init(solver_config, pairs_modified)
+        solver = NearestNeigborSolver.init(skmp_solver_type, solver_config, pairs_modified, knn)
         return cls(solver, None, dataset.task_type, use_full_desc)
 
     def setup(self, task: TaskT) -> None:

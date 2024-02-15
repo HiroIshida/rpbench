@@ -9,12 +9,7 @@ import numpy as np
 import scipy.sparse as sparse
 from disbmp import BoundingBox, FastMarchingTree, State
 from scipy.interpolate import RegularGridInterpolator
-from skmp.solver.interface import (
-    AbstractDataDrivenSolver,
-    AbstractScratchSolver,
-    Problem,
-    ResultProtocol,
-)
+from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
 from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
 import rpbench.two_dimensional.double_integrator_trajopt as diopt
@@ -133,44 +128,6 @@ class DoubleIntegratorOptimizationSolver(
             return DoubleIntegratorPlanningResult(traj, None, ret.nit)
         else:
             return DoubleIntegratorPlanningResult(None, None, ret.nit)
-
-
-@dataclass
-class DoubleIntegratorOptimizationDataDrivenSolver(
-    AbstractDataDrivenSolver[DoubleIntegratorPlanningConfig, DoubleIntegratorPlanningResult]
-):
-    config: DoubleIntegratorPlanningConfig
-    internal_solver: DoubleIntegratorOptimizationSolver
-    vec_descs: np.ndarray
-    trajectories: List[disbmp.Trajectory]
-
-    @classmethod
-    def init(
-        cls,
-        config: DoubleIntegratorPlanningConfig,
-        dataset: List[Tuple[np.ndarray, disbmp.Trajectory]],
-    ) -> "DoubleIntegratorOptimizationDataDrivenSolver":
-        vec_descs = np.array([p[0] for p in dataset])
-        trajectories = [p[1] for p in dataset]
-        internal_solver = DoubleIntegratorOptimizationSolver.init(config)
-        return cls(config, internal_solver, vec_descs, trajectories)
-
-    def _solve(self, query_desc: Optional[np.ndarray] = None) -> DoubleIntegratorPlanningResult:
-        if query_desc is not None:
-            sqdists = np.sum((self.vec_descs - query_desc) ** 2, axis=1)
-            idx_closest = np.argmin(sqdists)
-            reuse_traj = self.trajectories[idx_closest]
-        else:
-            reuse_traj = None
-        result = self.internal_solver._solve(reuse_traj)
-        return result
-
-    @classmethod
-    def get_result_type(cls) -> Type[DoubleIntegratorPlanningResult]:
-        return DoubleIntegratorPlanningResult
-
-    def _setup(self, problem: Problem) -> None:
-        self.internal_solver.setup(problem)
 
 
 @dataclass
