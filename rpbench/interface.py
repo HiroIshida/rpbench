@@ -579,3 +579,11 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         result = self.skmp_solver.solve(self.query_desc)
         self.query_desc = None
         return result
+
+    @property
+    def previous_est_positive(self) -> Optional[bool]:
+        return self.skmp_solver.previous_est_positive
+
+    @property
+    def previous_false_positive(self) -> Optional[bool]:
+        return self.skmp_solver.previous_false_positive
