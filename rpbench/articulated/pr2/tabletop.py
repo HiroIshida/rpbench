@@ -96,10 +96,14 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
         return CachedPR2ConstProvider.get_pr2()
 
     def export_table(self) -> DescriptionTable:
+        # TODO: make exportaion method chainable
         assert self.cache is not None
         world_dict = {}
-        world_dict["world"] = self.cache.values.reshape(self.cache.grid.sizes)
-        world_dict["table_pose"] = skcoords_to_pose_vec(self.world.table.worldcoords())
+        world_vector, world_mesh = self.world.export_description(None)
+        if world_vector is not None:
+            world_dict["world_vector"] = world_vector
+        if world_mesh is not None:
+            world_dict["world_mesh"] = world_mesh
 
         desc_dicts = []
         for desc in self.descriptions:
@@ -116,9 +120,6 @@ class TabletopSamplableBase(SamplableBase[TabletopWorldT, DescriptionT, RobotMod
                 desc_dict[name] = pose
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
-
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        return [self.world.export_intrinsic_description()] * self.n_inner_task
 
     @classmethod
     def cast_from(cls: Type[TabletopSamplableT], other: SamplableT) -> TabletopSamplableT:

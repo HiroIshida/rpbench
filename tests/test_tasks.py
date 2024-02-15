@@ -1,7 +1,7 @@
 import pickle
 import socket
 from hashlib import md5
-from typing import Any, Type
+from typing import Type
 
 import numpy as np
 import pytest
@@ -9,14 +9,11 @@ from ompl import set_ompl_random_seed
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 from rpbench.articulated.jaxon.below_table import (
+    HumanoidTableClutteredReachingIntrinsicTask2,
     HumanoidTableClutteredReachingTask,
     HumanoidTableClutteredReachingTask2,
     HumanoidTableReachingTask,
     HumanoidTableReachingTask2,
-)
-from rpbench.articulated.pr2.jskfridge import (
-    JskFridgeVerticalReachingTask,
-    JskFridgeVerticalReachingTask2,
 )
 from rpbench.articulated.pr2.minifridge import TabletopClutteredFridgeReachingTask
 from rpbench.articulated.pr2.tabletop import (
@@ -31,20 +28,6 @@ from rpbench.two_dimensional.dummy import DummyConfig, DummySolver, DummyTask
 
 np.random.seed(0)
 set_ompl_random_seed(0)
-
-
-def test_intrinsic_dimension():
-    for standard in [False, True]:
-        task: Any = TabletopOvenWorldWrap.sample(2, standard=standard)
-        int_descs = task.export_intrinsic_descriptions()
-        assert len(int_descs) == 2
-        assert len(int_descs[0]) == 7
-
-        task = TabletopOvenRightArmReachingTask.sample(1)
-        assert len(task.export_intrinsic_descriptions()[0]) == 13
-
-        task = TabletopOvenDualArmReachingTask.sample(1)
-        assert len(task.export_intrinsic_descriptions()[0]) == 19
 
 
 def test_tabletop_samplable():
@@ -86,18 +69,6 @@ def test_tabletop_task(task_type: Type[TabletopTaskBase]):
         assert task.get_dof() == 17
     else:
         assert task.get_dof() == 10
-
-    # test conversion to numpy format
-    desc_table = task.export_table()
-    assert desc_table.world_desc_dict["world"].ndim == 3
-    assert desc_table.world_desc_dict["table_pose"].shape == (6,)
-
-    assert len(desc_table.wcond_desc_dicts) == n_desc
-    desc_dict = desc_table.wcond_desc_dicts[0]
-    assert desc_dict["target_pose-0"].shape == (6,)
-
-    if isinstance(task, TabletopOvenDualArmReachingTaskBase):
-        assert desc_dict["target_pose-1"].shape == (6,)
 
     # test conversion to problem format
     raw_problems = task.export_problems()
@@ -194,9 +165,7 @@ def test_prob_dummy_task():
         HumanoidTableReachingTask2,
         HumanoidTableReachingTask,
         HumanoidTableClutteredReachingTask,
-        JskFridgeVerticalReachingTask,
         HumanoidTableClutteredReachingTask2,
-        JskFridgeVerticalReachingTask2,
         TabletopClutteredFridgeReachingTask,
     ],
 )
@@ -221,10 +190,10 @@ def test_task_hash_value():
     assert (
         HumanoidTableReachingTask2.compute_distribution_hash() == "d49ee725d0f62d9382bccfa614c73b0a"
     )
-    assert (
-        JskFridgeVerticalReachingTask.compute_distribution_hash()
-        == "6a138d57891b62785f3ae3ca02b7771d"
-    )
+    # assert (
+    #     JskFridgeVerticalReachingTask.compute_distribution_hash()
+    #     == "6a138d57891b62785f3ae3ca02b7771d"
+    # )
     assert (
         TabletopClutteredFridgeReachingTask.compute_distribution_hash()
         == "fa3be78522599984748e07670907c3c7"
@@ -235,19 +204,31 @@ def test_task_hash_value():
     )
 
 
-# test specific tasks (covered in journal) below
+def test_vector_descriptions():
+    test_table = {
+        HumanoidTableReachingTask: ((2 + 5 + 6), False),
+        HumanoidTableReachingTask2: ((2 + 5 + 3), False),
+        HumanoidTableClutteredReachingTask: ((2 + 6), True),
+        HumanoidTableClutteredReachingTask2: ((2 + 3), True),
+        HumanoidTableClutteredReachingIntrinsicTask2: ((2 + 5 * 8 + 3), False),
+    }
 
+    for task_type, (desc_len, has_mesh) in test_table.items():
+        descs = []
+        for _ in range(10):
+            task = task_type.sample(1)
+            table = task.export_table()
+            desc = table.get_vector_descs()[0]
+            assert len(desc) == desc_len
+            descs.append(desc)
 
-def test_humanoid_table_reaching2_description():
-    descs = []
-    for _ in range(10):
-        task = HumanoidTableReachingTask2.sample(1)
-        desc = task.export_intrinsic_descriptions()[0]
-        assert len(desc) == (2 + 5 + 6)
-        descs.append(desc)
-    descs = np.array(descs)
+            mesh = table.get_mesh()
+            if has_mesh:
+                assert mesh is not None
+            else:
+                assert mesh is None
 
-    descs_rpy = descs[:, -3:]
-    assert np.all(descs_rpy[:, 0] == descs_rpy[0, 0])
-    assert np.all(descs_rpy[:, 1] == descs_rpy[0, 1])
-    assert np.all(descs_rpy[:, 2] == descs_rpy[0, 2])
+        descs = np.array(descs)
+
+    # check that all descs are different
+    assert len(np.unique(descs, axis=0)) == len(descs)

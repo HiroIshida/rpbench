@@ -1,5 +1,6 @@
+from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, TypeVar, Union
+from typing import List, Optional, Tuple, TypeVar, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -107,9 +108,23 @@ class TabletopWorldBase(WorldBase):
         co.translate(relative_pos)
         return co
 
+    def export_description(
+        self, method: Optional[str] = None
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        print("descriptions are not tested yet!!!!!!!!!")
+        return self._export_description(method)
+
+    @abstractmethod
+    def _export_description(
+        self, method: Optional[str] = None
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        raise NotImplementedError
+
 
 @dataclass
 class TabletopClutterWorld(TabletopWorldBase):
+    _intrinsic_desc: np.ndarray
+
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopClutterWorld":
         intrinsic_desc = []
@@ -126,6 +141,7 @@ class TabletopClutterWorld(TabletopWorldBase):
             intrinsic_desc.extend([x_rand, y_rand])
         else:
             intrinsic_desc.extend([0.0, 0.0])
+        assert len(intrinsic_desc) == 2
 
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
@@ -135,12 +151,14 @@ class TabletopClutterWorld(TabletopWorldBase):
         obstacles = []  # reaching box is also an obstacle in planning context
         obstacles_2ds = []
 
+        n_obs_max = 8
         if standard:
             n_obs = 0
         else:
-            n_obs = 1 + np.random.randint(8)
+            n_obs = 1 + np.random.randint(n_obs_max + 1)
+        obstacle_desc_mat = np.zeros((n_obs_max, 6))
 
-        for _ in range(n_obs):
+        for i in range(n_obs):
             obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.1, 0.1, 0.15])
             obs2d = sample_box(table_extent, obs_extent[:2], [])
             if obs2d is None:
@@ -155,6 +173,18 @@ class TabletopClutterWorld(TabletopWorldBase):
             obs.rotate(obs2d.coords.angle, "z")
             obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
             obstacles.append(obs)
+            obstacle_desc_mat[i] = np.array(
+                [
+                    obs2d.coords.pos[0],
+                    obs2d.coords.pos[1],
+                    obs2d.coords.angle,
+                    obs_extent[0],
+                    obs_extent[1],
+                    obs_extent[2],
+                ]
+            )
+        obstacles_desc = obstacle_desc_mat.flatten()
+        desc = np.hstack([obstacles_desc, intrinsic_desc])
 
         # check if all obstacle dont collide each other
 
@@ -165,12 +195,23 @@ class TabletopClutterWorld(TabletopWorldBase):
                 obs.visualize((fig, ax), "green")
             ax.set_aspect("equal", adjustable="box")
 
-        return cls(table, obstacles)
+        return cls(table, obstacles, desc)
+
+    def _export_description(
+        self, method: Optional[str] = None
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        if method is None:
+            return self._intrinsic_desc[:2], self.create_exact_heightmap()
+        elif method == "intrinsic":
+            return self._intrinsic_desc, None
+        else:
+            raise NotImplementedError
 
 
 @dataclass
 class TabletopBoxWorld(TabletopWorldBase):
     box: Box
+    _intrinsic_desc: np.ndarray
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopBoxWorld":
@@ -188,6 +229,7 @@ class TabletopBoxWorld(TabletopWorldBase):
             intrinsic_desc.extend([x_rand, y_rand])
         else:
             intrinsic_desc.extend([0.0, 0.0])
+        assert len(intrinsic_desc) == 2
 
         table_tip = table.copy_worldcoords()
         table_tip.translate([-table_depth * 0.5, -table_width * 0.5, +0.5 * table_height])
@@ -209,16 +251,28 @@ class TabletopBoxWorld(TabletopWorldBase):
         box.translate(np.hstack([box2d.coords.pos, 0.5 * (box_extent[-1] + table._extents[-1])]))
         box.rotate(box2d.coords.angle, "z")
         box.visual_mesh.visual.face_colors = [255, 0, 0, 200]
+        intrinsic_desc.extend(
+            [
+                box2d.coords.pos[0],
+                box2d.coords.pos[1],
+                box2d.coords.angle,
+                box_extent[0],
+                box_extent[1],
+                box_extent[2],
+            ]
+        )
 
         obstacles = [box]  # reaching box is also an obstacle in planning context
         obstacles_2ds = []
 
+        n_max_obs = 8
         if standard:
             n_obs = 0
         else:
-            n_obs = 1 + np.random.randint(8)
+            n_obs = 1 + np.random.randint(n_max_obs + 1)
+        obstacle_desc_mat = np.zeros((n_max_obs, 6))
 
-        for _ in range(n_obs):
+        for i in range(n_obs):
             obs_extent = lognorm(s=0.5, scale=1.0).rvs(size=3) * np.array([0.04, 0.04, 0.2])
             obs2d = sample_box(table_extent, obs_extent[:2], [box2d])
             if obs2d is None:
@@ -233,6 +287,18 @@ class TabletopBoxWorld(TabletopWorldBase):
             obs.rotate(obs2d.coords.angle, "z")
             obs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
             obstacles.append(obs)
+            obstacle_desc_mat[i] = np.array(
+                [
+                    obs2d.coords.pos[0],
+                    obs2d.coords.pos[1],
+                    obs2d.coords.angle,
+                    obs_extent[0],
+                    obs_extent[1],
+                    obs_extent[2],
+                ]
+            )
+        obstacles_desc = obstacle_desc_mat.flatten()
+        intrinsic_desc.extend(list(obstacles_desc))
 
         # check if all obstacle dont collide each other
 
@@ -244,7 +310,17 @@ class TabletopBoxWorld(TabletopWorldBase):
                 obs.visualize((fig, ax), "green")
             ax.set_aspect("equal", adjustable="box")
 
-        return cls(table, obstacles, box)
+        return cls(table, obstacles, box, np.array(intrinsic_desc))
+
+    def _export_description(
+        self, method: Optional[str] = None
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        if method is None:
+            return self._intrinsic_desc[:2], self.create_exact_heightmap()
+        elif method == "intrinsic":
+            return self._intrinsic_desc, None
+        else:
+            raise NotImplementedError
 
 
 @dataclass
@@ -256,8 +332,8 @@ class TabletopOvenWorld(TabletopWorldBase):
     box_t: float
     _intrinsic_desc: np.ndarray
 
-    def export_intrinsic_description(self) -> np.ndarray:
-        return self._intrinsic_desc
+    def _export_description(self, method) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        return self._intrinsic_desc, None
 
     @classmethod
     def sample(cls, standard: bool = False) -> "TabletopOvenWorld":
