@@ -37,7 +37,7 @@ from skmp.solver.interface import (
 from skmp.trajectory import Trajectory
 from skrobot.coordinates import Coordinates
 
-from rpbench.utils import skcoords_to_pose_vec, temp_seed
+from rpbench.utils import temp_seed
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 SamplableT = TypeVar("SamplableT", bound="SamplableBase")
@@ -375,16 +375,7 @@ class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
 
 
 class ReachingTaskBase(TaskBase[WorldT, Tuple[Coordinates, ...], RobotModelT]):
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        world_vec = self.world.export_intrinsic_description()
-
-        intrinsic_descs = []
-        for desc in self.descriptions:
-            pose_vecs = [skcoords_to_pose_vec(pose) for pose in desc]
-            vecs = [world_vec] + pose_vecs
-            intrinsic_desc = np.hstack(vecs)
-            intrinsic_descs.append(intrinsic_desc)
-        return intrinsic_descs
+    ...
 
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):
@@ -548,7 +539,6 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
     skmp_solver: NearestNeigborSolver
     query_desc: Optional[np.ndarray]
     task_type: Type[TaskT]
-    use_full_desc: bool
 
     @classmethod
     def init(
@@ -557,7 +547,6 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         solver_config: ConfigT,
         dataset: PlanningDataset[TaskT],
         n_data_use: Optional[int] = None,
-        use_full_desc: bool = False,
         knn: int = 1,
     ) -> "DatadrivenTaskSolver[TaskT, ConfigT, ResultT]":
 
@@ -571,29 +560,19 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         dim_desc = None
         for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]
-            if use_full_desc:
-                desc = task.export_full_descriptions()[0]
-            else:
-                desc = task.export_intrinsic_descriptions()[0]
-            if dim_desc is None:
-                dim_desc = len(desc)
-            else:
-                assert dim_desc == len(desc)
+            desc = task.export_table().get_vector_descs()[0]
             pair = (desc, traj)
             pairs_modified.append(pair)
         print("dim desc: {}".format(dim_desc))
         solver = NearestNeigborSolver.init(skmp_solver_type, solver_config, pairs_modified, knn)
-        return cls(solver, None, dataset.task_type, use_full_desc)
+        return cls(solver, None, dataset.task_type)
 
     def setup(self, task: TaskT) -> None:
         assert task.n_inner_task == 1
         probs = [p for p in task.export_problems()]
         prob = probs[0]
         self.skmp_solver.setup(prob)
-        if self.use_full_desc:
-            self.query_desc = task.export_full_descriptions()[0]
-        else:
-            self.query_desc = task.export_intrinsic_descriptions()[0]
+        self.query_desc = task.export_table().get_vector_descs()[0]
 
     def solve(self) -> ResultT:
         assert self.query_desc is not None
