@@ -46,6 +46,8 @@ class DoubleIntegratorPlanningConfig:
     n_wp: int
     n_max_call: int
     timeout: Optional[int] = None
+    step_size_init: float = 1.0
+    step_size_step: float = 0.0
 
 
 @dataclass
@@ -121,7 +123,11 @@ class DoubleIntegratorOptimizationSolver(
             states = np.array([guiding_traj.interpolate(t) for t in times])
             traj_guess = diopt.Trajectory.from_X_and_V(states[:, :2], states[:, 2:], self.traj_conf)
 
-        osqp_conf = OsqpSqpConfig(n_max_eval=self.config.n_max_call)
+        osqp_conf = OsqpSqpConfig(
+            n_max_eval=self.config.n_max_call,
+            step_size_init=self.config.step_size_init,
+            step_size_step=self.config.step_size_step,
+        )
         ret = self.osqp_solver.solve(traj_guess.to_array(), osqp_conf)
         if ret.success:
             traj = diopt.Trajectory.from_array(ret.x, self.traj_conf)
