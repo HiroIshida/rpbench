@@ -40,11 +40,8 @@ class DummyWorld(DummyWorldBase):
             kde = gaussian_kde(xy)
         return cls(kde, np.array([-2.5, -2.0]), np.array([3.0, 2.0]))
 
-    def get_grid(self) -> Grid2d:
-        return Grid2d(self.b_min, self.b_max, (50, 50))
-
     def get_exact_sdf(self) -> Grid2dSDF:
-        grid = self.get_grid()
+        grid = Grid2d(self.b_min, self.b_max, (56, 56))
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
         X, Y = np.meshgrid(xlin, ylin)
         pts = np.array(list(zip(X.flatten(), Y.flatten())))
@@ -57,7 +54,7 @@ class DummyWorld(DummyWorldBase):
         itp = RegularGridInterpolator(
             (xlin, ylin), vals.reshape(grid.sizes), bounds_error=False, fill_value=1.0
         )
-        return Grid2dSDF(vals, self.get_grid(), itp)
+        return Grid2dSDF(vals, grid, itp)
 
     def visualize(self, fax) -> None:
         fig, ax = fax
@@ -86,9 +83,6 @@ class ProbDummyWorld(DummyWorldBase):
             points = np.random.rand(10, 2) * (width - margin * 2) + margin
             kde = gaussian_kde(points.T)
         return cls(kde, np.array([-0.2, 0.0]), width)
-
-    def get_grid(self) -> Grid2d:
-        return Grid2d(self.b_min, self.b_max, (50, 50))
 
     def get_exact_sdf(self) -> SDFProtocol:
         def sdf(X: np.ndarray) -> np.ndarray:
@@ -272,6 +266,17 @@ class DummyTask(DummyTaskBase[DummyWorld]):
                 if sdf(np.expand_dims(p, axis=0))[0] > 0:
                     descs.append(p)
             return descs
+
+
+class DummyMeshTask(DummyTask):
+    def export_table(self) -> DescriptionTable:
+        image = np.zeros((56, 56))
+        wd = {"image": image}  # type: ignore
+        wcd_list = []
+        for desc in self.descriptions:
+            wcd = {"p": desc}
+            wcd_list.append(wcd)
+        return DescriptionTable(wd, wcd_list)
 
 
 class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):
