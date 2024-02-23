@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sparse
 from disbmp import BoundingBox, FastMarchingTree, State
-from scipy.interpolate import RegularGridInterpolator
 from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
 from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
@@ -21,7 +20,7 @@ from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryEndPointConstraint,
     TrajectoryObstacleAvoidanceConstraint,
 )
-from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
+from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import temp_seed
 
 # NOTE: as double-integrator planning is quite different from other tasks
@@ -310,10 +309,8 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
 
     def export_table(self) -> DescriptionTable:
         wd = {}
-        if self.cache is None:
-            wd["world"] = self.world.export_intrinsic_description()
-        else:
-            wd["world"] = self.cache.values.reshape(self.cache.grid.sizes)
+        gmap = self.world.get_grid_map()
+        wd["world"] = gmap
 
         wcd_list = []
         for desc in self.descriptions:
@@ -356,9 +353,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         return 2
 
     def export_problems(self) -> List[Problem]:
-        if self.cache is None:
-            self.cache = self.create_cache(self.world, None)
-        sdf = self.cache
+        sdf = self.world.get_exact_sdf()
 
         tbound = TrajectoryBound(
             np.ones(2) * 0.0,
@@ -381,16 +376,17 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         return [np.hstack(desc) for desc in self.descriptions] * self.n_inner_task
 
     @staticmethod
-    def create_cache(world: BubblyWorldBase, robot_model: None) -> Grid2dSDF:
+    def create_cache(world: BubblyWorldBase, robot_model: None) -> None:
         # TODO: redundant implementation with world.get_grid_map()
-        grid = world.get_grid()
-        xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
-        grid_map = world.get_grid_map()
-        itp = RegularGridInterpolator(
-            (xlin, ylin), grid_map, bounds_error=False, fill_value=10.0, method="cubic"
-        )
-        vals = grid_map.flatten()
-        return Grid2dSDF(vals, world.get_grid(), itp)
+        # grid = world.get_grid()
+        # xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
+        # grid_map = world.get_grid_map()
+        # itp = RegularGridInterpolator(
+        #     (xlin, ylin), grid_map, bounds_error=False, fill_value=10.0, method="cubic"
+        # )
+        # vals = grid_map.flatten()
+        # return Grid2dSDF(vals, world.get_grid(), itp)
+        return None
 
     def create_viewer(self) -> "Taskvisualizer":
         return Taskvisualizer(self)
