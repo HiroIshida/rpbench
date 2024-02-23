@@ -194,7 +194,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         cls: Type[SamplableT],
         n_wcond_desc: int,
         standard: bool = False,
-        create_cache: bool = True,
+        create_cache: bool = False,
         timeout: float = 180.0,
     ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
@@ -228,7 +228,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         n_wcond_desc: int,
         predicate: Callable[[SamplableT], bool],
         max_trial_per_desc: int,
-        create_cache: bool = True,
+        create_cache: bool = False,
         timeout: int = 180,
     ) -> Optional[SamplableT]:
         """sample task that maches the predicate function"""
