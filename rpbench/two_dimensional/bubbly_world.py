@@ -45,7 +45,7 @@ class DoubleIntegratorPlanningProblem:
 class DoubleIntegratorPlanningConfig:
     n_wp: int
     n_max_call: int
-    timeout: Optional[int] = None
+    timeout: Optional[float] = None
     step_size_init: float = 1.0
     step_size_step: float = 0.0
 

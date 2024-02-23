@@ -129,7 +129,7 @@ class DummyConfig:
     random: bool = True
     random_scale: float = 2.0
     random_force_failure_rate: float = 0.2  # to intensionaly create false positive state
-    timeout: Optional[int] = None
+    timeout: Optional[float] = None
 
 
 @dataclass
