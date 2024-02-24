@@ -1,4 +1,14 @@
-from typing import Any, ClassVar, Iterator, List, Literal, Tuple, Type, overload
+from typing import (
+    Any,
+    ClassVar,
+    Iterator,
+    List,
+    Literal,
+    Tuple,
+    Type,
+    TypeVar,
+    overload,
+)
 
 import numpy as np
 from skmp.constraint import CollFreeConst
@@ -20,21 +30,18 @@ from rpbench.articulated.pr2.common import (
 )
 from rpbench.articulated.world.minifridge import (
     TabletopClutteredFridgeWorld,
+    TabletopClutteredFridgeWorldBase,
     TabletopClutteredFridgeWorldWithManyContents,
     TabletopClutteredFridgeWorldWithRealisticContents,
 )
-from rpbench.interface import (
-    DescriptionTable,
-    Problem,
-    ResultProtocol,
-    TaskBase,
-    WorldT,
-)
+from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
+
+TabletopWorldT = TypeVar("TabletopWorldT", bound=TabletopClutteredFridgeWorldBase)
 
 
 class TabletopClutteredFridgeReachingTaskBase(
-    TaskBase[WorldT, Tuple[Coordinates, np.ndarray], RobotModel]
+    TaskBase[TabletopWorldT, Tuple[Coordinates, np.ndarray], RobotModel]
 ):
     config_provider: ClassVar[
         Type[CachedRArmFixedPR2ConstProvider]
@@ -50,7 +57,7 @@ class TabletopClutteredFridgeReachingTaskBase(
 
     @classmethod
     def sample_descriptions(
-        cls, world: TabletopClutteredFridgeWorld, n_sample: int, standard: bool = False
+        cls, world: TabletopWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, np.ndarray]]:
 
         if standard:
@@ -80,29 +87,29 @@ class TabletopClutteredFridgeReachingTaskBase(
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
 
-    def export_full_descriptions(self) -> List[np.ndarray]:
-        world_vec = self.world.export_full_description()
-        descs_list = []
-        for desc in self.descriptions:
-            target_pose, base_pose = desc
-            vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
-            descs = np.hstack(vecs)
-            descs_list.append(descs)
-        return descs_list
+    # def export_full_descriptions(self) -> List[np.ndarray]:
+    #     world_vec = self.world.export_full_description()
+    #     descs_list = []
+    #     for desc in self.descriptions:
+    #         target_pose, base_pose = desc
+    #         vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
+    #         descs = np.hstack(vecs)
+    #         descs_list.append(descs)
+    #     return descs_list
 
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        world_vec = self.world.export_intrinsic_description()
+    # def export_intrinsic_descriptions(self) -> List[np.ndarray]:
+    #     world_vec = self.world.export_intrinsic_description()
 
-        intrinsic_descs = []
-        for desc in self.descriptions:
-            target_pose, base_pose = desc
-            vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
-            intrinsic_desc = np.hstack(vecs)
-            intrinsic_descs.append(intrinsic_desc)
-        return intrinsic_descs
+    #     intrinsic_descs = []
+    #     for desc in self.descriptions:
+    #         target_pose, base_pose = desc
+    #         vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
+    #         intrinsic_desc = np.hstack(vecs)
+    #         intrinsic_descs.append(intrinsic_desc)
+    #     return intrinsic_descs
 
     @staticmethod
-    def create_cache(world: TabletopClutteredFridgeWorld, robot_model: RobotModel) -> None:
+    def create_cache(world: TabletopWorldT, robot_model: RobotModel) -> None:
         return None
 
     def export_table(self) -> DescriptionTable:

@@ -167,7 +167,7 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
         n_obstacles = np.random.randint(1, 6)
         contents = cls.sample_contents(fridge.target_region, n_obstacles)
         for content in contents:
-            assert content.parent == fridge.target_region
+            assert content.parent == fridge.target_region  # type: ignore[attr-defined]
         return cls(fridge, contents)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -276,7 +276,7 @@ class FridgeWithManyContents(FridgeWithContents):
             return cls(fridge, [cylinder])
         contents = cls.sample_contents(fridge.target_region, 7)
         for content in contents:
-            assert content.parent == fridge.target_region
+            assert content.parent == fridge.target_region  # type: ignore[attr-defined]
         return cls(fridge, contents)
 
     @staticmethod
@@ -347,20 +347,23 @@ class FridgeWithRealisticContents(FridgeWithContentsBase):
                     break
             if is_colliding:
                 continue
+            assert isinstance(skelton, MeshSkelton)
             skelton.sdf.itp.fill_value = 1.0
             obj_list.append(skelton)
             target_region.assoc(skelton, relative_coords="world")
-        return obj_list
+        return obj_list  # type: ignore[return-value]
 
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         hmap_config = HeightmapConfig(n_grid, n_grid)
         for content in self.contents:
+            assert isinstance(content, MeshSkelton)
             content.itp_fill_value = 0.03
 
         hmap = LocatedHeightmap.by_raymarching(
             self.fridge.target_region, self.contents, conf=hmap_config
         )
         for content in self.contents:
+            assert isinstance(content, MeshSkelton)
             content.itp_fill_value = 1.0
         return hmap.heightmap
 
@@ -385,7 +388,7 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
         return self._heightmap
 
     @classmethod
-    def sample(cls, standard: bool = False) -> Optional["TabletopClutteredFridgeWorld"]:
+    def sample(cls, standard: bool = False) -> Optional["TabletopClutteredFridgeWorldBase"]:
         table_size = np.array([0.6, 3.0, 0.8])
         table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
