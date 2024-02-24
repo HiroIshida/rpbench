@@ -102,10 +102,6 @@ class TabletopClutteredFridgeReachingTaskBase(
     #         intrinsic_descs.append(intrinsic_desc)
     #     return intrinsic_descs
 
-    @staticmethod
-    def create_cache(world: TabletopWorldT, robot_model: RobotModel) -> None:
-        return None
-
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
         world_dict["vector"] = self.world.export_intrinsic_description()

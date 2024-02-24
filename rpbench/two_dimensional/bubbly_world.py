@@ -375,19 +375,6 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         # return [self.world.export_intrinsic_description()] * self.n_inner_task
         return [np.hstack(desc) for desc in self.descriptions] * self.n_inner_task
 
-    @staticmethod
-    def create_cache(world: BubblyWorldBase, robot_model: None) -> None:
-        # TODO: redundant implementation with world.get_grid_map()
-        # grid = world.get_grid()
-        # xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
-        # grid_map = world.get_grid_map()
-        # itp = RegularGridInterpolator(
-        #     (xlin, ylin), grid_map, bounds_error=False, fill_value=10.0, method="cubic"
-        # )
-        # vals = grid_map.flatten()
-        # return Grid2dSDF(vals, world.get_grid(), itp)
-        return None
-
     def create_viewer(self) -> "Taskvisualizer":
         return Taskvisualizer(self)
 

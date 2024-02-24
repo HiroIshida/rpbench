@@ -217,10 +217,6 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
     def get_robot_model() -> RobotModel:
         return CachedJaxonConstProvider.get_jaxon()
 
-    @staticmethod
-    def create_cache(world: BelowTableWorldT, robot_model: RobotModel) -> None:
-        return None
-
     @classmethod
     def get_dof(cls) -> int:
         config = CachedJaxonConstProvider.get_config()

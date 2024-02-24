@@ -69,10 +69,6 @@ class JskFridgeReachingTaskBase(
         return cls.config_provider.get_dof()
 
     @staticmethod
-    def create_cache(world: JskFridgeWorldBase, robot_model: RobotModel) -> None:
-        return None  # do not crete cache
-
-    @staticmethod
     @abstractmethod
     def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
         ...

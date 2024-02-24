@@ -188,10 +188,6 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     def get_robot_model() -> None:
         return None
 
-    @staticmethod
-    def create_cache(world: DummyWorldT, robot_model: None) -> None:
-        return None
-
     def export_table(self) -> DescriptionTable:
         wd = {}  # type: ignore
         wcd_list = []  # type: ignore
