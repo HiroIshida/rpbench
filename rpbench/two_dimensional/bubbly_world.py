@@ -167,6 +167,18 @@ class BubblyWorldBase(WorldBase):
     obstacles: List[CircleObstacle]
 
     @classmethod
+    def from_intrinsic_description(cls: Type[BubblyWorldT], desc: np.ndarray) -> BubblyWorldT:
+        n_obs = len(desc) // 3
+        assert len(desc) % 3 == 0
+        obstacles = []
+        for i in range(n_obs):
+            desc_this = desc[i * 3 : (i + 1) * 3]
+            center = desc_this[:2]
+            radius = desc_this[2]
+            obstacles.append(CircleObstacle(center, radius))
+        return cls(obstacles)
+
+    @classmethod
     @abstractmethod
     def get_meta_parameter(cls) -> BubblyMetaParameter:
         ...
@@ -207,7 +219,7 @@ class BubblyWorldBase(WorldBase):
 
     @classmethod
     def get_world_dof(cls) -> int:
-        return 3 * len(cls.get_meta_parameter().n_obs)
+        return 3 * cls.get_meta_parameter().n_obs
 
     def export_intrinsic_description(self) -> np.ndarray:
         return np.hstack([obs.as_vector() for obs in self.obstacles])
@@ -284,6 +296,25 @@ class BubblyWorldComplex(BubblyWorldBase):
 
 
 class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
+    @classmethod
+    def from_intrinsic_desc_vecs(cls, desc_vecs: np.ndarray) -> "BubblyPointConnectTaskBase":
+        assert desc_vecs.ndim == 2
+        world_type = cls.get_world_type()
+        world_dof = world_type.get_world_dof()
+        world_desc = None
+        goal_list = []
+        for desc_vec in desc_vecs:
+            if world_desc is None:
+                world_desc = desc_vec[:world_dof]
+            else:
+                # this may take time..
+                assert np.all(world_desc == desc_vec[:world_dof])
+            goal = desc_vec[world_dof:]
+            goal_list.append(goal)
+        assert world_desc is not None
+        world = world_type.from_intrinsic_description(world_desc)
+        return cls(world, goal_list)
+
     @staticmethod
     def get_robot_model() -> None:
         return None

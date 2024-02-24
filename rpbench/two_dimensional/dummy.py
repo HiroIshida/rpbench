@@ -16,6 +16,7 @@ from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
 
 DummyWorldT = TypeVar("DummyWorldT", bound="DummyWorldBase")
+DummyTaskT = TypeVar("DummyTaskT", bound="DummyTaskBase")
 
 
 @dataclass
@@ -184,6 +185,13 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
 
 
 class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
+    @classmethod
+    def from_intrinsic_desc_vecs(cls: Type[DummyTaskT], desc_vecs: np.ndarray) -> DummyTaskT:
+        world = cls.get_world_type().sample(True)
+        # split desc_vecs by dof of this task get_task_dof
+        desc_vec_list = list(desc_vecs.reshape(-1, cls.get_task_dof()))
+        return cls(world, desc_vec_list)
+
     @staticmethod
     def get_robot_model() -> None:
         return None

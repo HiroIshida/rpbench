@@ -124,6 +124,21 @@ def test_standard(task_type: Type[TaskBase]):
     assert res.traj is not None
 
 
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        BubblySimpleMeshPointConnectTask,
+        DummyTask,
+        ProbDummyTask,
+    ],
+)
+def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
+    task = task_type.sample(5)
+    intr_vecs = task.to_intrinsic_desc_vecs()
+    intr_vecs_again = task_type.from_intrinsic_desc_vecs(intr_vecs).to_intrinsic_desc_vecs()
+    assert np.allclose(intr_vecs, intr_vecs_again)
+
+
 def _test_task_hash_value():
     # these tasks are used in TRO submission or Phd thesis.
     # if you change the task definition, you must change the hash value here.
