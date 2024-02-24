@@ -12,7 +12,7 @@ def test_task_sovler():
     solvers = []
 
     # create rrtconnect
-    rrt_connect = SkmpTaskSolver(OMPLSolver.init(OMPLSolverConfig(n_max_call=10000)), task_type)  # type: ignore
+    rrt_connect = SkmpTaskSolver(OMPLSolver.init(OMPLSolverConfig(n_max_call=10000, n_max_satisfaction_trial=100)), task_type)  # type: ignore
     solvers.append(rrt_connect)
 
     # create lightning
