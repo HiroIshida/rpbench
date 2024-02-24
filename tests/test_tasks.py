@@ -154,27 +154,26 @@ def _test_task_hash_value():
 
 def test_vector_descriptions():
     test_table = {
-        HumanoidTableReachingTask: ((2 + 5 + 6), False),
+        HumanoidTableReachingTask: ((2 + 5 + 4), False),
         HumanoidTableReachingTask2: ((2 + 5 + 3), False),
-        HumanoidTableClutteredReachingTask: ((2 + 6), True),
+        HumanoidTableClutteredReachingTask: ((2 + 4), True),
         HumanoidTableClutteredReachingTask2: ((2 + 3), True),
         HumanoidTableClutteredReachingIntrinsicTask2: ((2 + 5 * 8 + 3), False),
     }
 
-    for task_type, (desc_len, has_mesh) in test_table.items():
+    for task_type, (desc_dim, has_mesh) in test_table.items():
         descs = []
         for _ in range(10):
             task = task_type.sample(1)
             table = task.export_table()
-            desc = table.get_vector_descs()[0]
-            assert len(desc) == desc_len
+            desc = table.get_desc_vecs()[0]
+            assert len(desc) == desc_dim
             descs.append(desc)
 
-            mesh = table.get_mesh()
             if has_mesh:
-                assert mesh is not None
+                assert table.world_mat is not None
             else:
-                assert mesh is None
+                assert table.world_mat is None
 
         descs = np.array(descs)
 

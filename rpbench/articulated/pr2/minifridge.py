@@ -76,18 +76,15 @@ class TabletopClutteredFridgeReachingTaskBase(
         return descriptions
 
     def export_table(self) -> DescriptionTable:
-        world_dict = {}  # type: ignore
-        world_dict["vector"] = self.world.export_intrinsic_description()
-        world_dict["mesh"] = self.world.fridge_conts.create_heightmap()
+        world_vec = np.array([self.world.fridge_conts.fridge.angle])
+        world_mat = self.world.fridge_conts.create_heightmap()
 
-        desc_dicts = []
+        other_vec_list = []
         for desc in self.descriptions:
-            desc_dict = {}
-            target_pose, init_state = desc
-            desc_dict["target_pose"] = skcoords_to_pose_vec(target_pose)
-            desc_dict["init_state"] = init_state
-            desc_dicts.append(desc_dict)
-        return DescriptionTable(world_dict, desc_dicts)
+            target_pose, init_pose = desc
+            other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_pose])
+            other_vec_list.append(other_vec)
+        return DescriptionTable(world_vec, world_mat, other_vec_list)
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider

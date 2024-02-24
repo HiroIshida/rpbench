@@ -263,7 +263,7 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
         pos_only = self.rarm_rot_type() == RotationType.IGNORE
 
         def process(co):
-            return co.worldpos() if pos_only else skcoords_to_pose_vec(co)
+            return co.worldpos() if pos_only else skcoords_to_pose_vec(co, yaw_only=True)
 
         desc_vecs = []
         for desc in self.descriptions:
@@ -272,19 +272,11 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
         return desc_vecs
 
     def _export_table(self, method: Optional[str] = None) -> DescriptionTable:
-        world_dict = {}
-
-        world_vec, world_mesh = self.world.get_parameter(method)
-        if world_vec is not None:
-            world_dict["world_vector"] = world_vec
-        if world_mesh is not None:
-            world_dict["world_mesh"] = world_mesh
-
-        desc_dicts = []
-        for intention_desc in self.export_intention_vector_descs():
-            desc_dict = {"intention": intention_desc}
-            desc_dicts.append(desc_dict)
-        return DescriptionTable(world_dict, desc_dicts)
+        world_vec, world_mat = self.world.get_parameter(method)
+        desc_list = []
+        for desc in self.export_intention_vector_descs():
+            desc_list.append(desc)
+        return DescriptionTable(world_vec, world_mat, desc_list)
 
     def export_table(self) -> DescriptionTable:
         return self._export_table(self.export_table_method())

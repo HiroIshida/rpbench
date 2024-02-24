@@ -392,9 +392,6 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
     def get_fridge_conts_class(cls) -> Type[FridgeWithContents]:
         ...
 
-    def export_intrinsic_description(self) -> np.ndarray:
-        return np.array([self.fridge_conts.fridge.angle])
-
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
             self._heightmap = self.fridge_conts.create_heightmap()

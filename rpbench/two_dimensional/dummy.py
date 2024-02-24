@@ -189,12 +189,7 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         return None
 
     def export_table(self) -> DescriptionTable:
-        wd = {}  # type: ignore
-        wcd_list = []  # type: ignore
-        for desc in self.descriptions:
-            wcd = {"p": desc}
-            wcd_list.append(wcd)
-        return DescriptionTable(wd, wcd_list)
+        return DescriptionTable(None, None, self.descriptions)
 
     def solve_default_each(self, problem: Problem) -> DummyResult:
         x0 = problem.start
@@ -267,12 +262,7 @@ class DummyTask(DummyTaskBase[DummyWorld]):
 class DummyMeshTask(DummyTask):
     def export_table(self) -> DescriptionTable:
         image = np.zeros((56, 56))
-        wd = {"image": image}  # type: ignore
-        wcd_list = []
-        for desc in self.descriptions:
-            wcd = {"p": desc}
-            wcd_list.append(wcd)
-        return DescriptionTable(wd, wcd_list)
+        return DescriptionTable(None, image, self.descriptions)
 
 
 class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):

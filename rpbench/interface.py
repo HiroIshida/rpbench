@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import (
     Any,
     Callable,
-    Dict,
     Generic,
     List,
     Optional,
@@ -73,67 +72,15 @@ class WorldBase(ABC):
 
 @dataclass(frozen=True)
 class DescriptionTable:
-    """Unified format of description for all tasks
-    both world and descriptions should be encoded into ArrayData
-    """
+    world_vec: Optional[np.ndarray]
+    world_mat: Optional[np.ndarray]
+    other_vecs: List[np.ndarray]  # world-conditioned description
 
-    world_desc_dict: Dict[str, np.ndarray]  # world common for all sub tasks
-    wcond_desc_dicts: List[Dict[str, np.ndarray]]  # world conditioned
-
-    # currently we assume that world and world-conditioned descriptions follows
-    # the following rule.
-    # wd refere to world description and wcd refere to world-condtioned descriotion
-    # - wd has only one key for 2dim or 3dim array
-    # - wd may have 1 dim array
-    # - wcd does not have 2dim or 3dim array
-    # - wcd must have 1dim array
-    # - wcd may be empty, but wd must not be empty
-    # to remove the above limitation, create a task class which inherit rpbench Task
-    # which is equipped with desc-2-tensor-tuple conversion rule
-
-    def get_mesh(self) -> Optional[np.ndarray]:
-        wd_ndim_to_value = {v.ndim: v for v in self.world_desc_dict.values()}
-        ndim_set = wd_ndim_to_value.keys()
-
-        contains_either_2or3_not_both = (2 in ndim_set) ^ (3 in ndim_set)
-        if not contains_either_2or3_not_both:
-            return None
-
-        if 2 in ndim_set:
-            mesh = wd_ndim_to_value[2]
-        elif 3 in ndim_set:
-            mesh = wd_ndim_to_value[3]
+    def get_desc_vecs(self) -> List[np.ndarray]:
+        if self.world_vec is None:
+            return self.other_vecs
         else:
-            assert False
-        return mesh
-
-    def get_vector_descs(self) -> List[np.ndarray]:
-        wd_ndim_to_value = {v.ndim: v for v in self.world_desc_dict.values()}
-        ndim_set = wd_ndim_to_value.keys()
-        # TODO: we should multiple keys for one dim
-        one_key_per_dim = len(wd_ndim_to_value) == len(self.world_desc_dict)
-        assert one_key_per_dim
-        wd_1dim_desc: Optional[np.ndarray] = None
-        if 1 in ndim_set:
-            wd_1dim_desc = wd_ndim_to_value[1]
-
-        if len(self.wcond_desc_dicts) == 0:
-            # FIXME: when wcd len == 0, wd_1dim_desc_tensor is ignored ...?
-            return []
-        else:
-            wcd_desc_dict = self.wcond_desc_dicts[0]
-            ndims = set([v.ndim for v in wcd_desc_dict.values()])
-            assert ndims == {1}
-
-            np_wcd_desc_list = []
-            for wcd_desc_dict in self.wcond_desc_dicts:
-                wcd_desc_vec_list = []
-                if wd_1dim_desc is not None:
-                    wcd_desc_vec_list.append(wd_1dim_desc)
-                wcd_desc_vec_list.extend(list(wcd_desc_dict.values()))
-                wcd_desc_vec_cat = np.concatenate(wcd_desc_vec_list)
-                np_wcd_desc_list.append(wcd_desc_vec_cat)
-            return np_wcd_desc_list
+            return [np.hstack([self.world_vec, desc]) for desc in self.other_vecs]
 
 
 @dataclass
@@ -466,7 +413,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         dim_desc = None
         for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]
-            desc = task.export_table().get_vector_descs()[0]
+            desc = task.export_table().get_desc_vecs()[0]
             pair = (desc, traj)
             pairs_modified.append(pair)
         print("dim desc: {}".format(dim_desc))
@@ -478,7 +425,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         probs = [p for p in task.export_problems()]
         prob = probs[0]
         self.skmp_solver.setup(prob)
-        self.query_desc = task.export_table().get_vector_descs()[0]
+        self.query_desc = task.export_table().get_desc_vecs()[0]
 
     def solve(self) -> ResultT:
         assert self.query_desc is not None

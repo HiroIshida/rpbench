@@ -283,7 +283,7 @@ class BubblyWorldComplex(BubblyWorldBase):
         return BubblyMetaParameter(40, 0.04, 0.08)
 
 
-class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], None]):
+class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
     @staticmethod
     def get_robot_model() -> None:
         return None
@@ -291,7 +291,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
     @classmethod
     def sample_descriptions(
         cls, world: BubblyWorldT, n_sample: int, standard: bool = False
-    ) -> List[Tuple[np.ndarray, ...]]:
+    ) -> List[np.ndarray]:
 
         descriptions = []
 
@@ -308,21 +308,13 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
                         val = sdf(np.expand_dims(goal, axis=0))[0]
                         if val > 0.0:
                             break
-            descriptions.append((start, goal))
+            descriptions.append(goal)
         return descriptions  # type: ignore
 
     def export_table(self) -> DescriptionTable:
-        wd = {}
-        gmap = self.world.get_grid_map()
-        wd["world"] = gmap
-
-        wcd_list = []
-        for desc in self.descriptions:
-            wcd = {}
-            wcd["start"] = desc[0]
-            wcd["goal"] = desc[1]
-            wcd_list.append(wcd)
-        return DescriptionTable(wd, wcd_list)
+        world_vec = None
+        world_mat = self.world.get_grid_map()
+        return DescriptionTable(world_vec, world_mat, self.descriptions)
 
     @dataclass
     class _FMTResult:
@@ -334,7 +326,8 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         s_min = np.hstack([problem.tbound.x_min, problem.tbound.v_min])
         s_max = np.hstack([problem.tbound.x_max, problem.tbound.v_max])
         bbox = BoundingBox(s_min, s_max)
-        s_start = State(np.hstack([problem.start, np.zeros(2)]))
+        x_start = np.ones(2) * 0.1
+        s_start = State(np.hstack([x_start, np.zeros(2)]))
         s_goal = State(np.hstack([problem.goal, np.zeros(2)]))
 
         def is_obstacle_free(state: State) -> bool:
@@ -365,19 +358,16 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         )
 
         probs = []
+        x_start = np.ones(2) * 0.1
         for desc in self.descriptions:
-            start, goal = desc
-            problem = DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
+            goal = desc
+            problem = DoubleIntegratorPlanningProblem(x_start, goal, sdf, tbound, 0.2)
             probs.append(problem)
         return probs
 
     @classmethod
     def get_task_dof(cls) -> int:
         return cls.get_world_type().get_world_dof() + 2
-
-    def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-        # return [self.world.export_intrinsic_description()] * self.n_inner_task
-        return [np.hstack(desc) for desc in self.descriptions] * self.n_inner_task
 
     def create_viewer(self) -> "Taskvisualizer":
         return Taskvisualizer(self)
