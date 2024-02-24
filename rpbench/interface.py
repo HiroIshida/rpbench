@@ -34,7 +34,6 @@ from skmp.solver.interface import (
     ResultT,
 )
 from skmp.trajectory import Trajectory
-from skrobot.coordinates import Coordinates
 
 from rpbench.utils import temp_seed
 
@@ -57,23 +56,6 @@ class SDFProtocol(Protocol):
         sd: np.ndarray[float, 1]
             1dim (n_point) array of signed distances of each points
         """
-        ...
-
-
-class GridProtocol(Protocol):
-    lb: np.ndarray
-    ub: np.ndarray
-
-    @property
-    def sizes(self) -> Tuple[int, ...]:
-        ...
-
-
-class GridSDFProtocol(SDFProtocol, Protocol):
-    values: np.ndarray
-
-    @property
-    def grid(self) -> GridProtocol:
         ...
 
 
@@ -264,7 +246,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
-        raise NotImplementedError()
+        ...
 
     @staticmethod
     @abstractmethod
@@ -275,14 +257,14 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         Also, we assume that robot joint configuration for every
         call of this method is consistent.
         """
-        raise NotImplementedError()
+        ...
 
     @classmethod
     @abstractmethod
     def sample_descriptions(
         cls, world: WorldT, n_sample: int, standard: bool = False
     ) -> Optional[List[DescriptionT]]:
-        raise NotImplementedError()
+        ...
 
     @abstractmethod
     def export_table(self) -> DescriptionTable:
@@ -295,16 +277,6 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     @abstractmethod
     def export_problems(self) -> List[Problem]:
         ...
-
-    @classmethod
-    @abstractmethod
-    def get_dof(cls) -> int:
-        """get dof of robot in this task"""
-        ...
-
-
-class ReachingTaskBase(TaskBase[WorldT, Tuple[Coordinates, ...], RobotModelT]):
-    ...
 
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):

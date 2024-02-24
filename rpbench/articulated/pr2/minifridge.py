@@ -42,10 +42,6 @@ class TabletopClutteredFridgeReachingTaskBase(
         return CachedRArmFixedPR2ConstProvider.get_pr2()
 
     @classmethod
-    def get_dof(cls) -> int:
-        return cls.config_provider.get_dof()
-
-    @classmethod
     def sample_descriptions(
         cls, world: TabletopWorldT, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, np.ndarray]]:

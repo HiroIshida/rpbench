@@ -209,10 +209,6 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         dummy_traj = Trajectory.from_two_points(x0, x1, 2)
         return DummyResult(dummy_traj, 1.0, 3000)  # whatever
 
-    @classmethod
-    def get_dof(cls) -> int:
-        return 2
-
     def export_problems(self) -> List[Problem]:
         box = BoxConst(self.world.b_min, self.world.b_max)
         sdf = self.world.get_exact_sdf()

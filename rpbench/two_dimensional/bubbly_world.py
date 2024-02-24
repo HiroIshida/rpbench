@@ -348,10 +348,6 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
         else:
             return self._FMTResult(None, time_elapsed, 0)  # 0 is dummy
 
-    @classmethod
-    def get_dof(cls) -> int:
-        return 2
-
     def export_problems(self) -> List[Problem]:
         sdf = self.world.get_exact_sdf()
 

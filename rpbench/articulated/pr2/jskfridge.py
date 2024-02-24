@@ -64,10 +64,6 @@ class JskFridgeReachingTaskBase(
         pr2.head_tilt_joint.joint_angle(0.82)
         return pr2
 
-    @classmethod
-    def get_dof(cls) -> int:
-        return cls.config_provider.get_dof()
-
     @staticmethod
     @abstractmethod
     def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
