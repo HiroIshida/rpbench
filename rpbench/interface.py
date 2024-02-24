@@ -39,8 +39,6 @@ from skrobot.coordinates import Coordinates
 from rpbench.utils import temp_seed
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
-SamplableT = TypeVar("SamplableT", bound="SamplableBase")
-OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
@@ -157,17 +155,7 @@ class DescriptionTable:
 
 
 @dataclass
-class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
-    """Task base class
-    Task is composed of world and *descriptions*
-
-    One may wonder why *descriptions* instead of a description.
-    When serialize the task to a data, serialized world data tends to
-    be very larget, though the description is light. So, if mupltiple tasks
-    instance share the same world, it should be handle it as a single task
-    for the memory efficiency.
-    """
-
+class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     world: WorldT
     descriptions: List[DescriptionT]
 
@@ -177,11 +165,11 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @classmethod
     def sample(
-        cls: Type[SamplableT],
+        cls: Type[TaskT],
         n_wcond_desc: int,
         standard: bool = False,
         timeout: float = 180.0,
-    ) -> SamplableT:
+    ) -> TaskT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
         cls.get_robot_model()
         world_t = cls.get_world_type()
@@ -203,12 +191,12 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @classmethod
     def predicated_sample(
-        cls: Type[SamplableT],
+        cls: Type[TaskT],
         n_wcond_desc: int,
-        predicate: Callable[[SamplableT], bool],
+        predicate: Callable[[TaskT], bool],
         max_trial_per_desc: int,
         timeout: int = 180,
-    ) -> Optional[SamplableT]:
+    ) -> Optional[TaskT]:
         """sample task that maches the predicate function"""
 
         # predicated sample cannot be a standard task
@@ -254,6 +242,25 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
             return cls(world, descriptions)
 
+    @classmethod
+    def compute_distribution_hash(cls: Type[TaskT]) -> str:
+        # Although it is difficult to exactly check the identity of the
+        # distribution defined by the calss, we can approximate it by
+        # checking the hash value of the sampled data.
+
+        # dont know why this dry run is needed...
+        # but it is needed to get the consistent hash value
+        cls.sample(10, False).export_table()
+
+        with temp_seed(0, True):
+            data = [cls.sample(10, False).export_table() for _ in range(10)]
+            data_str = pickle.dumps(data)
+        return md5(data_str).hexdigest()
+
+    def solve_default(self) -> List[ResultProtocol]:
+        return [self.solve_default_each(p) for p in self.export_problems()]
+
+    # please implement the following methods
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
@@ -281,57 +288,18 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def export_table(self) -> DescriptionTable:
         ...
 
-    def __len__(self) -> int:
-        """return number of descriptions"""
-        return len(self.descriptions)
-
-    @classmethod
-    def cast_from(cls: Type[SamplableT], obj: OtherSamplableT) -> SamplableT:
-        raise NotImplementedError()
-
-    @classmethod
-    def compute_distribution_hash(cls: Type[SamplableT]) -> str:
-        # Although it is difficult to exactly check the identity of the
-        # distribution defined by the calss, we can approximate it by
-        # checking the hash value of the sampled data.
-
-        # dont know why this dry run is needed...
-        # but it is needed to get the consistent hash value
-        cls.sample(10, False).export_table()
-
-        with temp_seed(0, True):
-            data = [cls.sample(10, False).export_table() for _ in range(10)]
-            data_str = pickle.dumps(data)
-        return md5(data_str).hexdigest()
-
-
-@dataclass
-class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
-    def solve_default(self) -> List[ResultProtocol]:
-        """solve the task by using default setting without initial solution
-        This solve function is expected to successfully solve
-        the problem and get smoother solution if the task is feasible.
-        Thus, typically the implementation would be the combination of
-        sampling-based algorithm with large sampling budget and nlp based
-        smoother.
-
-        This method is abstract, because depending on the task type
-        sampling budget could be much different.
-        """
-        return [self.solve_default_each(p) for p in self.export_problems()]
-
     @abstractmethod
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
+        ...
+
+    @abstractmethod
+    def export_problems(self) -> List[Problem]:
         ...
 
     @classmethod
     @abstractmethod
     def get_dof(cls) -> int:
         """get dof of robot in this task"""
-        ...
-
-    @abstractmethod
-    def export_problems(self) -> List[Problem]:
         ...
 
 
