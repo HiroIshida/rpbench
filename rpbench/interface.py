@@ -44,7 +44,6 @@ OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
-CacheT = TypeVar("CacheT", bound=Any)
 
 
 class SDFProtocol(Protocol):
@@ -171,33 +170,20 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     world: WorldT
     descriptions: List[DescriptionT]
-    _cache: Optional[GridSDFProtocol]
 
     @property
     def n_inner_task(self) -> int:
         return len(self.descriptions)
-
-    @property
-    def cache(self):
-        if self._cache is None:
-            robot_model = self.get_robot_model()
-            self._cache = self.create_cache(self.world, robot_model)
-        return self._cache
-
-    def delete_cache(self) -> None:
-        # This feature is usefull when the data-transfer is memmory/network intense.
-        self._cache = None
 
     @classmethod
     def sample(
         cls: Type[SamplableT],
         n_wcond_desc: int,
         standard: bool = False,
-        create_cache: bool = False,
         timeout: float = 180.0,
     ) -> SamplableT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
-        robot_model = cls.get_robot_model()
+        cls.get_robot_model()
         world_t = cls.get_world_type()
 
         t_start = time.time()
@@ -213,13 +199,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             descriptions = cls.sample_descriptions(world, n_wcond_desc, standard)
             if descriptions is None:
                 continue
-
-            if create_cache:
-                cache = cls.create_cache(world, robot_model)
-            else:
-                cache = None
-
-            return cls(world, descriptions, cache)
+            return cls(world, descriptions)
 
     @classmethod
     def predicated_sample(
@@ -227,7 +207,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         n_wcond_desc: int,
         predicate: Callable[[SamplableT], bool],
         max_trial_per_desc: int,
-        create_cache: bool = False,
         timeout: int = 180,
     ) -> Optional[SamplableT]:
         """sample task that maches the predicate function"""
@@ -235,7 +214,7 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         # predicated sample cannot be a standard task
         standard = False
 
-        robot_model = cls.get_robot_model()
+        cls.get_robot_model()
         world_t = cls.get_world_type()
 
         t_start = time.time()
@@ -248,11 +227,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             world = world_t.sample(standard=standard)
             if world is None:
                 continue
-
-            if create_cache:
-                cache = cls.create_cache(world, robot_model)
-            else:
-                cache = None
 
             # do some bit tricky thing.
             # Naively, we can sample task with multiple description and then check if
@@ -271,17 +245,14 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
                 if descs is not None:
                     desc = descs[0]
-                    temp_problem = cls(world, [desc], cache)
-
-                    # note that some predicate may depends on cache
-                    # thus, you must be careful if you set create_cache=False
+                    temp_problem = cls(world, [desc])
                     if predicate(temp_problem):
                         descriptions.append(desc)
 
                 if count_trial_before_first_success > max_trial_per_desc:
                     return None
 
-            return cls(world, descriptions, cache)
+            return cls(world, descriptions)
 
     @staticmethod
     @abstractmethod
@@ -296,15 +267,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         we assume this function utilize some cache.
         Also, we assume that robot joint configuration for every
         call of this method is consistent.
-        """
-        raise NotImplementedError()
-
-    @staticmethod
-    @abstractmethod
-    def create_cache(world: WorldT, robot_model: RobotModelT) -> Optional[GridSDFProtocol]:
-        """create cache of the world given robot state
-        The reason why this takes RobotModel as input is that, this method
-        may involves vision-simulation using robot model (e.g. synthetic pcloud)
         """
         raise NotImplementedError()
 
