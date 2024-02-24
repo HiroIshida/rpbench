@@ -75,9 +75,13 @@ class TabletopClutteredFridgeReachingTaskBase(
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
 
-    def export_table(self) -> DescriptionTable:
-        world_vec = np.array([self.world.fridge_conts.fridge.angle])
-        world_mat = self.world.fridge_conts.create_heightmap()
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        if use_matrix:
+            world_vec = np.array([self.world.fridge_conts.fridge.angle])
+            world_mat = self.world.fridge_conts.create_heightmap()
+        else:
+            world_vec = self.world.desc_vector
+            world_mat = None
 
         other_vec_list = []
         for desc in self.descriptions:

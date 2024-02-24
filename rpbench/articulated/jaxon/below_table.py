@@ -278,12 +278,11 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
             desc_list.append(desc)
         return DescriptionTable(world_vec, world_mat, desc_list)
 
-    def export_table(self) -> DescriptionTable:
-        return self._export_table(self.export_table_method())
-
-    def export_table_method(self) -> Optional[str]:
-        # override if you want to use intrinsic descriptionq
-        return None
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        if use_matrix:
+            return self._export_table()
+        else:
+            return self._export_table("intrinsic")
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider
@@ -521,12 +520,3 @@ class HumanoidTableClutteredReachingTask2(HumanoidTableClutteredReachingTaskBase
     @staticmethod
     def rarm_rot_type() -> RotationType:
         return RotationType.IGNORE
-
-
-class HumanoidTableClutteredReachingIntrinsicTask2(HumanoidTableClutteredReachingTaskBase):
-    @staticmethod
-    def rarm_rot_type() -> RotationType:
-        return RotationType.IGNORE
-
-    def export_table_method(self) -> Optional[str]:
-        return "intrinsic"

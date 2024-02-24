@@ -8,7 +8,6 @@ import pytest
 from ompl import set_ompl_random_seed
 
 from rpbench.articulated.jaxon.below_table import (
-    HumanoidTableClutteredReachingIntrinsicTask2,
     HumanoidTableClutteredReachingTask,
     HumanoidTableClutteredReachingTask2,
     HumanoidTableReachingTask,
@@ -158,14 +157,13 @@ def test_vector_descriptions():
         HumanoidTableReachingTask2: ((2 + 5 + 3), False),
         HumanoidTableClutteredReachingTask: ((2 + 4), True),
         HumanoidTableClutteredReachingTask2: ((2 + 3), True),
-        HumanoidTableClutteredReachingIntrinsicTask2: ((2 + 5 * 8 + 3), False),
     }
 
     for task_type, (desc_dim, has_mesh) in test_table.items():
         descs = []
         for _ in range(10):
             task = task_type.sample(1)
-            table = task.export_table()
+            table = task.export_table(use_matrix=True)
             desc = table.get_desc_vecs()[0]
             assert len(desc) == desc_dim
             descs.append(desc)

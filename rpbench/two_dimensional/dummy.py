@@ -188,7 +188,8 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     def get_robot_model() -> None:
         return None
 
-    def export_table(self) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        # don't depend on use_matrix
         return DescriptionTable(None, None, self.descriptions)
 
     def solve_default_each(self, problem: Problem) -> DummyResult:
@@ -260,8 +261,11 @@ class DummyTask(DummyTaskBase[DummyWorld]):
 
 
 class DummyMeshTask(DummyTask):
-    def export_table(self) -> DescriptionTable:
-        image = np.zeros((56, 56))
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        if use_matrix:
+            image = np.zeros((56, 56))
+        else:
+            image = None
         return DescriptionTable(None, image, self.descriptions)
 
 

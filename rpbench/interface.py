@@ -179,10 +179,11 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
         # dont know why this dry run is needed...
         # but it is needed to get the consistent hash value
-        cls.sample(10, False).export_table()
+        task = cls.sample(10, False)
+        task.export_table(use_matrix=False)
 
         with temp_seed(0, True):
-            data = [cls.sample(10, False).export_table() for _ in range(10)]
+            data = [cls.sample(10, False).export_table(False) for _ in range(10)]
             data_str = pickle.dumps(data)
         return md5(data_str).hexdigest()
 
@@ -214,7 +215,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         ...
 
     @abstractmethod
-    def export_table(self) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
         ...
 
     @abstractmethod
@@ -413,7 +414,8 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         dim_desc = None
         for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]
-            desc = task.export_table().get_desc_vecs()[0]
+            # FIXME: use_matrix is just for now
+            desc = task.export_table(use_matrix=False).get_desc_vecs()[0]
             pair = (desc, traj)
             pairs_modified.append(pair)
         print("dim desc: {}".format(dim_desc))
@@ -425,7 +427,8 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         probs = [p for p in task.export_problems()]
         prob = probs[0]
         self.skmp_solver.setup(prob)
-        self.query_desc = task.export_table().get_desc_vecs()[0]
+        # FIXME: use_matrix is just for now
+        self.query_desc = task.export_table(use_matrix=False).get_desc_vecs()[0]
 
     def solve(self) -> ResultT:
         assert self.query_desc is not None
