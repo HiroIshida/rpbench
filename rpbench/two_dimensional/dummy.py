@@ -227,6 +227,10 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
             probs.append(prob)
         return probs
 
+    @classmethod
+    def get_task_dof(cls) -> int:
+        return 2
+
     def visualize(self) -> Tuple:
         fig, ax = plt.subplots()
         self.world.visualize((fig, ax))

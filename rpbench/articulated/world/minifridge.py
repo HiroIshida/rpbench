@@ -1,8 +1,8 @@
 import copy
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import ycb_utils
@@ -15,7 +15,6 @@ from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import (
     BoxSkeleton,
     CylinderSkelton,
-    MeshSkelton,
     PrimitiveSkelton,
 )
 from rpbench.interface import WorldBase
@@ -114,17 +113,19 @@ def ycb_utils_load_singleton(name: str, scale: float = 1.0) -> Trimesh:
     return ycb_utils.load_with_scale(name, scale=scale)
 
 
-class FridgeWithContentsBase(ABC, CascadedCoords):
+class FridgeWithContents(CascadedCoords):
     fridge: Fridge
     contents: List[PrimitiveSkelton]
+    desc_vector: np.ndarray
 
-    def __init__(self, fridge: Fridge, contents: List[PrimitiveSkelton]):
+    def __init__(self, fridge: Fridge, contents: List[PrimitiveSkelton], desc_vector: np.ndarray):
         super().__init__()
         self.assoc(fridge, wrt="local")
         for c in contents:
             self.assoc(c, wrt="local", force=True)
         self.fridge = fridge
         self.contents = contents
+        self.desc_vector = desc_vector
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         region = self.fridge.target_region
@@ -144,16 +145,6 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
         co = Coordinates(pos)
         return co
 
-    @staticmethod
-    @abstractmethod
-    def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
-        # this is dirty but please assoc the contenets to target_region inside!!!!
-        ...
-
-    @abstractmethod
-    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
-        ...
-
     @classmethod
     def sample(cls, standard: bool = False):
         fridge = Fridge.sample(standard)
@@ -163,12 +154,17 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
             co = fridge.copy_worldcoords()
             co.translate([0.0, 0.0, 0.06 + fridge.thickness])
             cylinder.newcoords(co)
-            return cls(fridge, [cylinder])
-        n_obstacles = np.random.randint(1, 6)
-        contents = cls.sample_contents(fridge.target_region, n_obstacles)
+            cylinder_flag = 1
+            desc = np.array([cylinder_flag, 0.0, 0.0, 0.12, 0.02])
+
+            return cls(fridge, [cylinder], desc)
+
+        n_max_obstacles = 7
+        contents, desc_vector_contents = cls.sample_contents(fridge.target_region, n_max_obstacles)
         for content in contents:
             assert content.parent == fridge.target_region  # type: ignore[attr-defined]
-        return cls(fridge, contents)
+        desc_vector = np.hstack([desc_vector_contents, fridge.angle])
+        return cls(fridge, contents, desc_vector)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge.visualize(viewer)
@@ -212,10 +208,11 @@ class FridgeWithContentsBase(ABC, CascadedCoords):
 
         return False
 
-
-class FridgeWithContents(FridgeWithContentsBase):
     @staticmethod
-    def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
+    def sample_contents(
+        target_region: BoxSkeleton, n_max_obstacles: int
+    ) -> Tuple[List[PrimitiveSkelton], np.ndarray]:
+        n_obstacles = np.random.randint(1, n_max_obstacles + 1)
         D, W, H = target_region._extents
         obstacle_h_max = H - 0.03
         obstacle_h_min = 0.05
@@ -240,21 +237,36 @@ class FridgeWithContents(FridgeWithContentsBase):
                 continue
             obj2d_list.append(obj2d)
 
+        dof_per_cylinder = 4  # x, y, h, r
+        dof_per_box = 6  # x, y, yaw, w, d, h
+        dof_per_obj = 1 + max(dof_per_cylinder, dof_per_box)  # +1 for type
+        desc_vector = np.zeros(n_max_obstacles * dof_per_obj)
+        head = 0
+
         contents: List[Any] = []
         for obj2d in obj2d_list:
+            desc_obj = np.zeros(dof_per_obj)
             h = np.random.rand() * (obstacle_h_max - obstacle_h_min) + obstacle_h_min
             if isinstance(obj2d, Box2d):
                 extent = np.hstack([obj2d.extent, h])
                 obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
                 obj.rotate(obj2d.coords.angle, "z")
+                desc_obj[0] = 0
+                desc_obj[1:4] = np.hstack([obj2d.coords.pos, obj2d.coords.angle])
+                desc_obj[4:6] = obj2d.extent
             elif isinstance(obj2d, Circle):
                 obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
+                desc_obj[0] = 1
+                desc_obj[1:3] = np.hstack([obj2d.center])
+                desc_obj[3] = obj2d.radius
             else:
                 assert False
             obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
             contents.append(obj)
+            desc_vector[head : head + dof_per_obj] = desc_obj
+            head += dof_per_obj
             target_region.assoc(obj, relative_coords="local")
-        return contents
+        return contents, desc_vector
 
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         hmap_config = HeightmapConfig(n_grid, n_grid)
@@ -264,119 +276,120 @@ class FridgeWithContents(FridgeWithContentsBase):
         return hmap.heightmap
 
 
-class FridgeWithManyContents(FridgeWithContents):
-    @classmethod
-    def sample(cls, standard: bool = False):
-        fridge = Fridge.sample(standard)
-        if standard:
-            cylinder = CylinderSkelton(radius=0.02, height=0.12)
-            co = fridge.copy_worldcoords()
-            co.translate([0.0, 0.0, 0.06 + fridge.thickness])
-            cylinder.newcoords(co)
-            return cls(fridge, [cylinder])
-        contents = cls.sample_contents(fridge.target_region, 7)
-        for content in contents:
-            assert content.parent == fridge.target_region  # type: ignore[attr-defined]
-        return cls(fridge, contents)
-
-    @staticmethod
-    def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
-        D, W, H = target_region._extents
-        obstacle_h_max = H - 0.03
-        region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
-
-        obj2d_list = []  # type: ignore
-        while len(obj2d_list) < n_obstacles:
-            center = region2d.sample_point()
-            np.random.rand() < 0.5
-            r = 0.015
-            obj2d = Circle(center, r)
-
-            if not region2d.contains(obj2d):
-                continue
-            if any([is_colliding(obj2d, o) for o in obj2d_list]):
-                continue
-            obj2d_list.append(obj2d)
-
-        contents: List[Any] = []
-        for obj2d in obj2d_list:
-            h = obstacle_h_max - 0.02
-            obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
-            obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
-            contents.append(obj)
-            target_region.assoc(obj, relative_coords="local")
-        return contents
-
-
-class FridgeWithRealisticContents(FridgeWithContentsBase):
-    # with domain gap
-
-    @staticmethod
-    def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
-        # this for testing feasibility with domain gap
-        # almost copied from jskfridge
-        mesh_list = [
-            ycb_utils_load_singleton("006_mustard_bottle", scale=1.0),
-            ycb_utils_load_singleton("010_potted_meat_can"),
-            ycb_utils_load_singleton("013_apple"),
-            ycb_utils_load_singleton("019_pitcher_base", scale=1.0),
-        ]
-        skelton_list = [MeshSkelton(mesh, fill_value=0.03, dim_grid=30) for mesh in mesh_list]
-        box = target_region
-
-        obj_list = []  # type: ignore
-        while len(obj_list) < n_obstacles:
-            skelton = copy.deepcopy(np.random.choice(skelton_list))
-
-            assert isinstance(skelton, MeshSkelton)
-            pos = box.sample_points(1)[0]
-            pos[2] = box.worldpos()[2] - 0.5 * box._extents[2] + 0.01
-            skelton.newcoords(Coordinates(pos))
-            yaw = np.random.uniform(0.0, 2 * np.pi)
-            skelton.rotate(yaw, "z")
-
-            values = box.sdf(skelton.surface_points)
-            is_containd = np.all(values < -0.005)
-            if not is_containd:
-                continue
-
-            is_colliding = False
-            for obj in obj_list:
-                if np.any(skelton.sdf(obj.surface_points) < 0.0):
-                    is_colliding = True
-                    break
-            if is_colliding:
-                continue
-            assert isinstance(skelton, MeshSkelton)
-            skelton.sdf.itp.fill_value = 1.0
-            obj_list.append(skelton)
-            target_region.assoc(skelton, relative_coords="world")
-        return obj_list  # type: ignore[return-value]
-
-    def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
-        hmap_config = HeightmapConfig(n_grid, n_grid)
-        for content in self.contents:
-            assert isinstance(content, MeshSkelton)
-            content.itp_fill_value = 0.03
-
-        hmap = LocatedHeightmap.by_raymarching(
-            self.fridge.target_region, self.contents, conf=hmap_config
-        )
-        for content in self.contents:
-            assert isinstance(content, MeshSkelton)
-            content.itp_fill_value = 1.0
-        return hmap.heightmap
+# class FridgeWithManyContents(FridgeWithContents):
+#     @classmethod
+#     def sample(cls, standard: bool = False):
+#         fridge = Fridge.sample(standard)
+#         if standard:
+#             cylinder = CylinderSkelton(radius=0.02, height=0.12)
+#             co = fridge.copy_worldcoords()
+#             co.translate([0.0, 0.0, 0.06 + fridge.thickness])
+#             cylinder.newcoords(co)
+#             return cls(fridge, [cylinder])
+#         contents = cls.sample_contents(fridge.target_region, 7)
+#         for content in contents:
+#             assert content.parent == fridge.target_region  # type: ignore[attr-defined]
+#         return cls(fridge, contents)
+#
+#     @staticmethod
+#     def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
+#         D, W, H = target_region._extents
+#         obstacle_h_max = H - 0.03
+#         region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
+#
+#         obj2d_list = []  # type: ignore
+#         while len(obj2d_list) < n_obstacles:
+#             center = region2d.sample_point()
+#             np.random.rand() < 0.5
+#             r = 0.015
+#             obj2d = Circle(center, r)
+#
+#             if not region2d.contains(obj2d):
+#                 continue
+#             if any([is_colliding(obj2d, o) for o in obj2d_list]):
+#                 continue
+#             obj2d_list.append(obj2d)
+#
+#         contents: List[Any] = []
+#         for obj2d in obj2d_list:
+#             h = obstacle_h_max - 0.02
+#             obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
+#             obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
+#             contents.append(obj)
+#             target_region.assoc(obj, relative_coords="local")
+#         return contents
+#
+#
+# class FridgeWithRealisticContents(FridgeWithContentsBase):
+#     # with domain gap
+#
+#     @staticmethod
+#     def sample_contents(target_region: BoxSkeleton, n_obstacles: int) -> List[PrimitiveSkelton]:
+#         # this for testing feasibility with domain gap
+#         # almost copied from jskfridge
+#         mesh_list = [
+#             ycb_utils_load_singleton("006_mustard_bottle", scale=1.0),
+#             ycb_utils_load_singleton("010_potted_meat_can"),
+#             ycb_utils_load_singleton("013_apple"),
+#             ycb_utils_load_singleton("019_pitcher_base", scale=1.0),
+#         ]
+#         skelton_list = [MeshSkelton(mesh, fill_value=0.03, dim_grid=30) for mesh in mesh_list]
+#         box = target_region
+#
+#         obj_list = []  # type: ignore
+#         while len(obj_list) < n_obstacles:
+#             skelton = copy.deepcopy(np.random.choice(skelton_list))
+#
+#             assert isinstance(skelton, MeshSkelton)
+#             pos = box.sample_points(1)[0]
+#             pos[2] = box.worldpos()[2] - 0.5 * box._extents[2] + 0.01
+#             skelton.newcoords(Coordinates(pos))
+#             yaw = np.random.uniform(0.0, 2 * np.pi)
+#             skelton.rotate(yaw, "z")
+#
+#             values = box.sdf(skelton.surface_points)
+#             is_containd = np.all(values < -0.005)
+#             if not is_containd:
+#                 continue
+#
+#             is_colliding = False
+#             for obj in obj_list:
+#                 if np.any(skelton.sdf(obj.surface_points) < 0.0):
+#                     is_colliding = True
+#                     break
+#             if is_colliding:
+#                 continue
+#             assert isinstance(skelton, MeshSkelton)
+#             skelton.sdf.itp.fill_value = 1.0
+#             obj_list.append(skelton)
+#             target_region.assoc(skelton, relative_coords="world")
+#         return obj_list  # type: ignore[return-value]
+#
+#     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
+#         hmap_config = HeightmapConfig(n_grid, n_grid)
+#         for content in self.contents:
+#             assert isinstance(content, MeshSkelton)
+#             content.itp_fill_value = 0.03
+#
+#         hmap = LocatedHeightmap.by_raymarching(
+#             self.fridge.target_region, self.contents, conf=hmap_config
+#         )
+#         for content in self.contents:
+#             assert isinstance(content, MeshSkelton)
+#             content.itp_fill_value = 1.0
+#         return hmap.heightmap
 
 
 @dataclass
 class TabletopClutteredFridgeWorldBase(WorldBase):
     table: BoxSkeleton
-    fridge_conts: FridgeWithContentsBase
+    fridge_conts: FridgeWithContents
+    desc_vector: np.ndarray
     _heightmap: Optional[np.ndarray] = None  # lazy
 
     @classmethod
     @abstractmethod
-    def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
+    def get_fridge_conts_class(cls) -> Type[FridgeWithContents]:
         ...
 
     def export_intrinsic_description(self) -> np.ndarray:
@@ -403,7 +416,7 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
         table.rotate(angle, "z")
         fridge_conts.translate([slide, 0.0, 0.0])
         fridge_conts.rotate(angle, "z")
-        return cls(table, fridge_conts)
+        return cls(table, fridge_conts, fridge_conts.desc_vector)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge_conts.visualize(viewer)
@@ -417,6 +430,11 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         return self.fridge_conts.sample_pregrasp_coords()
 
+    @classmethod
+    @abstractmethod
+    def get_world_dof(cls) -> int:
+        ...
+
 
 _EXPORT_METHOD = {"method": None}
 
@@ -429,7 +447,7 @@ def set_export_method(whatever):  # TODO: what the hell is this
 
 class TabletopClutteredFridgeWorld(TabletopClutteredFridgeWorldBase):
     @classmethod
-    def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
+    def get_fridge_conts_class(cls) -> Type[FridgeWithContents]:
         return FridgeWithContents
 
     def export_full_description(self) -> np.ndarray:
@@ -445,14 +463,18 @@ class TabletopClutteredFridgeWorld(TabletopClutteredFridgeWorldBase):
         else:
             assert False
 
-
-class TabletopClutteredFridgeWorldWithManyContents(TabletopClutteredFridgeWorldBase):
     @classmethod
-    def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
-        return FridgeWithManyContents
+    def get_world_dof(cls) -> int:
+        return 7 * 7 + 1
 
 
-class TabletopClutteredFridgeWorldWithRealisticContents(TabletopClutteredFridgeWorldBase):
-    @classmethod
-    def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
-        return FridgeWithRealisticContents
+# class TabletopClutteredFridgeWorldWithManyContents(TabletopClutteredFridgeWorldBase):
+#     @classmethod
+#     def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
+#         return FridgeWithManyContents
+#
+#
+# class TabletopClutteredFridgeWorldWithRealisticContents(TabletopClutteredFridgeWorldBase):
+#     @classmethod
+#     def get_fridge_conts_class(cls) -> Type[FridgeWithContentsBase]:
+#         return FridgeWithRealisticContents

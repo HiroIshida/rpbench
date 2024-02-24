@@ -205,6 +205,10 @@ class BubblyWorldBase(WorldBase):
                 if len(obstacles) == n_obs:
                     return cls(obstacles)
 
+    @classmethod
+    def get_world_dof(cls) -> int:
+        return 3 * len(cls.get_meta_parameter().n_obs)
+
     def export_intrinsic_description(self) -> np.ndarray:
         return np.hstack([obs.as_vector() for obs in self.obstacles])
 
@@ -366,6 +370,10 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, Tuple[np.ndarray, ...], 
             problem = DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
             probs.append(problem)
         return probs
+
+    @classmethod
+    def get_task_dof(cls) -> int:
+        return cls.get_world_type().get_world_dof() + 2
 
     def export_intrinsic_descriptions(self) -> List[np.ndarray]:
         # return [self.world.export_intrinsic_description()] * self.n_inner_task

@@ -61,7 +61,12 @@ class BelowTableWorldBase(WorldBase):
     _intrinsic_desc: np.ndarray
 
     @abstractmethod
-    def export_description(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def get_world_dof(cls) -> int:
         ...
 
     def get_exact_sdf(self) -> UnionSDF:
@@ -100,7 +105,7 @@ class BelowTableWorldBase(WorldBase):
 
 @dataclass
 class BelowTableSingleObstacleWorld(BelowTableWorldBase):
-    def export_description(self, method: Optional[str]) -> Tuple[np.ndarray, None]:
+    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, None]:
         assert method in (None, "intrinsic")
         return self._intrinsic_desc, None
 
@@ -131,6 +136,10 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
         desc_world = np.hstack([desc_table, desc_obstacle])
 
         return cls(target_region, table, [obs], desc_world)
+
+    @classmethod
+    def get_world_dof(cls) -> int:
+        return 7
 
 
 @dataclass
@@ -179,7 +188,7 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
 
         return cls(target_region, table, obstacles, desc)
 
-    def export_description(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         if method is None:
             vec_desc = self._intrinsic_desc[:2]  # only use table position
             mat_desc = self.heightmap()
@@ -189,6 +198,10 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         else:
             raise ValueError(f"unknown method: {method}")
         return vec_desc, mat_desc
+
+    @classmethod
+    def get_world_dof(cls) -> int:
+        return 42
 
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
@@ -261,7 +274,7 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
     def _export_table(self, method: Optional[str] = None) -> DescriptionTable:
         world_dict = {}
 
-        world_vec, world_mesh = self.world.export_description(method)
+        world_vec, world_mesh = self.world.get_parameter(method)
         if world_vec is not None:
             world_dict["world_vector"] = world_vec
         if world_mesh is not None:
@@ -356,6 +369,12 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
                     return sqp_result
 
         return SQPBasedSolverResult.abnormal()
+
+    @classmethod
+    def get_task_dof(cls) -> int:
+        reaching_target_task_dof = 3 if cls.rarm_rot_type() == RotationType.IGNORE else 6
+        world_t: BelowTableWorldT = cls.get_world_type()  # type: ignore[assignment]
+        return world_t.get_world_dof() + reaching_target_task_dof
 
     @overload
     def create_viewer(self, mode: Literal["static"]) -> StaticSolutionVisualizer:

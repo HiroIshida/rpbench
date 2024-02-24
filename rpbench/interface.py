@@ -278,6 +278,11 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def export_problems(self) -> List[Problem]:
         ...
 
+    @classmethod
+    @abstractmethod
+    def get_task_dof(cls) -> int:
+        ...
+
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):
     """TaskSolver interface

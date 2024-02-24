@@ -21,8 +21,6 @@ from rpbench.articulated.pr2.common import (
 from rpbench.articulated.world.minifridge import (
     TabletopClutteredFridgeWorld,
     TabletopClutteredFridgeWorldBase,
-    TabletopClutteredFridgeWorldWithManyContents,
-    TabletopClutteredFridgeWorldWithRealisticContents,
 )
 from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
@@ -76,27 +74,6 @@ class TabletopClutteredFridgeReachingTaskBase(
                     break
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
-
-    # def export_full_descriptions(self) -> List[np.ndarray]:
-    #     world_vec = self.world.export_full_description()
-    #     descs_list = []
-    #     for desc in self.descriptions:
-    #         target_pose, base_pose = desc
-    #         vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
-    #         descs = np.hstack(vecs)
-    #         descs_list.append(descs)
-    #     return descs_list
-
-    # def export_intrinsic_descriptions(self) -> List[np.ndarray]:
-    #     world_vec = self.world.export_intrinsic_description()
-
-    #     intrinsic_descs = []
-    #     for desc in self.descriptions:
-    #         target_pose, base_pose = desc
-    #         vecs = [world_vec] + [skcoords_to_pose_vec(target_pose)] + [base_pose]
-    #         intrinsic_desc = np.hstack(vecs)
-    #         intrinsic_descs.append(intrinsic_desc)
-    #     return intrinsic_descs
 
     def export_table(self) -> DescriptionTable:
         world_dict = {}  # type: ignore
@@ -165,6 +142,10 @@ class TabletopClutteredFridgeReachingTaskBase(
         ompl_solver.setup(problem)
         return ompl_solver.solve()
 
+    @classmethod
+    def get_task_dof(cls) -> int:
+        return cls.get_world_type().get_world_dof() + 4 + 3  # type: ignore[attr-defined]
+
     @overload
     def create_viewer(self, mode: Literal["static"]) -> StaticSolutionVisualizer:
         ...
@@ -227,17 +208,17 @@ class TabletopClutteredFridgeReachingTask(
         return TabletopClutteredFridgeWorld
 
 
-class TabletopClutteredFridgeReachingManyContentsTask(
-    TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithManyContents]
-):
-    @staticmethod
-    def get_world_type() -> Type[TabletopClutteredFridgeWorldWithManyContents]:
-        return TabletopClutteredFridgeWorldWithManyContents
-
-
-class TabletopClutteredFridgeReachingRealisticTask(
-    TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithRealisticContents]
-):
-    @staticmethod
-    def get_world_type() -> Type[TabletopClutteredFridgeWorldWithRealisticContents]:
-        return TabletopClutteredFridgeWorldWithRealisticContents
+# class TabletopClutteredFridgeReachingManyContentsTask(
+#     TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithManyContents]
+# ):
+#     @staticmethod
+#     def get_world_type() -> Type[TabletopClutteredFridgeWorldWithManyContents]:
+#         return TabletopClutteredFridgeWorldWithManyContents
+#
+#
+# class TabletopClutteredFridgeReachingRealisticTask(
+#     TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithRealisticContents]
+# ):
+#     @staticmethod
+#     def get_world_type() -> Type[TabletopClutteredFridgeWorldWithRealisticContents]:
+#         return TabletopClutteredFridgeWorldWithRealisticContents
