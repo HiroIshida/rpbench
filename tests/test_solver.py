@@ -1,12 +1,12 @@
 from skmp.solver.nlp_solver.sqp_based_solver import SQPBasedSolver, SQPBasedSolverConfig
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.articulated.pr2.tabletop import TabletopOvenRightArmReachingTask
+from rpbench.articulated.pr2.minifridge import TabletopClutteredFridgeReachingTask
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset, SkmpTaskSolver
 
 
 def test_task_sovler():
-    task_type = TabletopOvenRightArmReachingTask
+    task_type = TabletopClutteredFridgeReachingTask
     task = task_type.sample(1, standard=True)
 
     solvers = []

@@ -3,12 +3,12 @@ from pathlib import Path
 
 from skmp.solver.ompl_solver import OMPLSolver, OMPLSolverConfig
 
-from rpbench.articulated.pr2.tabletop import TabletopOvenRightArmReachingTask
+from rpbench.articulated.pr2.minifridge import TabletopClutteredFridgeReachingTask
 from rpbench.interface import DatadrivenTaskSolver, PlanningDataset
 
 
 def test_dataset():
-    task_type = TabletopOvenRightArmReachingTask
+    task_type = TabletopClutteredFridgeReachingTask
     solcon = OMPLSolverConfig()
 
     with tempfile.TemporaryDirectory() as td:
