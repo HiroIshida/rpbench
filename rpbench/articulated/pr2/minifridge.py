@@ -60,20 +60,24 @@ class TabletopClutteredFridgeReachingTaskBase(
                 if pose is not None:
                     pose_list.append(pose)
 
-        colkin = CachedRArmFixedPR2ConstProvider.get_whole_body_colkin()
-        pr2 = CachedRArmPR2ConstProvider.get_pr2()
-        sdf = world.get_exact_sdf()
-        collfree_const = CollFreeConst(colkin, sdf, pr2)
+            colkin = CachedRArmFixedPR2ConstProvider.get_whole_body_colkin()
+            pr2 = CachedRArmPR2ConstProvider.get_pr2()
+            sdf = world.get_exact_sdf()
+            collfree_const = CollFreeConst(colkin, sdf, pr2)
 
-        while True:
-            base_pos = np.random.randn(3) * np.array([0.1, 0.2, 0.3]) - np.array([-0.05, 0.0, 0.0])
-            set_robot_state(pr2, [], base_pos, base_type=BaseType.PLANER)
-            colkin.reflect_skrobot_model(pr2)
-            q = get_robot_state(pr2, colkin.control_joint_names)
+        if standard:
+            base_pos = np.array([-0.1, 0.0, 0.0])
+        else:
+            while True:
+                base_pos = np.random.randn(3) * np.array([0.1, 0.2, 0.3]) - np.array(
+                    [-0.05, 0.0, 0.0]
+                )
+                set_robot_state(pr2, [], base_pos, base_type=BaseType.PLANER)
+                colkin.reflect_skrobot_model(pr2)
+                q = get_robot_state(pr2, colkin.control_joint_names)
 
-            if collfree_const.is_valid(q):
-                break
-
+                if collfree_const.is_valid(q):
+                    break
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
 
