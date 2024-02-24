@@ -12,7 +12,6 @@ from typing import (
     Callable,
     Dict,
     Generic,
-    Iterable,
     List,
     Optional,
     Protocol,
@@ -370,7 +369,7 @@ class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
         ...
 
     @abstractmethod
-    def export_problems(self) -> Iterable[Problem]:
+    def export_problems(self) -> List[Problem]:
         ...
 
 

@@ -1,14 +1,4 @@
-from typing import (
-    Any,
-    ClassVar,
-    Iterator,
-    List,
-    Literal,
-    Tuple,
-    Type,
-    TypeVar,
-    overload,
-)
+from typing import Any, ClassVar, List, Literal, Tuple, Type, TypeVar, overload
 
 import numpy as np
 from skmp.constraint import CollFreeConst
@@ -126,7 +116,7 @@ class TabletopClutteredFridgeReachingTaskBase(
             desc_dicts.append(desc_dict)
         return DescriptionTable(world_dict, desc_dicts)
 
-    def export_problems(self) -> Iterator[Problem]:
+    def export_problems(self) -> List[Problem]:
         provider = self.config_provider
         q_start = provider.get_start_config()
         box_const = provider.get_box_const()
@@ -158,6 +148,7 @@ class TabletopClutteredFridgeReachingTaskBase(
             ]
         )
 
+        problems = []
         for target_pose, base_pose in self.descriptions:
             set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
             pose_const = provider.get_pose_const([target_pose])
@@ -168,7 +159,8 @@ class TabletopClutteredFridgeReachingTaskBase(
             problem = Problem(
                 q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
             )
-            yield problem
+            problems.append(problem)
+        return problems
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
         solcon = OMPLSolverConfig(n_max_call=40000, n_max_satisfaction_trial=200, simplify=True)
