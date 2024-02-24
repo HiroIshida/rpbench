@@ -1,3 +1,5 @@
+import hashlib
+import pickle
 import socket
 from typing import Type
 
@@ -79,6 +81,7 @@ def test_prob_dummy_task():
         HumanoidTableClutteredReachingTask,
         HumanoidTableClutteredReachingTask2,
         TabletopClutteredFridgeReachingTask,
+        BubblySimpleMeshPointConnectTask,
     ],
 )
 def test_task_hash(task_type: Type[TaskBase]):
@@ -89,7 +92,31 @@ def test_task_hash(task_type: Type[TaskBase]):
         assert hval == hval2
 
 
-def test_task_hash_value():
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        HumanoidTableReachingTask2,
+        HumanoidTableReachingTask,
+        HumanoidTableClutteredReachingTask,
+        HumanoidTableClutteredReachingTask2,
+        TabletopClutteredFridgeReachingTask,
+        BubblySimpleMeshPointConnectTask,
+    ],
+)
+def test_standard(task_type: Type[TaskBase]):
+    # consistency
+    hash_value = hashlib.md5(pickle.dumps(task_type.sample(1, standard=True))).hexdigest()
+    for _ in range(5):
+        task = task_type.sample(1, standard=True)
+        assert hash_value == hashlib.md5(pickle.dumps(task)).hexdigest()
+
+    # solvability
+    task = task_type.sample(1, standard=True)
+    res = task.solve_default()[0]
+    assert res.traj is not None
+
+
+def _test_task_hash_value():
     # these tasks are used in TRO submission or Phd thesis.
     # if you change the task definition, you must change the hash value here.
     if socket.gethostname() != "azarashi":
