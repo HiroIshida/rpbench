@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import (
     Any,
     Callable,
-    Dict,
     Generic,
     List,
     Optional,
@@ -34,17 +33,13 @@ from skmp.solver.interface import (
     ResultT,
 )
 from skmp.trajectory import Trajectory
-from skrobot.coordinates import Coordinates
 
 from rpbench.utils import temp_seed
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
-SamplableT = TypeVar("SamplableT", bound="SamplableBase")
-OtherSamplableT = TypeVar("OtherSamplableT", bound="SamplableBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
-CacheT = TypeVar("CacheT", bound=Any)
 
 
 class SDFProtocol(Protocol):
@@ -63,23 +58,6 @@ class SDFProtocol(Protocol):
         ...
 
 
-class GridProtocol(Protocol):
-    lb: np.ndarray
-    ub: np.ndarray
-
-    @property
-    def sizes(self) -> Tuple[int, ...]:
-        ...
-
-
-class GridSDFProtocol(SDFProtocol, Protocol):
-    values: np.ndarray
-
-    @property
-    def grid(self) -> GridProtocol:
-        ...
-
-
 class WorldBase(ABC):
     @classmethod
     @abstractmethod
@@ -94,110 +72,42 @@ class WorldBase(ABC):
 
 @dataclass(frozen=True)
 class DescriptionTable:
-    """Unified format of description for all tasks
-    both world and descriptions should be encoded into ArrayData
-    """
+    world_vec: Optional[np.ndarray]
+    world_mat: Optional[np.ndarray]
+    other_vecs: List[np.ndarray]  # world-conditioned description
 
-    world_desc_dict: Dict[str, np.ndarray]  # world common for all sub tasks
-    wcond_desc_dicts: List[Dict[str, np.ndarray]]  # world conditioned
-
-    # currently we assume that world and world-conditioned descriptions follows
-    # the following rule.
-    # wd refere to world description and wcd refere to world-condtioned descriotion
-    # - wd has only one key for 2dim or 3dim array
-    # - wd may have 1 dim array
-    # - wcd does not have 2dim or 3dim array
-    # - wcd must have 1dim array
-    # - wcd may be empty, but wd must not be empty
-    # to remove the above limitation, create a task class which inherit rpbench Task
-    # which is equipped with desc-2-tensor-tuple conversion rule
-
-    def get_mesh(self) -> Optional[np.ndarray]:
-        wd_ndim_to_value = {v.ndim: v for v in self.world_desc_dict.values()}
-        ndim_set = wd_ndim_to_value.keys()
-
-        contains_either_2or3_not_both = (2 in ndim_set) ^ (3 in ndim_set)
-        if not contains_either_2or3_not_both:
-            return None
-
-        if 2 in ndim_set:
-            mesh = wd_ndim_to_value[2]
-        elif 3 in ndim_set:
-            mesh = wd_ndim_to_value[3]
+    def get_desc_vecs(self) -> List[np.ndarray]:
+        if self.world_vec is None:
+            return self.other_vecs
         else:
-            assert False
-        return mesh
-
-    def get_vector_descs(self) -> List[np.ndarray]:
-        wd_ndim_to_value = {v.ndim: v for v in self.world_desc_dict.values()}
-        ndim_set = wd_ndim_to_value.keys()
-        # TODO: we should multiple keys for one dim
-        one_key_per_dim = len(wd_ndim_to_value) == len(self.world_desc_dict)
-        assert one_key_per_dim
-        wd_1dim_desc: Optional[np.ndarray] = None
-        if 1 in ndim_set:
-            wd_1dim_desc = wd_ndim_to_value[1]
-
-        if len(self.wcond_desc_dicts) == 0:
-            # FIXME: when wcd len == 0, wd_1dim_desc_tensor is ignored ...?
-            return []
-        else:
-            wcd_desc_dict = self.wcond_desc_dicts[0]
-            ndims = set([v.ndim for v in wcd_desc_dict.values()])
-            assert ndims == {1}
-
-            np_wcd_desc_list = []
-            for wcd_desc_dict in self.wcond_desc_dicts:
-                wcd_desc_vec_list = []
-                if wd_1dim_desc is not None:
-                    wcd_desc_vec_list.append(wd_1dim_desc)
-                wcd_desc_vec_list.extend(list(wcd_desc_dict.values()))
-                wcd_desc_vec_cat = np.concatenate(wcd_desc_vec_list)
-                np_wcd_desc_list.append(wcd_desc_vec_cat)
-            return np_wcd_desc_list
+            return [np.hstack([self.world_vec, desc]) for desc in self.other_vecs]
 
 
 @dataclass
-class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
-    """Task base class
-    Task is composed of world and *descriptions*
-
-    One may wonder why *descriptions* instead of a description.
-    When serialize the task to a data, serialized world data tends to
-    be very larget, though the description is light. So, if mupltiple tasks
-    instance share the same world, it should be handle it as a single task
-    for the memory efficiency.
-    """
-
+class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     world: WorldT
     descriptions: List[DescriptionT]
-    _cache: Optional[GridSDFProtocol]
 
     @property
     def n_inner_task(self) -> int:
         return len(self.descriptions)
 
-    @property
-    def cache(self):
-        if self._cache is None:
-            robot_model = self.get_robot_model()
-            self._cache = self.create_cache(self.world, robot_model)
-        return self._cache
+    @classmethod
+    def from_intrinsic_desc_vecs(cls: Type[TaskT], desc_vecs: np.ndarray) -> "TaskT":
+        raise NotImplementedError()
 
-    def delete_cache(self) -> None:
-        # This feature is usefull when the data-transfer is memmory/network intense.
-        self._cache = None
+    def to_intrinsic_desc_vecs(self) -> np.ndarray:
+        return np.array(self.export_table(use_matrix=False).get_desc_vecs())
 
     @classmethod
     def sample(
-        cls: Type[SamplableT],
+        cls: Type[TaskT],
         n_wcond_desc: int,
         standard: bool = False,
-        create_cache: bool = False,
         timeout: float = 180.0,
-    ) -> SamplableT:
+    ) -> TaskT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
-        robot_model = cls.get_robot_model()
+        cls.get_robot_model()
         world_t = cls.get_world_type()
 
         t_start = time.time()
@@ -213,29 +123,22 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             descriptions = cls.sample_descriptions(world, n_wcond_desc, standard)
             if descriptions is None:
                 continue
-
-            if create_cache:
-                cache = cls.create_cache(world, robot_model)
-            else:
-                cache = None
-
-            return cls(world, descriptions, cache)
+            return cls(world, descriptions)
 
     @classmethod
     def predicated_sample(
-        cls: Type[SamplableT],
+        cls: Type[TaskT],
         n_wcond_desc: int,
-        predicate: Callable[[SamplableT], bool],
+        predicate: Callable[[TaskT], bool],
         max_trial_per_desc: int,
-        create_cache: bool = False,
         timeout: int = 180,
-    ) -> Optional[SamplableT]:
+    ) -> Optional[TaskT]:
         """sample task that maches the predicate function"""
 
         # predicated sample cannot be a standard task
         standard = False
 
-        robot_model = cls.get_robot_model()
+        cls.get_robot_model()
         world_t = cls.get_world_type()
 
         t_start = time.time()
@@ -248,11 +151,6 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             world = world_t.sample(standard=standard)
             if world is None:
                 continue
-
-            if create_cache:
-                cache = cls.create_cache(world, robot_model)
-            else:
-                cache = None
 
             # do some bit tricky thing.
             # Naively, we can sample task with multiple description and then check if
@@ -271,22 +169,39 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
                 if descs is not None:
                     desc = descs[0]
-                    temp_problem = cls(world, [desc], cache)
-
-                    # note that some predicate may depends on cache
-                    # thus, you must be careful if you set create_cache=False
+                    temp_problem = cls(world, [desc])
                     if predicate(temp_problem):
                         descriptions.append(desc)
 
                 if count_trial_before_first_success > max_trial_per_desc:
                     return None
 
-            return cls(world, descriptions, cache)
+            return cls(world, descriptions)
 
+    @classmethod
+    def compute_distribution_hash(cls: Type[TaskT]) -> str:
+        # Although it is difficult to exactly check the identity of the
+        # distribution defined by the calss, we can approximate it by
+        # checking the hash value of the sampled data.
+
+        # dont know why this dry run is needed...
+        # but it is needed to get the consistent hash value
+        task = cls.sample(10, False)
+        task.export_table(use_matrix=False)
+
+        with temp_seed(0, True):
+            data = [cls.sample(10, False).export_table(False) for _ in range(10)]
+            data_str = pickle.dumps(data)
+        return md5(data_str).hexdigest()
+
+    def solve_default(self) -> List[ResultProtocol]:
+        return [self.solve_default_each(p) for p in self.export_problems()]
+
+    # please implement the following methods
     @staticmethod
     @abstractmethod
     def get_world_type() -> Type[WorldT]:
-        raise NotImplementedError()
+        ...
 
     @staticmethod
     @abstractmethod
@@ -297,84 +212,31 @@ class SamplableBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         Also, we assume that robot joint configuration for every
         call of this method is consistent.
         """
-        raise NotImplementedError()
-
-    @staticmethod
-    @abstractmethod
-    def create_cache(world: WorldT, robot_model: RobotModelT) -> Optional[GridSDFProtocol]:
-        """create cache of the world given robot state
-        The reason why this takes RobotModel as input is that, this method
-        may involves vision-simulation using robot model (e.g. synthetic pcloud)
-        """
-        raise NotImplementedError()
+        ...
 
     @classmethod
     @abstractmethod
     def sample_descriptions(
         cls, world: WorldT, n_sample: int, standard: bool = False
     ) -> Optional[List[DescriptionT]]:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def export_table(self) -> DescriptionTable:
         ...
 
-    def __len__(self) -> int:
-        """return number of descriptions"""
-        return len(self.descriptions)
-
-    @classmethod
-    def cast_from(cls: Type[SamplableT], obj: OtherSamplableT) -> SamplableT:
-        raise NotImplementedError()
-
-    @classmethod
-    def compute_distribution_hash(cls: Type[SamplableT]) -> str:
-        # Although it is difficult to exactly check the identity of the
-        # distribution defined by the calss, we can approximate it by
-        # checking the hash value of the sampled data.
-
-        # dont know why this dry run is needed...
-        # but it is needed to get the consistent hash value
-        cls.sample(10, False).export_table()
-
-        with temp_seed(0, True):
-            data = [cls.sample(10, False).export_table() for _ in range(10)]
-            data_str = pickle.dumps(data)
-        return md5(data_str).hexdigest()
-
-
-@dataclass
-class TaskBase(SamplableBase[WorldT, DescriptionT, RobotModelT]):
-    def solve_default(self) -> List[ResultProtocol]:
-        """solve the task by using default setting without initial solution
-        This solve function is expected to successfully solve
-        the problem and get smoother solution if the task is feasible.
-        Thus, typically the implementation would be the combination of
-        sampling-based algorithm with large sampling budget and nlp based
-        smoother.
-
-        This method is abstract, because depending on the task type
-        sampling budget could be much different.
-        """
-        return [self.solve_default_each(p) for p in self.export_problems()]
+    @abstractmethod
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        ...
 
     @abstractmethod
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def get_dof(cls) -> int:
-        """get dof of robot in this task"""
         ...
 
     @abstractmethod
     def export_problems(self) -> List[Problem]:
         ...
 
-
-class ReachingTaskBase(TaskBase[WorldT, Tuple[Coordinates, ...], RobotModelT]):
-    ...
+    @classmethod
+    @abstractmethod
+    def get_task_dof(cls) -> int:
+        ...
 
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):
@@ -559,7 +421,10 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         dim_desc = None
         for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]
-            desc = task.export_table().get_vector_descs()[0]
+            # FIXME: use_matrix is just for now
+            assert False, "not tested yet"
+            desc = task.export_table(use_matrix=False).get_desc_vecs()[0]
+            assert desc.ndim == 1
             pair = (desc, traj)
             pairs_modified.append(pair)
         print("dim desc: {}".format(dim_desc))
@@ -571,7 +436,9 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         probs = [p for p in task.export_problems()]
         prob = probs[0]
         self.skmp_solver.setup(prob)
-        self.query_desc = task.export_table().get_vector_descs()[0]
+        # FIXME: use_matrix is just for now
+        self.query_desc = task.export_table(use_matrix=False).get_desc_vecs()[0]
+        assert self.query_desc.ndim == 1
 
     def solve(self) -> ResultT:
         assert self.query_desc is not None

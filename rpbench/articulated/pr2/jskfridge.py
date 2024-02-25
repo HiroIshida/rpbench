@@ -64,14 +64,6 @@ class JskFridgeReachingTaskBase(
         pr2.head_tilt_joint.joint_angle(0.82)
         return pr2
 
-    @classmethod
-    def get_dof(cls) -> int:
-        return cls.config_provider.get_dof()
-
-    @staticmethod
-    def create_cache(world: JskFridgeWorldBase, robot_model: RobotModel) -> None:
-        return None  # do not crete cache
-
     @staticmethod
     @abstractmethod
     def sample_pose(world: JskFridgeWorldBase) -> Coordinates:
@@ -117,18 +109,16 @@ class JskFridgeReachingTaskBase(
         descriptions = list(zip(pose_list, base_pos_list))
         return descriptions
 
-    def export_table(self) -> DescriptionTable:
-        world_dict = {}  # type: ignore
-        world_dict["mesh"] = self.world.heightmap()
-
-        desc_dicts = []
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        assert use_matrix, "under construction"
+        world_vec = None
+        world_mat = self.world.heightmap()
+        other_vec_list = []
         for desc in self.descriptions:
-            desc_dict = {}
             target_pose, init_state = desc
-            desc_dict["target_pose"] = skcoords_to_pose_vec(target_pose)
-            desc_dict["init_state"] = init_state
-            desc_dicts.append(desc_dict)
-        return DescriptionTable(world_dict, desc_dicts)
+            vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_state])
+            other_vec_list.append(vec)
+        return DescriptionTable(world_vec, world_mat, other_vec_list)
 
     def export_problems(self) -> List[Problem]:
         pr2 = self.get_robot_model()

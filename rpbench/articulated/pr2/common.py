@@ -89,20 +89,6 @@ class CachedPR2ConstProvider(ABC):
         return config.get_collision_kin(whole_body=True)
 
     @classmethod
-    @lru_cache
-    def get_dof(cls) -> int:
-        config = cls.get_config()
-        names = config._get_control_joint_names()
-        dof = len(names)
-        if config.base_type == BaseType.PLANER:
-            dof += 3
-        elif config.base_type == BaseType.FLOATING:
-            dof += 6
-        else:
-            assert False
-        return dof
-
-    @classmethod
     def get_collfree_const(
         cls, sdf: Callable[[np.ndarray], np.ndarray], whole_body: bool = False
     ) -> CollFreeConst:

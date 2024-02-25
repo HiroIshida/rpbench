@@ -43,8 +43,8 @@ from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import (
     DescriptionTable,
     Problem,
-    ReachingTaskBase,
     ResultProtocol,
+    TaskBase,
     WorldBase,
 )
 from rpbench.timeout_decorator import TimeoutError, timeout
@@ -61,7 +61,12 @@ class BelowTableWorldBase(WorldBase):
     _intrinsic_desc: np.ndarray
 
     @abstractmethod
-    def export_description(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def get_world_dof(cls) -> int:
         ...
 
     def get_exact_sdf(self) -> UnionSDF:
@@ -100,7 +105,7 @@ class BelowTableWorldBase(WorldBase):
 
 @dataclass
 class BelowTableSingleObstacleWorld(BelowTableWorldBase):
-    def export_description(self, method: Optional[str]) -> Tuple[np.ndarray, None]:
+    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, None]:
         assert method in (None, "intrinsic")
         return self._intrinsic_desc, None
 
@@ -131,6 +136,10 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
         desc_world = np.hstack([desc_table, desc_obstacle])
 
         return cls(target_region, table, [obs], desc_world)
+
+    @classmethod
+    def get_world_dof(cls) -> int:
+        return 7
 
 
 @dataclass
@@ -179,7 +188,7 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
 
         return cls(target_region, table, obstacles, desc)
 
-    def export_description(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         if method is None:
             vec_desc = self._intrinsic_desc[:2]  # only use table position
             mat_desc = self.heightmap()
@@ -189,6 +198,10 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         else:
             raise ValueError(f"unknown method: {method}")
         return vec_desc, mat_desc
+
+    @classmethod
+    def get_world_dof(cls) -> int:
+        return 42
 
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
@@ -210,21 +223,12 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         return (self.__class__, tuple(args))
 
 
-class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
+class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates, ...], Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
     @staticmethod
     def get_robot_model() -> RobotModel:
         return CachedJaxonConstProvider.get_jaxon()
-
-    @staticmethod
-    def create_cache(world: BelowTableWorldT, robot_model: RobotModel) -> None:
-        return None
-
-    @classmethod
-    def get_dof(cls) -> int:
-        config = CachedJaxonConstProvider.get_config()
-        return len(config._get_control_joint_names()) + 6
 
     @classmethod
     @abstractmethod
@@ -259,7 +263,7 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
         pos_only = self.rarm_rot_type() == RotationType.IGNORE
 
         def process(co):
-            return co.worldpos() if pos_only else skcoords_to_pose_vec(co)
+            return co.worldpos() if pos_only else skcoords_to_pose_vec(co, yaw_only=True)
 
         desc_vecs = []
         for desc in self.descriptions:
@@ -268,26 +272,17 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
         return desc_vecs
 
     def _export_table(self, method: Optional[str] = None) -> DescriptionTable:
-        world_dict = {}
+        world_vec, world_mat = self.world.get_parameter(method)
+        desc_list = []
+        for desc in self.export_intention_vector_descs():
+            desc_list.append(desc)
+        return DescriptionTable(world_vec, world_mat, desc_list)
 
-        world_vec, world_mesh = self.world.export_description(method)
-        if world_vec is not None:
-            world_dict["world_vector"] = world_vec
-        if world_mesh is not None:
-            world_dict["world_mesh"] = world_mesh
-
-        desc_dicts = []
-        for intention_desc in self.export_intention_vector_descs():
-            desc_dict = {"intention": intention_desc}
-            desc_dicts.append(desc_dict)
-        return DescriptionTable(world_dict, desc_dicts)
-
-    def export_table(self) -> DescriptionTable:
-        return self._export_table(self.export_table_method())
-
-    def export_table_method(self) -> Optional[str]:
-        # override if you want to use intrinsic descriptionq
-        return None
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        if use_matrix:
+            return self._export_table()
+        else:
+            return self._export_table("intrinsic")
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider
@@ -365,6 +360,12 @@ class HumanoidTableReachingTaskBase(ReachingTaskBase[BelowTableWorldT, Jaxon]):
                     return sqp_result
 
         return SQPBasedSolverResult.abnormal()
+
+    @classmethod
+    def get_task_dof(cls) -> int:
+        reaching_target_task_dof = 3 if cls.rarm_rot_type() == RotationType.IGNORE else 6
+        world_t: BelowTableWorldT = cls.get_world_type()  # type: ignore[assignment]
+        return world_t.get_world_dof() + reaching_target_task_dof
 
     @overload
     def create_viewer(self, mode: Literal["static"]) -> StaticSolutionVisualizer:
@@ -519,12 +520,3 @@ class HumanoidTableClutteredReachingTask2(HumanoidTableClutteredReachingTaskBase
     @staticmethod
     def rarm_rot_type() -> RotationType:
         return RotationType.IGNORE
-
-
-class HumanoidTableClutteredReachingIntrinsicTask2(HumanoidTableClutteredReachingTaskBase):
-    @staticmethod
-    def rarm_rot_type() -> RotationType:
-        return RotationType.IGNORE
-
-    def export_table_method(self) -> Optional[str]:
-        return "intrinsic"

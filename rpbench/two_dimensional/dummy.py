@@ -16,6 +16,7 @@ from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
 
 DummyWorldT = TypeVar("DummyWorldT", bound="DummyWorldBase")
+DummyTaskT = TypeVar("DummyTaskT", bound="DummyTaskBase")
 
 
 @dataclass
@@ -184,21 +185,20 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
 
 
 class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
+    @classmethod
+    def from_intrinsic_desc_vecs(cls: Type[DummyTaskT], desc_vecs: np.ndarray) -> DummyTaskT:
+        world = cls.get_world_type().sample(True)
+        # split desc_vecs by dof of this task get_task_dof
+        desc_vec_list = list(desc_vecs.reshape(-1, cls.get_task_dof()))
+        return cls(world, desc_vec_list)
+
     @staticmethod
     def get_robot_model() -> None:
         return None
 
-    @staticmethod
-    def create_cache(world: DummyWorldT, robot_model: None) -> None:
-        return None
-
-    def export_table(self) -> DescriptionTable:
-        wd = {}  # type: ignore
-        wcd_list = []  # type: ignore
-        for desc in self.descriptions:
-            wcd = {"p": desc}
-            wcd_list.append(wcd)
-        return DescriptionTable(wd, wcd_list)
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        # don't depend on use_matrix
+        return DescriptionTable(None, None, self.descriptions)
 
     def solve_default_each(self, problem: Problem) -> DummyResult:
         x0 = problem.start
@@ -212,10 +212,6 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         assert np.linalg.norm(x1 - x0) < 1e-3
         dummy_traj = Trajectory.from_two_points(x0, x1, 2)
         return DummyResult(dummy_traj, 1.0, 3000)  # whatever
-
-    @classmethod
-    def get_dof(cls) -> int:
-        return 2
 
     def export_problems(self) -> List[Problem]:
         box = BoxConst(self.world.b_min, self.world.b_max)
@@ -234,6 +230,10 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
             )
             probs.append(prob)
         return probs
+
+    @classmethod
+    def get_task_dof(cls) -> int:
+        return 2
 
     def visualize(self) -> Tuple:
         fig, ax = plt.subplots()
@@ -269,14 +269,12 @@ class DummyTask(DummyTaskBase[DummyWorld]):
 
 
 class DummyMeshTask(DummyTask):
-    def export_table(self) -> DescriptionTable:
-        image = np.zeros((56, 56))
-        wd = {"image": image}  # type: ignore
-        wcd_list = []
-        for desc in self.descriptions:
-            wcd = {"p": desc}
-            wcd_list.append(wcd)
-        return DescriptionTable(wd, wcd_list)
+    def export_table(self, use_matrix: bool) -> DescriptionTable:
+        if use_matrix:
+            image = np.zeros((56, 56))
+        else:
+            image = None
+        return DescriptionTable(None, image, self.descriptions)
 
 
 class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):

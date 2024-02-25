@@ -20,12 +20,15 @@ def create_union_sdf(
     return union_sdf
 
 
-def skcoords_to_pose_vec(co: Coordinates) -> np.ndarray:
+def skcoords_to_pose_vec(co: Coordinates, yaw_only: bool = False) -> np.ndarray:
     pos = co.worldpos()
     rot = co.worldrot()
     ypr = rpy_angle(rot)[0]
     rpy = np.flip(ypr)
-    return np.hstack((pos, rpy))
+    if yaw_only:
+        return np.hstack((pos, rpy[2]))
+    else:
+        return np.hstack((pos, rpy))
 
 
 def pose_vec_to_skcoords(vec: np.ndarray) -> Coordinates:
