@@ -75,7 +75,7 @@ class TabletopClutteredFridgeReachingTaskBase(
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
 
-    def export_table(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             world_vec = np.array([self.world.fridge_conts.fridge.angle])
             world_mat = self.world.fridge_conts.create_heightmap()

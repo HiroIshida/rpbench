@@ -342,7 +342,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
             descriptions.append(goal)
         return descriptions  # type: ignore
 
-    def export_table(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             world_vec = None
             world_mat = self.world.get_grid_map()

@@ -423,7 +423,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
             task, traj = dataset.pairs[i]
             # FIXME: use_matrix is just for now
             assert False, "not tested yet"
-            desc = task.export_table(use_matrix=False).get_desc_vecs()[0]
+            desc = task.export_task_expression(use_matrix=False).get_desc_vecs()[0]
             assert desc.ndim == 1
             pair = (desc, traj)
             pairs_modified.append(pair)

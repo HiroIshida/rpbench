@@ -196,7 +196,7 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     def get_robot_model() -> None:
         return None
 
-    def export_table(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         # don't depend on use_matrix
         return TaskExpression(None, None, self.descriptions)
 
@@ -269,7 +269,7 @@ class DummyTask(DummyTaskBase[DummyWorld]):
 
 
 class DummyMeshTask(DummyTask):
-    def export_table(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             image = np.zeros((56, 56))
         else:

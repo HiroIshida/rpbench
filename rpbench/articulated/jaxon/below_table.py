@@ -271,18 +271,18 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
             desc_vecs.append(desc_vec)
         return desc_vecs
 
-    def _export_table(self, method: Optional[str] = None) -> TaskExpression:
+    def _export_task_expression(self, method: Optional[str] = None) -> TaskExpression:
         world_vec, world_mat = self.world.get_parameter(method)
         desc_list = []
         for desc in self.export_intention_vector_descs():
             desc_list.append(desc)
         return TaskExpression(world_vec, world_mat, desc_list)
 
-    def export_table(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
-            return self._export_table()
+            return self._export_task_expression()
         else:
-            return self._export_table("intrinsic")
+            return self._export_task_expression("intrinsic")
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider

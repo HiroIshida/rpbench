@@ -109,7 +109,7 @@ class JskFridgeReachingTaskBase(
         descriptions = list(zip(pose_list, base_pos_list))
         return descriptions
 
-    def export_table(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         assert use_matrix, "under construction"
         world_vec = None
         world_mat = self.world.heightmap()
