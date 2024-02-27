@@ -11,7 +11,7 @@ from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
 from skmp.solver.interface import AbstractScratchSolver, Problem
 from skmp.trajectory import Trajectory
 
-from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
+from rpbench.interface import SDFProtocol, TaskBase, TaskExpression, WorldBase
 from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
 
@@ -196,9 +196,9 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     def get_robot_model() -> None:
         return None
 
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> TaskExpression:
         # don't depend on use_matrix
-        return DescriptionTable(None, None, self.descriptions)
+        return TaskExpression(None, None, self.descriptions)
 
     def solve_default_each(self, problem: Problem) -> DummyResult:
         x0 = problem.start
@@ -269,12 +269,12 @@ class DummyTask(DummyTaskBase[DummyWorld]):
 
 
 class DummyMeshTask(DummyTask):
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             image = np.zeros((56, 56))
         else:
             image = None
-        return DescriptionTable(None, image, self.descriptions)
+        return TaskExpression(None, image, self.descriptions)
 
 
 class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):

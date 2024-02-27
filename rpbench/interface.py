@@ -71,7 +71,7 @@ class WorldBase(ABC):
 
 
 @dataclass(frozen=True)
-class DescriptionTable:
+class TaskExpression:
     world_vec: Optional[np.ndarray]
     world_mat: Optional[np.ndarray]
     other_vecs: List[np.ndarray]  # world-conditioned description
@@ -97,7 +97,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         raise NotImplementedError()
 
     def to_task_params(self) -> np.ndarray:
-        return np.array(self.export_table(use_matrix=False).get_desc_vecs())
+        return np.array(self.export_task_expression(use_matrix=False).get_desc_vecs())
 
     @classmethod
     def sample(
@@ -187,10 +187,10 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         # dont know why this dry run is needed...
         # but it is needed to get the consistent hash value
         task = cls.sample(10, False)
-        task.export_table(use_matrix=False)
+        task.export_task_expression(use_matrix=False)
 
         with temp_seed(0, True):
-            data = [cls.sample(10, False).export_table(False) for _ in range(10)]
+            data = [cls.sample(10, False).export_task_expression(False) for _ in range(10)]
             data_str = pickle.dumps(data)
         return md5(data_str).hexdigest()
 
@@ -222,7 +222,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         ...
 
     @abstractmethod
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         ...
 
     @abstractmethod
@@ -437,7 +437,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
         prob = probs[0]
         self.skmp_solver.setup(prob)
         # FIXME: use_matrix is just for now
-        self.query_desc = task.export_table(use_matrix=False).get_desc_vecs()[0]
+        self.query_desc = task.export_task_expression(use_matrix=False).get_desc_vecs()[0]
         assert self.query_desc.ndim == 1
 
     def solve(self) -> ResultT:

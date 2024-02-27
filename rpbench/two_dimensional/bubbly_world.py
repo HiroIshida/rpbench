@@ -12,7 +12,7 @@ from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
 from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
 import rpbench.two_dimensional.double_integrator_trajopt as diopt
-from rpbench.interface import DescriptionTable, SDFProtocol, TaskBase, WorldBase
+from rpbench.interface import SDFProtocol, TaskBase, TaskExpression, WorldBase
 from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryBound,
     TrajectoryCostFunction,
@@ -342,14 +342,14 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
             descriptions.append(goal)
         return descriptions  # type: ignore
 
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             world_vec = None
             world_mat = self.world.get_grid_map()
         else:
             world_vec = self.world.export_intrinsic_description()
             world_mat = None
-        return DescriptionTable(world_vec, world_mat, self.descriptions)
+        return TaskExpression(world_vec, world_mat, self.descriptions)
 
     @dataclass
     class _FMTResult:

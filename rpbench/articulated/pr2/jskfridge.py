@@ -22,7 +22,7 @@ from rpbench.articulated.world.jskfridge import (
     JskFridgeWorld3,
     JskFridgeWorldBase,
 )
-from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
+from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 DescriptionT = TypeVar("DescriptionT")
@@ -109,7 +109,7 @@ class JskFridgeReachingTaskBase(
         descriptions = list(zip(pose_list, base_pos_list))
         return descriptions
 
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> TaskExpression:
         assert use_matrix, "under construction"
         world_vec = None
         world_mat = self.world.heightmap()
@@ -118,7 +118,7 @@ class JskFridgeReachingTaskBase(
             target_pose, init_state = desc
             vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_state])
             other_vec_list.append(vec)
-        return DescriptionTable(world_vec, world_mat, other_vec_list)
+        return TaskExpression(world_vec, world_mat, other_vec_list)
 
     def export_problems(self) -> List[Problem]:
         pr2 = self.get_robot_model()

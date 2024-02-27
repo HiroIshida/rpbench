@@ -22,7 +22,7 @@ from rpbench.articulated.world.minifridge import (
     TabletopClutteredFridgeWorld,
     TabletopClutteredFridgeWorldBase,
 )
-from rpbench.interface import DescriptionTable, Problem, ResultProtocol, TaskBase
+from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 TabletopWorldT = TypeVar("TabletopWorldT", bound=TabletopClutteredFridgeWorldBase)
@@ -75,7 +75,7 @@ class TabletopClutteredFridgeReachingTaskBase(
         descriptions = [(pose, base_pos) for pose in pose_list]
         return descriptions
 
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             world_vec = np.array([self.world.fridge_conts.fridge.angle])
             world_mat = self.world.fridge_conts.create_heightmap()
@@ -88,7 +88,7 @@ class TabletopClutteredFridgeReachingTaskBase(
             target_pose, init_pose = desc
             other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_pose])
             other_vec_list.append(other_vec)
-        return DescriptionTable(world_vec, world_mat, other_vec_list)
+        return TaskExpression(world_vec, world_mat, other_vec_list)
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider

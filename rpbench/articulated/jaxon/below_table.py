@@ -41,10 +41,10 @@ from rpbench.articulated.jaxon.common import CachedJaxonConstProvider
 from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import (
-    DescriptionTable,
     Problem,
     ResultProtocol,
     TaskBase,
+    TaskExpression,
     WorldBase,
 )
 from rpbench.timeout_decorator import TimeoutError, timeout
@@ -271,14 +271,14 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
             desc_vecs.append(desc_vec)
         return desc_vecs
 
-    def _export_table(self, method: Optional[str] = None) -> DescriptionTable:
+    def _export_table(self, method: Optional[str] = None) -> TaskExpression:
         world_vec, world_mat = self.world.get_parameter(method)
         desc_list = []
         for desc in self.export_intention_vector_descs():
             desc_list.append(desc)
-        return DescriptionTable(world_vec, world_mat, desc_list)
+        return TaskExpression(world_vec, world_mat, desc_list)
 
-    def export_table(self, use_matrix: bool) -> DescriptionTable:
+    def export_table(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
             return self._export_table()
         else:
