@@ -93,10 +93,10 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         return len(self.descriptions)
 
     @classmethod
-    def from_intrinsic_desc_vecs(cls: Type[TaskT], desc_vecs: np.ndarray) -> "TaskT":
+    def from_task_params(cls: Type[TaskT], desc_vecs: np.ndarray) -> "TaskT":
         raise NotImplementedError()
 
-    def to_intrinsic_desc_vecs(self) -> np.ndarray:
+    def to_task_params(self) -> np.ndarray:
         return np.array(self.export_table(use_matrix=False).get_desc_vecs())
 
     @classmethod

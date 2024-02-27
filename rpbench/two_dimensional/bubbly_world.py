@@ -167,7 +167,7 @@ class BubblyWorldBase(WorldBase):
     obstacles: List[CircleObstacle]
 
     @classmethod
-    def from_intrinsic_description(cls: Type[BubblyWorldT], desc: np.ndarray) -> BubblyWorldT:
+    def from_desc(cls: Type[BubblyWorldT], desc: np.ndarray) -> BubblyWorldT:
         n_obs = len(desc) // 3
         assert len(desc) % 3 == 0
         obstacles = []
@@ -297,7 +297,7 @@ class BubblyWorldComplex(BubblyWorldBase):
 
 class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
     @classmethod
-    def from_intrinsic_desc_vecs(cls, desc_vecs: np.ndarray) -> "BubblyPointConnectTaskBase":
+    def from_task_params(cls, desc_vecs: np.ndarray) -> "BubblyPointConnectTaskBase":
         assert desc_vecs.ndim == 2
         world_type = cls.get_world_type()
         world_dof = world_type.get_world_dof()
@@ -312,7 +312,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
             goal = desc_vec[world_dof:]
             goal_list.append(goal)
         assert world_desc is not None
-        world = world_type.from_intrinsic_description(world_desc)
+        world = world_type.from_desc(world_desc)
         return cls(world, goal_list)
 
     @staticmethod

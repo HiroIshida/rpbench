@@ -186,7 +186,7 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
 
 class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     @classmethod
-    def from_intrinsic_desc_vecs(cls: Type[DummyTaskT], desc_vecs: np.ndarray) -> DummyTaskT:
+    def from_task_params(cls: Type[DummyTaskT], desc_vecs: np.ndarray) -> DummyTaskT:
         world = cls.get_world_type().sample(True)
         # split desc_vecs by dof of this task get_task_dof
         desc_vec_list = list(desc_vecs.reshape(-1, cls.get_task_dof()))

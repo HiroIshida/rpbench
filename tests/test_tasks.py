@@ -134,8 +134,8 @@ def test_standard(task_type: Type[TaskBase]):
 )
 def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     task = task_type.sample(5)
-    intr_vecs = task.to_intrinsic_desc_vecs()
-    intr_vecs_again = task_type.from_intrinsic_desc_vecs(intr_vecs).to_intrinsic_desc_vecs()
+    intr_vecs = task.to_task_params()
+    intr_vecs_again = task_type.from_task_params(intr_vecs).to_task_params()
     assert np.allclose(intr_vecs, intr_vecs_again)
 
 
