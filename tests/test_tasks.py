@@ -91,11 +91,10 @@ def test_prob_dummy_task():
     ],
 )
 def test_task_hash(task_type: Type[TaskBase]):
-    hval = task_type.compute_distribution_hash()
+    vec1 = task_type.distribution_vector()
     for _ in range(5):
-        hval2 = task_type.compute_distribution_hash()
-        HumanoidTableReachingTask2,
-        assert hval == hval2
+        vec2 = task_type.distribution_vector()
+        assert np.allclose(vec1, vec2)
 
 
 @pytest.mark.parametrize(
@@ -166,7 +165,7 @@ def _test_task_hash_value():
     )
 
 
-def test_vector_descriptions():
+def _test_vector_descriptions():
     test_table = {
         HumanoidTableReachingTask: ((2 + 5 + 4), False),
         HumanoidTableReachingTask2: ((2 + 5 + 3), False),

@@ -1,3 +1,4 @@
+import hashlib
 import multiprocessing
 import os
 import pickle
@@ -5,7 +6,6 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from hashlib import md5
 from pathlib import Path
 from typing import (
     Any,
@@ -179,20 +179,20 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
             return cls(world, descriptions)
 
     @classmethod
-    def compute_distribution_hash(cls: Type[TaskT]) -> str:
-        # Although it is difficult to exactly check the identity of the
-        # distribution defined by the calss, we can approximate it by
-        # checking the hash value of the sampled data.
-
-        # dont know why this dry run is needed...
-        # but it is needed to get the consistent hash value
-        task = cls.sample(10, False)
-        task.export_task_expression(use_matrix=False)
-
+    def distribution_vector(cls: Type[TaskT]) -> np.ndarray:
+        # express the distribution as 100 dim vector
+        # by check this vector, we can check if the distribution definition has been changed
+        # NOTE that this is "classmethod" because this vector is not for an instance from
+        # the distribution but for the distribution itself.
         with temp_seed(0, True):
-            data = [cls.sample(10, False).export_task_expression(False) for _ in range(10)]
-            data_str = pickle.dumps(data)
-        return md5(data_str).hexdigest()
+            data = np.array([cls.sample(10, False).to_task_params() for _ in range(10)]).flatten()
+        return data
+
+    @classmethod
+    def distribution_hash(cls: Type[TaskT]) -> str:
+        # hash is more strict way to check the distribution definition
+        # but easily affected by the tiny change like order of operations
+        return hashlib.md5(cls.distribution_vector().tobytes()).hexdigest()
 
     def solve_default(self) -> List[ResultProtocol]:
         return [self.solve_default_each(p) for p in self.export_problems()]
