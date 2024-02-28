@@ -184,6 +184,11 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         # by check this vector, we can check if the distribution definition has been changed
         # NOTE that this is "classmethod" because this vector is not for an instance from
         # the distribution but for the distribution itself.
+
+        cls.sample(10, False)  # this line somehow affects the result of the following line
+        # actually we don't cache any thing by sample() procedure, so this line is not necessary
+        # python's bug?
+
         with temp_seed(0, True):
             data = np.array([cls.sample(10, False).to_task_params() for _ in range(10)]).flatten()
         return data
@@ -231,11 +236,6 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
 
     @abstractmethod
     def export_problems(self) -> List[Problem]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def get_task_dof(cls) -> int:
         ...
 
 

@@ -32,7 +32,6 @@ from skmp.visualization.solution_visualizer import (
 )
 from skrobot.coordinates import Coordinates
 from skrobot.model.primitives import Axis
-from skrobot.model.robot_model import RobotModel
 from skrobot.sdf.signed_distance_function import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType, RotationType
@@ -58,16 +57,53 @@ class BelowTableWorldBase(WorldBase):
     target_region: BoxSkeleton
     table: BoxSkeleton
     obstacles: List[BoxSkeleton]
-    _intrinsic_desc: np.ndarray
 
-    @abstractmethod
-    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-        ...
+    def get_parameter(self) -> np.ndarray:
+        # table's x, z position
+        table_pos = self.table.worldpos()
+        table_param = table_pos[[0, 2]]
+
+        # obstacles's x y position and 3dof size
+        obstacle_param_arr = np.zeros((self.get_n_obstacles(), 5))  # later flatten
+        for i, obs in enumerate(self.obstacles):
+            obs_pos = obs.worldpos()
+            obstacle_param_arr[i] = np.hstack([obs.extents, obs_pos[:2]])
+        obstacle_param = obstacle_param_arr.flatten()
+        return np.hstack([table_param, obstacle_param])
+
+    @classmethod
+    def from_parameter(cls: Type[BelowTableWorldT], param: np.ndarray) -> BelowTableWorldT:
+        table_param_dim = 2
+        table_param = param[:table_param_dim]
+        table = BoxSkeleton([1.0, 3.0, 0.1])
+        table.translate([table_param[0], 0, table_param[1]])
+
+        table_height = table.worldpos()[2]
+        target_region = BoxSkeleton([0.8, 0.8, table_height])
+        target_region.translate([0.6, -0.7, 0.5 * table_height])
+
+        obstacle_param = param[table_param_dim:]
+        n_obstacles = cls.get_n_obstacles()
+        obstacles = []
+        for i in range(n_obstacles):
+            obs_param = obstacle_param[i * 5 : (i + 1) * 5]
+            extent = obs_param[:3]
+            if np.all(extent == 0):
+                break
+            x, y = obs_param[3:]
+            z = extent[2] * 0.5
+            obs = BoxSkeleton(extent, pos=[x, y, z])
+            obstacles.append(obs)
+        return cls(target_region, table, obstacles)
 
     @classmethod
     @abstractmethod
-    def get_world_dof(cls) -> int:
+    def get_n_obstacles(cls) -> int:
         ...
+
+    @classmethod
+    def get_param_dim(cls) -> int:
+        return 2 + cls.get_n_obstacles() * 5
 
     def get_exact_sdf(self) -> UnionSDF:
         return UnionSDF([self.table.sdf] + [obs.sdf for obs in self.obstacles])
@@ -85,7 +121,7 @@ class BelowTableWorldBase(WorldBase):
     @staticmethod
     def sample_table_and_target_region(
         standard: bool = False,
-    ) -> Tuple[BoxSkeleton, BoxSkeleton, np.ndarray]:
+    ) -> Tuple[BoxSkeleton, BoxSkeleton]:
         if standard:
             table_position = np.array([0.8, 0.0, 0.8])
         else:
@@ -99,20 +135,19 @@ class BelowTableWorldBase(WorldBase):
         table_height = table_position[2]
         target_region = BoxSkeleton([0.8, 0.8, table_height])
         target_region.translate([0.6, -0.7, 0.5 * table_height])
-        desc = table_position[[0, 2]]
-        return table, target_region, desc
+        return table, target_region
 
 
 @dataclass
 class BelowTableSingleObstacleWorld(BelowTableWorldBase):
-    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, None]:
-        assert method in (None, "intrinsic")
-        return self._intrinsic_desc, None
+    @classmethod
+    def get_n_obstacles(cls) -> int:
+        return 1
 
     @classmethod
     def sample(cls, standard: bool = False) -> "BelowTableSingleObstacleWorld":
 
-        table, target_region, desc_table = cls.sample_table_and_target_region(standard)
+        table, target_region = cls.sample_table_and_target_region(standard)
         table.worldpos()
 
         # determine obstacle
@@ -132,14 +167,7 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
             pos = np.hstack([pos2d, obs_height * 0.5])
             obs = BoxSkeleton(np.hstack([obs_width, obs_height]), pos=pos)
 
-        desc_obstacle = np.hstack([obs.extents, obs.worldpos()[:2]])
-        desc_world = np.hstack([desc_table, desc_obstacle])
-
-        return cls(target_region, table, [obs], desc_world)
-
-    @classmethod
-    def get_world_dof(cls) -> int:
-        return 7
+        return cls(target_region, table, [obs])
 
 
 @dataclass
@@ -147,10 +175,13 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
     _heightmap: Optional[np.ndarray] = None  # lazy
 
     @classmethod
+    def get_n_obstacles(cls) -> int:
+        return 8
+
+    @classmethod
     def sample(cls, standard: bool = False) -> "BelowTableClutteredWorld":
-        table, target_region, table_desc = cls.sample_table_and_target_region(standard)
+        table, target_region = cls.sample_table_and_target_region(standard)
         table_position = table.worldpos()
-        assert len(table_desc) == 2
 
         # determine obstacle
         if standard:
@@ -159,14 +190,7 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
             obstacles_desc = np.hstack([obs.extents, obs.worldpos()[:2]])
         else:
             obstacles = []
-            n_max_obstacle = 8
-            desc_dim_per_obstacle = 3 + 2
-            obstacle_desc_mat = np.zeros(
-                (n_max_obstacle, desc_dim_per_obstacle)
-            )  # later will be flatten
-            # here, if n_obstacles < 8, then the corresponding desc will be zero.
-
-            n_obstacle = np.random.randint(n_max_obstacle + 1)
+            n_obstacle = np.random.randint(cls.get_n_obstacles() + 1)
             for i in range(n_obstacle):
                 region_width = np.array(target_region._extents[:2])
                 region_center = target_region.worldpos()[:2]
@@ -181,27 +205,7 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
                 pos = np.hstack([pos2d, obs_width[2] * 0.5])
                 obs = BoxSkeleton(obs_width, pos=pos)
                 obstacles.append(obs)
-                obstacle_desc_mat[i] = np.hstack([obs.extents, obs.worldpos()[:2]])
-
-            obstacles_desc = obstacle_desc_mat.flatten()
-        desc = np.hstack([table_desc, obstacles_desc])
-
-        return cls(target_region, table, obstacles, desc)
-
-    def get_parameter(self, method: Optional[str]) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-        if method is None:
-            vec_desc = self._intrinsic_desc[:2]  # only use table position
-            mat_desc = self.heightmap()
-        elif method == "intrinsic":
-            vec_desc = self._intrinsic_desc
-            mat_desc = None
-        else:
-            raise ValueError(f"unknown method: {method}")
-        return vec_desc, mat_desc
-
-    @classmethod
-    def get_world_dof(cls) -> int:
-        return 42
+        return cls(target_region, table, obstacles)
 
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
@@ -223,16 +227,19 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         return (self.__class__, tuple(args))
 
 
-class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates, ...], Jaxon]):
+HumanoidTableTaskT = TypeVar("HumanoidTableTaskT", bound="HumanoidTableReachingTaskBase")
+
+
+class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
     @staticmethod
-    def get_robot_model() -> RobotModel:
+    def get_robot_model() -> Jaxon:
         return CachedJaxonConstProvider.get_jaxon()
 
     @classmethod
     @abstractmethod
-    def sample_target_poses(cls, world: BelowTableWorldT, standard: bool) -> Tuple[Coordinates]:
+    def sample_target_pose(cls, world: BelowTableWorldT, standard: bool) -> Coordinates:
         ...
 
     @staticmethod
@@ -243,23 +250,19 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
     @classmethod
     def sample_descriptions(
         cls, world: BelowTableWorldT, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates, ...]]:
+    ) -> List[Coordinates]:
         # TODO: duplication of tabletop.py
         if standard:
             assert n_sample == 1
-        pose_list: List[Tuple[Coordinates, ...]] = []
+        pose_list = []
         while len(pose_list) < n_sample:
-            poses = cls.sample_target_poses(world, standard)
-            is_valid_poses = True
-            for pose in poses:
-                position = np.expand_dims(pose.worldpos(), axis=0)
-                if world.get_exact_sdf()(position)[0] < 1e-3:
-                    is_valid_poses = False
-            if is_valid_poses:
-                pose_list.append(poses)
+            pose = cls.sample_target_pose(world, standard)
+            position = np.expand_dims(pose.worldpos(), axis=0)
+            if world.get_exact_sdf()(position)[0] > 1e-3:
+                pose_list.append(pose)
         return pose_list
 
-    def export_intention_vector_descs(self) -> List[np.ndarray]:
+    def get_intension_params(self) -> List[np.ndarray]:
         pos_only = self.rarm_rot_type() == RotationType.IGNORE
 
         def process(co):
@@ -267,22 +270,39 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
 
         desc_vecs = []
         for desc in self.descriptions:
-            desc_vec = np.hstack([process(co) for co in desc])
+            desc_vec = process(desc)
             desc_vecs.append(desc_vec)
         return desc_vecs
 
-    def _export_task_expression(self, method: Optional[str] = None) -> TaskExpression:
-        world_vec, world_mat = self.world.get_parameter(method)
-        desc_list = []
-        for desc in self.export_intention_vector_descs():
-            desc_list.append(desc)
-        return TaskExpression(world_vec, world_mat, desc_list)
-
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
-        if use_matrix:
-            return self._export_task_expression()
+        if use_matrix and hasattr(self.world, "heightmap"):
+            world_param = self.world.get_parameter()
+            world_vec_param = world_param[:2]
+            world_mat = self.world.heightmap()  # type: ignore
+            return TaskExpression(world_vec_param, world_mat, self.get_intension_params())
         else:
-            return self._export_task_expression("intrinsic")
+            world_param = self.world.get_parameter()
+            return TaskExpression(world_param, None, self.get_intension_params())
+
+    @classmethod
+    @abstractmethod
+    def param_to_intention(cls, intention_param: np.ndarray) -> Coordinates:
+        ...
+
+    @classmethod
+    def from_task_params(cls: Type[HumanoidTableTaskT], params: np.ndarray) -> HumanoidTableTaskT:
+        world_t = cls.get_world_type()
+        world_param_dim = world_t.get_param_dim()
+        world = None
+        intention_list = []
+        for param in params:
+            world_param = param[:world_param_dim]
+            if world is None:
+                world = world_t.from_parameter(world_param)
+            intention = cls.param_to_intention(param[world_param_dim:])
+            intention_list.append(intention)
+        assert world is not None
+        return cls(world, intention_list)
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider
@@ -361,12 +381,6 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Tuple[Coordinates
 
         return SQPBasedSolverResult.abnormal()
 
-    @classmethod
-    def get_task_dof(cls) -> int:
-        reaching_target_task_dof = 3 if cls.rarm_rot_type() == RotationType.IGNORE else 6
-        world_t: BelowTableWorldT = cls.get_world_type()  # type: ignore[assignment]
-        return world_t.get_world_dof() + reaching_target_task_dof
-
     @overload
     def create_viewer(self, mode: Literal["static"]) -> StaticSolutionVisualizer:
         ...
@@ -434,12 +448,12 @@ class HumanoidTableNotClutteredReachingTaskBase(
         return BelowTableSingleObstacleWorld
 
     @classmethod
-    def sample_target_poses(
+    def sample_target_pose(
         cls, world: BelowTableSingleObstacleWorld, standard: bool
-    ) -> Tuple[Coordinates]:
+    ) -> Coordinates:
         if standard:
             co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
-            return (co,)
+            return co
 
         sdf = world.get_exact_sdf()
 
@@ -453,20 +467,40 @@ class HumanoidTableNotClutteredReachingTaskBase(
             sd_val = sdf(points)[0]
             if sd_val > 0.03:
                 co.rotate(-0.5 * np.pi, "y")
-                return (co,)
+                return co
         assert False
 
 
-class HumanoidTableReachingTask(HumanoidTableNotClutteredReachingTaskBase):
+class RotIgnoreMixin:
+    @staticmethod
+    def rarm_rot_type() -> RotationType:
+        return RotationType.IGNORE
+
+    @classmethod
+    def param_to_intention(cls, intention_param: np.ndarray) -> Coordinates:
+        x, y, z = intention_param
+        co = Coordinates([x, y, z], rot=[0, 0, 0])
+        return co
+
+
+class RotXYZWMixin:
     @staticmethod
     def rarm_rot_type() -> RotationType:
         return RotationType.XYZW
 
+    @classmethod
+    def param_to_intention(cls, intention_param: np.ndarray) -> Coordinates:
+        x, y, z, yaw = intention_param
+        co = Coordinates([x, y, z], rot=[yaw, 0, 0])
+        return co
 
-class HumanoidTableReachingTask2(HumanoidTableNotClutteredReachingTaskBase):
-    @staticmethod
-    def rarm_rot_type() -> RotationType:
-        return RotationType.IGNORE
+
+class HumanoidTableReachingTask(RotXYZWMixin, HumanoidTableNotClutteredReachingTaskBase):
+    ...
+
+
+class HumanoidTableReachingTask2(RotIgnoreMixin, HumanoidTableNotClutteredReachingTaskBase):
+    ...
 
 
 class HumanoidTableClutteredReachingTaskBase(
@@ -477,12 +511,10 @@ class HumanoidTableClutteredReachingTaskBase(
         return BelowTableClutteredWorld
 
     @classmethod
-    def sample_target_poses(
-        cls, world: BelowTableClutteredWorld, standard: bool
-    ) -> Tuple[Coordinates]:
+    def sample_target_pose(cls, world: BelowTableClutteredWorld, standard: bool) -> Coordinates:
         if standard:
             co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
-            return (co,)
+            return co
 
         sdf = world.get_exact_sdf()
 
@@ -503,20 +535,16 @@ class HumanoidTableClutteredReachingTaskBase(
             margin = 0.08
             if sd_val > margin and sd_val_back > margin:
                 co.rotate(-0.5 * np.pi, "y")
-                return (co,)
+                return co
 
         # because no way to sample,
         co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
-        return (co,)
+        return co
 
 
-class HumanoidTableClutteredReachingTask(HumanoidTableClutteredReachingTaskBase):
-    @staticmethod
-    def rarm_rot_type() -> RotationType:
-        return RotationType.XYZW
+class HumanoidTableClutteredReachingTask(RotXYZWMixin, HumanoidTableClutteredReachingTaskBase):
+    ...
 
 
-class HumanoidTableClutteredReachingTask2(HumanoidTableClutteredReachingTaskBase):
-    @staticmethod
-    def rarm_rot_type() -> RotationType:
-        return RotationType.IGNORE
+class HumanoidTableClutteredReachingTask2(RotIgnoreMixin, HumanoidTableClutteredReachingTaskBase):
+    ...
