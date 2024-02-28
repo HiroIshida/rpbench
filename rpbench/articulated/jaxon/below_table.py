@@ -331,7 +331,7 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
         problems = []
         for desc in self.descriptions:
             goal_eq_const = provider.get_dual_legs_pose_const(
-                jaxon, co_rarm=desc[0], arm_rot_type=self.rarm_rot_type()
+                jaxon, co_rarm=desc, arm_rot_type=self.rarm_rot_type()
             )
 
             problem = Problem(
