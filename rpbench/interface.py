@@ -93,7 +93,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         return len(self.descriptions)
 
     @classmethod
-    def from_task_params(cls: Type[TaskT], desc_vecs: np.ndarray) -> "TaskT":
+    def from_task_params(cls: Type[TaskT], params: np.ndarray) -> "TaskT":
         raise NotImplementedError()
 
     def to_task_params(self) -> np.ndarray:
@@ -417,7 +417,7 @@ class DatadrivenTaskSolver(AbstractTaskSolver[TaskT, ConfigT, ResultT]):
             message = "request: {}, available {}".format(n_data_use, len(dataset.pairs))
             raise NotEnoughDataException(message)
 
-        pairs_modified = []
+        pairs_modified: List[Tuple[np.ndarray, Optional[Trajectory]]] = []
         dim_desc = None
         for i in tqdm.tqdm(range(n_data_use)):
             task, traj = dataset.pairs[i]

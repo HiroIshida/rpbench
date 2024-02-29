@@ -10,6 +10,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
     overload,
 )
 
@@ -187,7 +188,6 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         if standard:
             obs = BoxSkeleton([0.1, 0.1, 0.5], pos=[0.6, -0.2, 0.25])
             obstacles = [obs]
-            obstacles_desc = np.hstack([obs.extents, obs.worldpos()[:2]])
         else:
             obstacles = []
             n_obstacle = np.random.randint(cls.get_n_obstacles() + 1)
@@ -254,7 +254,7 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
         # TODO: duplication of tabletop.py
         if standard:
             assert n_sample == 1
-        pose_list = []
+        pose_list: List[Coordinates] = []
         while len(pose_list) < n_sample:
             pose = cls.sample_target_pose(world, standard)
             position = np.expand_dims(pose.worldpos(), axis=0)
@@ -291,7 +291,9 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
 
     @classmethod
     def from_task_params(cls: Type[HumanoidTableTaskT], params: np.ndarray) -> HumanoidTableTaskT:
-        world_t = cls.get_world_type()
+        world_t = cast(
+            BelowTableWorldT, cls.get_world_type()
+        )  # don't know why cast is needed. mypy's bug??
         world_param_dim = world_t.get_param_dim()
         world = None
         intention_list = []
