@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, List, Literal, Tuple, Type, TypeVar, overload
+from typing import Any, ClassVar, List, Literal, Tuple, Type, overload
 
 import numpy as np
 from skmp.constraint import CollFreeConst
@@ -18,22 +18,21 @@ from rpbench.articulated.pr2.common import (
     CachedRArmFixedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
-from rpbench.articulated.world.minifridge import (
-    TabletopClutteredFridgeWorld,
-    TabletopClutteredFridgeWorldBase,
-)
+from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
 from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
-TabletopWorldT = TypeVar("TabletopWorldT", bound=TabletopClutteredFridgeWorldBase)
 
-
-class TabletopClutteredFridgeReachingTaskBase(
-    TaskBase[TabletopWorldT, Tuple[Coordinates, np.ndarray], RobotModel]
+class TabletopClutteredFridgeReachingTask(
+    TaskBase[TabletopClutteredFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
 ):
     config_provider: ClassVar[
         Type[CachedRArmFixedPR2ConstProvider]
     ] = CachedRArmFixedPR2ConstProvider
+
+    @staticmethod
+    def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
+        return TabletopClutteredFridgeWorld
 
     @staticmethod
     def get_robot_model() -> RobotModel:
@@ -41,7 +40,7 @@ class TabletopClutteredFridgeReachingTaskBase(
 
     @classmethod
     def sample_descriptions(
-        cls, world: TabletopWorldT, n_sample: int, standard: bool = False
+        cls, world: TabletopClutteredFridgeWorld, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, np.ndarray]]:
 
         if standard:
@@ -80,7 +79,7 @@ class TabletopClutteredFridgeReachingTaskBase(
             world_vec = np.array([self.world.fridge_conts.fridge.angle])
             world_mat = self.world.fridge_conts.create_heightmap()
         else:
-            world_vec = self.world.desc_vector
+            world_vec = self.world.to_parameter()
             world_mat = None
 
         other_vec_list = []
@@ -89,6 +88,25 @@ class TabletopClutteredFridgeReachingTaskBase(
             other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_pose])
             other_vec_list.append(other_vec)
         return TaskExpression(world_vec, world_mat, other_vec_list)
+
+    @classmethod
+    def from_task_params(cls, params: np.ndarray) -> "TabletopClutteredFridgeReachingTask":
+        world_type = cls.get_world_type()
+        world_param_dof = world_type.get_world_dof()
+        world = None
+        desc_list = []
+        for param in params:
+            world_param = param[:world_param_dof]
+            if world is None:
+                world = world_type.from_parameter(world_param)
+            other_param = param[world_param_dof:]
+            pose_param = other_param[:4]
+            ypr = (pose_param[3], 0, 0)
+            co = Coordinates(pose_param[:3], ypr)
+            base_param = other_param[4:]
+            desc_list.append((co, base_param))
+        assert world is not None
+        return cls(world, desc_list)
 
     def export_problems(self) -> List[Problem]:
         provider = self.config_provider
@@ -199,14 +217,6 @@ class TabletopClutteredFridgeReachingTaskBase(
 
         obj.viewer.camera_transform = t
         return obj
-
-
-class TabletopClutteredFridgeReachingTask(
-    TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorld]
-):
-    @staticmethod
-    def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
-        return TabletopClutteredFridgeWorld
 
 
 # class TabletopClutteredFridgeReachingManyContentsTask(

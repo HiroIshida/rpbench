@@ -1,12 +1,11 @@
 import copy
-from abc import abstractmethod
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import ycb_utils
-from skrobot.coordinates import CascadedCoords, Coordinates
+from skrobot.coordinates import CascadedCoords, Coordinates, rpy_angle
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import TrimeshSceneViewer
 from trimesh import Trimesh
@@ -29,7 +28,9 @@ class Fridge(CascadedCoords):
     angle: float
     target_region: BoxSkeleton
 
-    def __init__(self, size: np.ndarray, thickness: float, angle: float):
+    def __init__(self, angle: float):
+        size = np.array([0.5, 0.5, 0.4])
+        thickness = 0.06
         CascadedCoords.__init__(self)
         d, w, h = size
         plane_xaxis = BoxSkeleton([thickness, w, h])
@@ -81,13 +82,11 @@ class Fridge(CascadedCoords):
 
     @classmethod
     def sample(cls, standard: bool = False) -> "Fridge":
-        size = np.array([0.5, 0.5, 0.4])
-        thickness = 0.06
         if standard:
             angle = 140 * (np.pi / 180.0)
         else:
             angle = (90 + np.random.rand() * 80) * (np.pi / 180.0)
-        return cls(size, thickness, angle)
+        return cls(angle)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         for panel in self.panels.values():
@@ -116,16 +115,14 @@ def ycb_utils_load_singleton(name: str, scale: float = 1.0) -> Trimesh:
 class FridgeWithContents(CascadedCoords):
     fridge: Fridge
     contents: List[PrimitiveSkelton]
-    desc_vector: np.ndarray
 
-    def __init__(self, fridge: Fridge, contents: List[PrimitiveSkelton], desc_vector: np.ndarray):
+    def __init__(self, fridge: Fridge, contents: List[PrimitiveSkelton]):
         super().__init__()
         self.assoc(fridge, wrt="local")
         for c in contents:
             self.assoc(c, wrt="local", force=True)
         self.fridge = fridge
         self.contents = contents
-        self.desc_vector = desc_vector
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         region = self.fridge.target_region
@@ -146,6 +143,10 @@ class FridgeWithContents(CascadedCoords):
         return co
 
     @classmethod
+    def n_max_obstacle(cls) -> int:
+        return 7
+
+    @classmethod
     def sample(cls, standard: bool = False):
         fridge = Fridge.sample(standard)
 
@@ -154,17 +155,12 @@ class FridgeWithContents(CascadedCoords):
             co = fridge.copy_worldcoords()
             co.translate([0.0, 0.0, 0.06 + fridge.thickness])
             cylinder.newcoords(co)
-            cylinder_flag = 1
-            desc = np.array([cylinder_flag, 0.0, 0.0, 0.12, 0.02])
+            return cls(fridge, [cylinder])
 
-            return cls(fridge, [cylinder], desc)
-
-        n_max_obstacles = 7
-        contents, desc_vector_contents = cls.sample_contents(fridge.target_region, n_max_obstacles)
+        contents = cls.sample_contents(fridge.target_region, cls.n_max_obstacle())
         for content in contents:
             assert content.parent == fridge.target_region  # type: ignore[attr-defined]
-        desc_vector = np.hstack([desc_vector_contents, fridge.angle])
-        return cls(fridge, contents, desc_vector)
+        return cls(fridge, contents)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge.visualize(viewer)
@@ -209,9 +205,7 @@ class FridgeWithContents(CascadedCoords):
         return False
 
     @staticmethod
-    def sample_contents(
-        target_region: BoxSkeleton, n_max_obstacles: int
-    ) -> Tuple[List[PrimitiveSkelton], np.ndarray]:
+    def sample_contents(target_region: BoxSkeleton, n_max_obstacles: int) -> List[PrimitiveSkelton]:
         n_obstacles = np.random.randint(1, n_max_obstacles + 1)
         D, W, H = target_region._extents
         obstacle_h_max = H - 0.03
@@ -237,36 +231,73 @@ class FridgeWithContents(CascadedCoords):
                 continue
             obj2d_list.append(obj2d)
 
-        dof_per_cylinder = 4  # x, y, h, r
-        dof_per_box = 6  # x, y, yaw, w, d, h
-        dof_per_obj = 1 + max(dof_per_cylinder, dof_per_box)  # +1 for type
-        desc_vector = np.zeros(n_max_obstacles * dof_per_obj)
-        head = 0
-
         contents: List[Any] = []
         for obj2d in obj2d_list:
-            desc_obj = np.zeros(dof_per_obj)
             h = np.random.rand() * (obstacle_h_max - obstacle_h_min) + obstacle_h_min
             if isinstance(obj2d, Box2d):
                 extent = np.hstack([obj2d.extent, h])
                 obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
                 obj.rotate(obj2d.coords.angle, "z")
-                desc_obj[0] = 0
-                desc_obj[1:4] = np.hstack([obj2d.coords.pos, obj2d.coords.angle])
-                desc_obj[4:6] = obj2d.extent
             elif isinstance(obj2d, Circle):
                 obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
-                desc_obj[0] = 1
-                desc_obj[1:3] = np.hstack([obj2d.center])
-                desc_obj[3] = obj2d.radius
             else:
                 assert False
             obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
             contents.append(obj)
-            desc_vector[head : head + dof_per_obj] = desc_obj
-            head += dof_per_obj
             target_region.assoc(obj, relative_coords="local")
-        return contents, desc_vector
+        return contents
+
+    def to_parameter(self) -> np.ndarray:
+        # serialize this object to compact vector representation
+        region_pos = self.fridge.target_region.worldpos()
+
+        dof_per_cylinder = 4  # x, y, h, r
+        dof_per_box = 6  # x, y, yaw, w, d, h
+        dof_per_obj = 1 + max(dof_per_cylinder, dof_per_box)  # +1 for type number
+        param = np.zeros(self.n_max_obstacle() * dof_per_obj + 1)  # +1 for fridge door angle
+        head = 0
+        for obj in self.contents:
+            if isinstance(obj, BoxSkeleton):
+                type_num = 0
+                x, y = (obj.worldpos() - region_pos)[:2]
+                yaw, _, _ = rpy_angle(obj.worldrot())[0]
+                w, d, h = obj.extents
+                obj_param = np.array([type_num, x, y, yaw, w, d, h])
+            elif isinstance(obj, CylinderSkelton):
+                type_num = 1
+                x, y = (obj.worldpos() - region_pos)[:2]
+                h = obj.height
+                r = obj.radius
+                obj_param = np.array([type_num, x, y, h, r, 0.0, 0.0])
+            else:
+                assert False
+            param[head : head + dof_per_obj] = obj_param
+            head += dof_per_obj
+        param[-1] = self.fridge.angle
+        return param
+
+    @classmethod
+    def from_parameter(cls, param: np.ndarray) -> "FridgeWithContents":
+        angle = param[-1]
+        fridge = Fridge(angle)
+        H = fridge.target_region.extents[2]
+        contents: List[PrimitiveSkelton] = []
+        head = 0
+        while head < len(param) - 1:
+            type_num = int(param[head])
+            if type_num == 0:
+                x, y, yaw, w, d, h = param[head + 1 : head + 7]
+                obj = BoxSkeleton(np.array([w, d, h]), pos=np.array([x, y, -0.5 * H + 0.5 * h]))
+                obj.rotate(yaw, "z")
+            elif type_num == 1:
+                x, y, h, r = param[head + 1 : head + 5]
+                obj = CylinderSkelton(r, h, pos=np.array([x, y, -0.5 * H + 0.5 * h]))
+            else:
+                assert False
+            contents.append(obj)
+            head += 7
+            fridge.target_region.assoc(obj, relative_coords="local")
+        return cls(fridge, contents)
 
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
         hmap_config = HeightmapConfig(n_grid, n_grid)
@@ -381,16 +412,10 @@ class FridgeWithContents(CascadedCoords):
 
 
 @dataclass
-class TabletopClutteredFridgeWorldBase(WorldBase):
+class TabletopClutteredFridgeWorld(WorldBase):
     table: BoxSkeleton
     fridge_conts: FridgeWithContents
-    desc_vector: np.ndarray
     _heightmap: Optional[np.ndarray] = None  # lazy
-
-    @classmethod
-    @abstractmethod
-    def get_fridge_conts_class(cls) -> Type[FridgeWithContents]:
-        ...
 
     def heightmap(self) -> np.ndarray:
         if self._heightmap is None:
@@ -398,13 +423,12 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
         return self._heightmap
 
     @classmethod
-    def sample(cls, standard: bool = False) -> Optional["TabletopClutteredFridgeWorldBase"]:
+    def sample(cls, standard: bool = False) -> "TabletopClutteredFridgeWorld":
         table_size = np.array([0.6, 3.0, 0.8])
         table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
 
-        fridge_conts_class = cls.get_fridge_conts_class()
-        fridge_conts = fridge_conts_class.sample(standard)
+        fridge_conts = FridgeWithContents.sample(standard)
         fridge_conts.translate([0.0, 0.0, table_size[2]])
 
         slide = 0.6
@@ -413,7 +437,7 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
         table.rotate(angle, "z")
         fridge_conts.translate([slide, 0.0, 0.0])
         fridge_conts.rotate(angle, "z")
-        return cls(table, fridge_conts, fridge_conts.desc_vector)
+        return cls(table, fridge_conts)
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge_conts.visualize(viewer)
@@ -427,42 +451,62 @@ class TabletopClutteredFridgeWorldBase(WorldBase):
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         return self.fridge_conts.sample_pregrasp_coords()
 
+    def to_parameter(self) -> np.ndarray:
+        return self.fridge_conts.to_parameter()
+
     @classmethod
-    @abstractmethod
-    def get_world_dof(cls) -> int:
-        ...
+    def from_parameter(cls, param: np.ndarray) -> "TabletopClutteredFridgeWorld":
+        table_size = np.array([0.6, 3.0, 0.8])
+        table = BoxSkeleton(table_size)
+        table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
 
+        fridge_conts = FridgeWithContents.from_parameter(param)
+        fridge_conts.translate([0.0, 0.0, table_size[2]])
 
-_EXPORT_METHOD = {"method": None}
+        slide = 0.6
+        angle = 0.0
+        table.translate([slide, 0.0, 0.0])
+        table.rotate(angle, "z")
+        fridge_conts.translate([slide, 0.0, 0.0])
+        fridge_conts.rotate(angle, "z")
 
-
-def set_export_method(whatever):  # TODO: what the hell is this
-    # if whatever is callbale: the interface shuld be np.ndarray -> np.ndarray
-    # where the input is 2d array of heightmap and the output is a 1d array
-    _EXPORT_METHOD["method"] = whatever
-
-
-class TabletopClutteredFridgeWorld(TabletopClutteredFridgeWorldBase):
-    @classmethod
-    def get_fridge_conts_class(cls) -> Type[FridgeWithContents]:
-        return FridgeWithContents
-
-    def export_full_description(self) -> np.ndarray:
-        if _EXPORT_METHOD["method"] is None:
-            assert False
-            return np.zeros(0)  # nothing is exported
-        elif callable(_EXPORT_METHOD["method"]):
-            ret = _EXPORT_METHOD["method"](self.heightmap())
-            assert isinstance(ret, np.ndarray)
-            return ret
-        elif _EXPORT_METHOD["method"] == "raw":
-            return self.heightmap().flatten()
-        else:
-            assert False
+        return cls(table, fridge_conts)
 
     @classmethod
     def get_world_dof(cls) -> int:
         return 7 * 7 + 1
+
+
+# _EXPORT_METHOD = {"method": None}
+#
+#
+# def set_export_method(whatever):  # TODO: what the hell is this
+#     # if whatever is callbale: the interface shuld be np.ndarray -> np.ndarray
+#     # where the input is 2d array of heightmap and the output is a 1d array
+#     _EXPORT_METHOD["method"] = whatever
+#
+#
+# class TabletopClutteredFridgeWorld(TabletopClutteredFridgeWorldBase):
+#     @classmethod
+#     def get_fridge_conts_class(cls) -> Type[FridgeWithContents]:
+#         return FridgeWithContents
+#
+#     def export_full_description(self) -> np.ndarray:
+#         if _EXPORT_METHOD["method"] is None:
+#             assert False
+#             return np.zeros(0)  # nothing is exported
+#         elif callable(_EXPORT_METHOD["method"]):
+#             ret = _EXPORT_METHOD["method"](self.heightmap())
+#             assert isinstance(ret, np.ndarray)
+#             return ret
+#         elif _EXPORT_METHOD["method"] == "raw":
+#             return self.heightmap().flatten()
+#         else:
+#             assert False
+#
+#     @classmethod
+#     def get_world_dof(cls) -> int:
+#         return 7 * 7 + 1
 
 
 # class TabletopClutteredFridgeWorldWithManyContents(TabletopClutteredFridgeWorldBase):

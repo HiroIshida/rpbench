@@ -10,6 +10,7 @@ from rpbench.articulated.jaxon.below_table import (
     HumanoidTableReachingTask,
     HumanoidTableReachingTask2,
 )
+from rpbench.articulated.pr2.minifridge import TabletopClutteredFridgeReachingTask
 from rpbench.interface import TaskBase
 from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
 from rpbench.two_dimensional.dummy import (
@@ -76,6 +77,7 @@ def test_prob_dummy_task():
 @pytest.mark.parametrize(
     "task_type",
     [
+        TabletopClutteredFridgeReachingTask,
         HumanoidTableReachingTask2,
         HumanoidTableReachingTask,
         HumanoidTableClutteredReachingTask,
@@ -121,6 +123,7 @@ def test_task_hash(task_type: Type[TaskBase]):
 @pytest.mark.parametrize(
     "task_type",
     [
+        TabletopClutteredFridgeReachingTask,
         HumanoidTableReachingTask2,
         HumanoidTableReachingTask,
         HumanoidTableClutteredReachingTask,
@@ -132,6 +135,12 @@ def test_task_hash(task_type: Type[TaskBase]):
 )
 def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     task = task_type.sample(5)
+    mat = task.export_task_expression(use_matrix=True).world_mat
     intr_vecs = task.to_task_params()
-    task_type.from_task_params(intr_vecs).to_task_params()
-    # assert np.allclose(intr_vecs, intr_vecs_again)
+    task_again = task_type.from_task_params(intr_vecs)
+
+    intr_vecs_again = task_again.to_task_params()
+    mat_again = task_again.export_task_expression(use_matrix=True).world_mat
+    assert np.allclose(intr_vecs, intr_vecs_again)
+    if mat is not None:
+        assert np.allclose(mat, mat_again)
