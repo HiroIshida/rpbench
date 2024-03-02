@@ -117,7 +117,8 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
     def export_problems(self) -> List[Problem]:
         provider = self.get_config_provider()
         q_start = provider.get_start_config()
-        box_const = provider.get_box_const()
+        base_bound = ((-0.5, -0.5, -0.5), (0.5, 0.5, 0.5))
+        box_const = provider.get_box_const(base_bound=base_bound)
 
         sdf = self.world.get_exact_sdf()
         ineq_const = provider.get_collfree_const(sdf)
@@ -162,9 +163,9 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
         assert len(self.descriptions) == 1
         target_co, base_pose = self.descriptions[0]
         geometries = [Axis.from_coords(target_co)]
-        # geometries = []
-        config = self.config_provider.get_config()  # type: ignore[attr-defined]
-        pr2 = self.config_provider.get_pr2()  # type: ignore[attr-defined]
+        provider = self.get_config_provider()
+        config = provider.get_config()
+        pr2 = provider.get_pr2()  # type: ignore[attr-defined]
         set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
 
         def robot_updator(robot, q):

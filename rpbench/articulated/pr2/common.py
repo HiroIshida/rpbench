@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import lru_cache
-from typing import Callable, List, Type, TypeVar
+from typing import Callable, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
 from skmp.constraint import (
@@ -43,9 +43,14 @@ class CachedPR2ConstProvider(ABC):
 
     @classmethod
     @lru_cache
-    def get_box_const(cls) -> BoxConst:
+    def get_box_const(
+        cls, base_bound: Optional[Tuple[Tuple[float, ...], Tuple[float, ...]]] = None
+    ) -> BoxConst:
+        # base bound is tuple to enable lru_cache
+        if base_bound is not None:
+            base_bound_np = (np.array(base_bound[0]), np.array(base_bound[1]))
         config = cls.get_config()
-        return config.get_box_const()
+        return config.get_box_const(base_bound_np)
 
     @classmethod
     def get_pose_const(cls, target_pose_list: List[Coordinates]) -> PoseConstraint:
