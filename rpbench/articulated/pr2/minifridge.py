@@ -1,4 +1,5 @@
-from typing import Any, ClassVar, List, Literal, Tuple, Type, overload
+from abc import abstractmethod
+from typing import Any, List, Literal, Tuple, Type, TypeVar, overload
 
 import numpy as np
 from skmp.constraint import CollFreeConst
@@ -15,6 +16,7 @@ from skrobot.model.robot_model import RobotModel
 from tinyfk import BaseType
 
 from rpbench.articulated.pr2.common import (
+    CachedPR2ConstProvider,
     CachedRArmFixedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
@@ -22,11 +24,14 @@ from rpbench.articulated.world.minifridge import MiniFridgeWorld
 from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
+PR2MiniFridgeTaskT = TypeVar("PR2MiniFridgeTaskT", bound="PR2MiniFridgeTaskBase")
 
-class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]):
-    config_provider: ClassVar[
-        Type[CachedRArmFixedPR2ConstProvider]
-    ] = CachedRArmFixedPR2ConstProvider
+
+class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]):
+    @classmethod
+    @abstractmethod
+    def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
+        ...
 
     @staticmethod
     def get_world_type() -> Type[MiniFridgeWorld]:
@@ -34,7 +39,7 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
 
     @classmethod
     def get_robot_model(cls) -> RobotModel:
-        return CachedRArmFixedPR2ConstProvider.get_pr2()
+        return cls.get_config_provider().get_pr2()
 
     @classmethod
     def sample_descriptions(
@@ -44,6 +49,9 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
         if standard:
             assert n_sample == 1
 
+        provider = cls.get_config_provider()
+        config = provider.get_config()
+
         with temp_seed(0, use_tempseed=standard):
             pose_list: List[Coordinates] = []
             while len(pose_list) < n_sample:
@@ -51,8 +59,8 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
                 if pose is not None:
                     pose_list.append(pose)
 
-            colkin = CachedRArmFixedPR2ConstProvider.get_whole_body_colkin()
-            pr2 = CachedRArmPR2ConstProvider.get_pr2()
+            colkin = provider.get_whole_body_colkin()
+            pr2 = provider.get_pr2()
             sdf = world.get_exact_sdf()
             collfree_const = CollFreeConst(colkin, sdf, pr2)
 
@@ -65,7 +73,7 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
                 )
                 set_robot_state(pr2, [], base_pos, base_type=BaseType.PLANER)
                 colkin.reflect_skrobot_model(pr2)
-                q = get_robot_state(pr2, colkin.control_joint_names)
+                q = get_robot_state(pr2, colkin.control_joint_names, base_type=config.base_type)
 
                 if collfree_const.is_valid(q):
                     break
@@ -88,7 +96,7 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
         return TaskExpression(world_vec, world_mat, other_vec_list)
 
     @classmethod
-    def from_task_params(cls, params: np.ndarray) -> "PR2MiniFridgeTask":
+    def from_task_params(cls: Type[PR2MiniFridgeTaskT], params: np.ndarray) -> PR2MiniFridgeTaskT:
         world_type = cls.get_world_type()
         world_param_dof = world_type.get_world_dof()
         world = None
@@ -107,7 +115,7 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
         return cls(world, desc_list)
 
     def export_problems(self) -> List[Problem]:
-        provider = self.config_provider
+        provider = self.get_config_provider()
         q_start = provider.get_start_config()
         box_const = provider.get_box_const()
 
@@ -115,28 +123,7 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
         ineq_const = provider.get_collfree_const(sdf)
 
         pr2 = provider.get_pr2()
-
-        joint_names = provider.get_config()._get_control_joint_names()
-        assert joint_names == [
-            "r_shoulder_pan_joint",
-            "r_shoulder_lift_joint",
-            "r_upper_arm_roll_joint",
-            "r_elbow_flex_joint",
-            "r_forearm_roll_joint",
-            "r_wrist_flex_joint",
-            "r_wrist_roll_joint",
-        ]
-        motion_step_box = np.array(
-            [
-                0.05,  # r_shoulder_pan_joint
-                0.05,  # r_shoulder_lift_joint
-                0.1,  # r_upper_arm_rolr_joint
-                0.1,  # r_elbow_flex_joint
-                0.2,  # r_forearm_rolr_joint
-                0.2,  # r_wrist_flex_joint
-                0.5,  # r_wrist_rolr_joint
-            ]
-        )
+        motion_step_box = provider.get_config().get_default_motion_step_box()
 
         problems = []
         for target_pose, base_pose in self.descriptions:
@@ -215,3 +202,15 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
 
         obj.viewer.camera_transform = t
         return obj
+
+
+class FixedPR2MiniFridgeTask(PR2MiniFridgeTaskBase):
+    @classmethod
+    def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
+        return CachedRArmFixedPR2ConstProvider
+
+
+class MovingPR2MiniFridgeTask(PR2MiniFridgeTaskBase):
+    @classmethod
+    def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
+        return CachedRArmPR2ConstProvider

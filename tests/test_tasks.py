@@ -10,7 +10,10 @@ from rpbench.articulated.jaxon.below_table import (
     HumanoidTableReachingTask,
     HumanoidTableReachingTask2,
 )
-from rpbench.articulated.pr2.minifridge import PR2MiniFridgeTask
+from rpbench.articulated.pr2.minifridge import (
+    FixedPR2MiniFridgeTask,
+    MovingPR2MiniFridgeTask,
+)
 from rpbench.interface import TaskBase
 from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
 from rpbench.two_dimensional.dummy import (
@@ -77,7 +80,8 @@ def test_prob_dummy_task():
 @pytest.mark.parametrize(
     "task_type",
     [
-        PR2MiniFridgeTask,
+        FixedPR2MiniFridgeTask,
+        MovingPR2MiniFridgeTask,
         HumanoidTableReachingTask2,
         HumanoidTableReachingTask,
         HumanoidTableClutteredReachingTask,
@@ -123,7 +127,7 @@ def test_task_hash(task_type: Type[TaskBase]):
 @pytest.mark.parametrize(
     "task_type",
     [
-        PR2MiniFridgeTask,
+        FixedPR2MiniFridgeTask,
         HumanoidTableReachingTask2,
         HumanoidTableReachingTask,
         HumanoidTableClutteredReachingTask,
