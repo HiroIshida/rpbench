@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from functools import lru_cache
 from typing import Callable, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
@@ -26,6 +25,7 @@ from skrobot.models.pr2 import PR2
 from tinyfk import BaseType
 
 from rpbench.interface import TaskBase
+from rpbench.utils import lru_cache_keeping_random_state
 
 
 class CachedPR2ConstProvider(ABC):
@@ -42,7 +42,7 @@ class CachedPR2ConstProvider(ABC):
         ...
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
     def get_box_const(
         cls, base_bound: Optional[Tuple[Tuple[float, ...], Tuple[float, ...]]] = None
     ) -> BoxConst:
@@ -70,27 +70,32 @@ class CachedPR2ConstProvider(ABC):
         return angles
 
     @classmethod
-    @lru_cache
     def get_pr2(cls) -> PR2:
-        pr2 = PR2(use_tight_joint_limit=True)
+        pr2 = cls._get_pr2()
         pr2.reset_manip_pose()
         pr2.newcoords(Coordinates())
         return pr2
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
+    def _get_pr2(cls) -> PR2:
+        pr2 = PR2(use_tight_joint_limit=True)
+        return pr2
+
+    @classmethod
+    @lru_cache_keeping_random_state
     def get_efkin(cls) -> ArticulatedEndEffectorKinematicsMap:
         config = cls.get_config()
         return config.get_endeffector_kin()
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
     def get_colkin(cls) -> ArticulatedCollisionKinematicsMap:
         config = cls.get_config()
         return config.get_collision_kin()
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
     def get_whole_body_colkin(cls) -> ArticulatedCollisionKinematicsMap:
         config = cls.get_config()
         return config.get_collision_kin(whole_body=True)
@@ -111,7 +116,7 @@ class CachedPR2ConstProvider(ABC):
         return colfree
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
     def get_self_collision_free_const(cls) -> PairWiseSelfCollFreeConst:
         selfcollfree_const = cls.get_config().get_pairwise_selcol_consts(cls.get_pr2())
         return selfcollfree_const

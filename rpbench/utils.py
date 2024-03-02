@@ -1,5 +1,6 @@
 import collections
 import contextlib
+from functools import lru_cache
 from typing import Callable, Dict, List
 
 import numpy as np
@@ -48,6 +49,20 @@ def temp_seed(seed, use_tempseed):
             np.random.set_state(state)
     else:
         yield
+
+
+def keep_random_state(func):
+    def wrapper(*args, **kwargs):
+        rn_state = np.random.get_state()
+        ret = func(*args, **kwargs)
+        np.random.set_state(rn_state)
+        return ret
+
+    return wrapper
+
+
+def lru_cache_keeping_random_state(func):
+    return lru_cache()(keep_random_state(func))
 
 
 class SceneWrapper(trimesh.Scene):

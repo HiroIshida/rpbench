@@ -2,7 +2,6 @@ import copy
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from functools import lru_cache
 from pathlib import Path
 from typing import (
     ClassVar,
@@ -33,7 +32,7 @@ from skrobot.model.primitives import Axis, Box
 from skrobot.viewers import TrimeshSceneViewer
 from tinyfk import BaseType, RotationType
 
-from rpbench.utils import SceneWrapper
+from rpbench.utils import SceneWrapper, lru_cache_keeping_random_state
 
 
 class CachedJaxonConstProvider(ABC):
@@ -42,7 +41,7 @@ class CachedJaxonConstProvider(ABC):
         return JaxonConfig()
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
     def get_jaxon(cls) -> Jaxon:
         jaxon = Jaxon()
         jaxon.reset_manip_pose()
@@ -50,7 +49,7 @@ class CachedJaxonConstProvider(ABC):
         return jaxon
 
     @classmethod
-    @lru_cache
+    @lru_cache_keeping_random_state
     def get_box_const(cls) -> BoxConst:
         config = cls.get_config()
         return config.get_box_const()
