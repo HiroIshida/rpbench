@@ -169,7 +169,7 @@ class BubblyWorldBase(WorldBase):
     @classmethod
     def from_desc(cls: Type[BubblyWorldT], desc: np.ndarray) -> BubblyWorldT:
         n_obs = len(desc) // 3
-        assert len(desc) % 3 == 0
+        assert len(desc) % 3 == 0, f"Invalid description length: {len(desc)}"
         obstacles = []
         for i in range(n_obs):
             desc_this = desc[i * 3 : (i + 1) * 3]
@@ -297,50 +297,35 @@ class BubblyWorldComplex(BubblyWorldBase):
 
 class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
     @classmethod
-    def from_task_params(cls, desc_vecs: np.ndarray) -> "BubblyPointConnectTaskBase":
-        assert desc_vecs.ndim == 2
+    def from_task_param(cls, param: np.ndarray) -> "BubblyPointConnectTaskBase":
+        assert param.ndim == 1
         world_type = cls.get_world_type()
         world_dof = world_type.get_world_dof()
-        world_desc = None
-        goal_list = []
-        for desc_vec in desc_vecs:
-            if world_desc is None:
-                world_desc = desc_vec[:world_dof]
-            else:
-                # this may take time..
-                assert np.all(world_desc == desc_vec[:world_dof])
-            goal = desc_vec[world_dof:]
-            goal_list.append(goal)
-        assert world_desc is not None
+        world_desc = param[:world_dof]
         world = world_type.from_desc(world_desc)
-        return cls(world, goal_list)
+        goal = param[world_dof:]
+        return cls(world, goal)
 
     @classmethod
     def get_robot_model(cls) -> None:
         return None
 
     @classmethod
-    def sample_descriptions(
-        cls, world: BubblyWorldT, n_sample: int, standard: bool = False
-    ) -> List[np.ndarray]:
-
-        descriptions = []
-
+    def sample_description(
+        cls, world: BubblyWorldT, standard: bool = False
+    ) -> Optional[np.ndarray]:
         start = np.ones(2) * 0.1
-        for _ in range(n_sample):
-            if standard:
-                goal = np.ones(2) * 0.95
-            else:
-                sdf = world.get_exact_sdf()
-
-                while True:
-                    goal = np.random.rand(2)
-                    if np.linalg.norm(goal - start) > 0.4:
-                        val = sdf(np.expand_dims(goal, axis=0))[0]
-                        if val > 0.0:
-                            break
-            descriptions.append(goal)
-        return descriptions  # type: ignore
+        if standard:
+            goal = np.ones(2) * 0.95
+            return goal
+        else:
+            sdf = world.get_exact_sdf()
+            goal = np.random.rand(2)
+            if np.linalg.norm(goal - start) > 0.4:
+                val = sdf(np.expand_dims(goal, axis=0))[0]
+                if val > 0.0:
+                    return goal
+        return None
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
@@ -349,7 +334,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
         else:
             world_vec = self.world.export_intrinsic_description()
             world_mat = None
-        return TaskExpression(world_vec, world_mat, self.descriptions)
+        return TaskExpression(world_vec, world_mat, self.description)
 
     @dataclass
     class _FMTResult:
@@ -357,7 +342,8 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
         time_elapsed: float
         n_call: int
 
-    def solve_default_each(self, problem: DoubleIntegratorPlanningProblem) -> ResultProtocol:
+    def solve_default(self) -> ResultProtocol:
+        problem = self.export_problem()
         s_min = np.hstack([problem.tbound.x_min, problem.tbound.v_min])
         s_max = np.hstack([problem.tbound.x_max, problem.tbound.v_max])
         bbox = BoundingBox(s_min, s_max)
@@ -380,7 +366,7 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
         else:
             return self._FMTResult(None, time_elapsed, 0)  # 0 is dummy
 
-    def export_problems(self) -> List[Problem]:
+    def export_problem(self) -> Problem:
         sdf = self.world.get_exact_sdf()
 
         tbound = TrajectoryBound(
@@ -392,13 +378,10 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
             np.ones(2) * 0.1,
         )
 
-        probs = []
         x_start = np.ones(2) * 0.1
-        for desc in self.descriptions:
-            goal = desc
-            problem = DoubleIntegratorPlanningProblem(x_start, goal, sdf, tbound, 0.2)
-            probs.append(problem)
-        return probs
+        goal = self.description
+        problem = DoubleIntegratorPlanningProblem(x_start, goal, sdf, tbound, 0.2)
+        return problem
 
     @classmethod
     def get_task_dof(cls) -> int:
@@ -462,9 +445,9 @@ class Taskvisualizer:
     def __init__(self, task: BubblyPointConnectTaskBase):
         fig, ax = plt.subplots()
         task.world.visualize((fig, ax))
-        for start, goal in task.descriptions:
-            ax.plot(start[0], start[1], "mo", markersize=10, label="start")
-            ax.plot(goal[0], goal[1], "m*", markersize=10, label="goal")
+        start, goal = task.description
+        ax.plot(start[0], start[1], "mo", markersize=10, label="start")
+        ax.plot(goal[0], goal[1], "m*", markersize=10, label="goal")
         ax.set_xlim([-0.1, 1.1])
         ax.set_ylim([-0.1, 1.1])
         ax.plot([0, 0, 1, 1, 0], [0, 1, 1, 0, 0], c="k")
