@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Type, TypeVar
+from typing import Optional, Tuple, Type, TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -186,21 +186,20 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
 
 class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
     @classmethod
-    def from_task_params(cls: Type[DummyTaskT], desc_vecs: np.ndarray) -> DummyTaskT:
+    def from_task_param(cls: Type[DummyTaskT], param: np.ndarray) -> DummyTaskT:
         world = cls.get_world_type().sample(True)
         # split desc_vecs by dof of this task get_task_dof
-        desc_vec_list = list(desc_vecs.reshape(-1, cls.get_task_dof()))
-        return cls(world, desc_vec_list)
+        return cls(world, param)
 
     @classmethod
     def get_robot_model(cls) -> None:
         return None
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
-        # don't depend on use_matrix
-        return TaskExpression(None, None, self.descriptions)
+        return TaskExpression(None, None, self.description)
 
-    def solve_default_each(self, problem: Problem) -> DummyResult:
+    def solve_default(self) -> DummyResult:
+        problem = self.export_problem()
         x0 = problem.start
         assert isinstance(problem.goal_const, ConfigPointConst)
         x1 = problem.goal_const.desired_angles
@@ -213,23 +212,20 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         dummy_traj = Trajectory.from_two_points(x0, x1, 2)
         return DummyResult(dummy_traj, 1.0, 3000)  # whatever
 
-    def export_problems(self) -> List[Problem]:
+    def export_problem(self) -> Problem:
         box = BoxConst(self.world.b_min, self.world.b_max)
         sdf = self.world.get_exact_sdf()
         # create easy simple dummy problem
-        probs = []
-        for desc in self.descriptions:
-            goal_const = ConfigPointConst(desc)
-            prob = Problem(
-                desc,
-                box,
-                goal_const,
-                PointCollFreeConst(sdf),
-                None,
-                skip_init_feasibility_check=True,
-            )
-            probs.append(prob)
-        return probs
+        goal_const = ConfigPointConst(self.description)
+        prob = Problem(
+            self.description,
+            box,
+            goal_const,
+            PointCollFreeConst(sdf),
+            None,
+            skip_init_feasibility_check=True,
+        )
+        return prob
 
     @classmethod
     def get_task_dof(cls) -> int:
@@ -239,8 +235,8 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         fig, ax = plt.subplots()
         self.world.visualize((fig, ax))
 
-        for goal in self.descriptions:
-            ax.scatter(goal[0], goal[1], label="point", c="red")
+        goal = self.description
+        ax.scatter(goal[0], goal[1], label="point", c="red")
         return fig, ax
 
 
@@ -250,22 +246,16 @@ class DummyTask(DummyTaskBase[DummyWorld]):
         return DummyWorld
 
     @classmethod
-    def sample_descriptions(
-        cls, world: DummyWorld, n_sample: int, standard: bool = False
-    ) -> List[np.ndarray]:
-
+    def sample_description(cls, world: DummyWorld, standard: bool = False) -> Optional[np.ndarray]:
         sdf = world.get_exact_sdf()
-
         if standard:
-            assert n_sample == 1
-            return [np.zeros(2)]
+            return np.zeros(2)
         else:
-            descs: List[np.ndarray] = []
-            while len(descs) < n_sample:
-                p = np.random.rand(2) * (world.b_max - world.b_min) + world.b_min
-                if sdf(np.expand_dims(p, axis=0))[0] > 0:
-                    descs.append(p)
-            return descs
+            p = np.random.rand(2) * (world.b_max - world.b_min) + world.b_min
+            if sdf(np.expand_dims(p, axis=0))[0] > 0:
+                return p
+            else:
+                return None
 
 
 class DummyMeshTask(DummyTask):
@@ -274,7 +264,7 @@ class DummyMeshTask(DummyTask):
             image = np.zeros((56, 56))
         else:
             image = None
-        return TaskExpression(None, image, self.descriptions)
+        return TaskExpression(None, image, self.description)
 
 
 class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):
@@ -283,18 +273,10 @@ class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):
         return ProbDummyWorld
 
     @classmethod
-    def sample_descriptions(
-        cls, world: ProbDummyWorld, n_sample: int, standard: bool = False
-    ) -> List[np.ndarray]:
-
+    def sample_description(cls, world: ProbDummyWorld, standard: bool = False) -> np.ndarray:
         world.get_exact_sdf()
-
         if standard:
-            assert n_sample == 1
-            return [np.zeros(2)]
+            return np.zeros(2)
         else:
-            descs: List[np.ndarray] = []
-            while len(descs) < n_sample:
-                p = world.kde.resample(1).flatten()
-                descs.append(p)
-            return descs
+            p = world.kde.resample(1).flatten()
+            return p
