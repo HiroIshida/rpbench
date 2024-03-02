@@ -233,8 +233,8 @@ HumanoidTableTaskT = TypeVar("HumanoidTableTaskT", bound="HumanoidTableReachingT
 class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
-    @staticmethod
-    def get_robot_model() -> Jaxon:
+    @classmethod
+    def get_robot_model(cls) -> Jaxon:
         return CachedJaxonConstProvider.get_jaxon()
 
     @classmethod

@@ -36,8 +36,8 @@ class JskFridgeReachingTaskBase(
         Type[CachedLArmFixedPR2ConstProvider]
     ] = CachedLArmFixedPR2ConstProvider
 
-    @staticmethod
-    def get_robot_model() -> RobotModel:
+    @classmethod
+    def get_robot_model(cls) -> RobotModel:
         pr2 = CachedLArmFixedPR2ConstProvider.get_pr2()
         # this configuration hide the arm from kinect so that
         # fridge recognition is easire

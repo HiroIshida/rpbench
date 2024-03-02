@@ -107,7 +107,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         timeout: float = 180.0,
     ) -> TaskT:
         """Sample task with a single scene with n_wcond_desc descriptions."""
-        cls.get_robot_model()
+        cls.get_robot_model()  # to create cache of robot model (we really need this?)
         world_t = cls.get_world_type()
 
         t_start = time.time()
@@ -138,7 +138,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         # predicated sample cannot be a standard task
         standard = False
 
-        cls.get_robot_model()
+        cls.get_robot_model()  # to create cache of robot model (we really need this?)
         world_t = cls.get_world_type()
 
         t_start = time.time()
@@ -208,9 +208,9 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def get_world_type() -> Type[WorldT]:
         ...
 
-    @staticmethod
+    @classmethod
     @abstractmethod
-    def get_robot_model() -> RobotModelT:
+    def get_robot_model(cls) -> RobotModelT:
         """get robot model set by initial joint angles
         Because loading the model everytime takes time a lot,
         we assume this function utilize some cache.

@@ -192,8 +192,8 @@ class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
         desc_vec_list = list(desc_vecs.reshape(-1, cls.get_task_dof()))
         return cls(world, desc_vec_list)
 
-    @staticmethod
-    def get_robot_model() -> None:
+    @classmethod
+    def get_robot_model(cls) -> None:
         return None
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:

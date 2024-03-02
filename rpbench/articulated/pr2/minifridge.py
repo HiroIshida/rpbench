@@ -32,8 +32,8 @@ class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray]
     def get_world_type() -> Type[MiniFridgeWorld]:
         return MiniFridgeWorld
 
-    @staticmethod
-    def get_robot_model() -> RobotModel:
+    @classmethod
+    def get_robot_model(cls) -> RobotModel:
         return CachedRArmFixedPR2ConstProvider.get_pr2()
 
     @classmethod

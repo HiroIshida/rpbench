@@ -315,8 +315,8 @@ class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
         world = world_type.from_desc(world_desc)
         return cls(world, goal_list)
 
-    @staticmethod
-    def get_robot_model() -> None:
+    @classmethod
+    def get_robot_model(cls) -> None:
         return None
 
     @classmethod
