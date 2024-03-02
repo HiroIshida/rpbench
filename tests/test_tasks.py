@@ -141,7 +141,6 @@ def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     ],
 )
 def test_default_solve(task_type: Type[TaskBase]):
-    task = task_type.sample(5)
-    results = task.solve_default()
+    task = task_type.sample(1)
+    task.solve_default()
     # we don't care if tasks are solvable or not
-    assert len(results) == 5

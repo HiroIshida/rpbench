@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, List, Literal, Tuple, Type, TypeVar, overload
+from typing import Any, List, Literal, Optional, Tuple, Type, TypeVar, overload
 
 import numpy as np
 from skmp.constraint import CollFreeConst
@@ -31,6 +31,11 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
     @classmethod
     @abstractmethod
     def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def get_base_bounds(cls, base_pos) -> Optional[Tuple[Tuple[float, ...], Tuple[float, ...]]]:
         ...
 
     @staticmethod
@@ -117,8 +122,6 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
     def export_problems(self) -> List[Problem]:
         provider = self.get_config_provider()
         q_start = provider.get_start_config()
-        base_bound = ((-0.5, -0.5, -0.5), (0.5, 0.5, 0.5))
-        box_const = provider.get_box_const(base_bound=base_bound)
 
         sdf = self.world.get_exact_sdf()
         ineq_const = provider.get_collfree_const(sdf)
@@ -128,6 +131,10 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
 
         problems = []
         for target_pose, base_pose in self.descriptions:
+
+            base_bound = self.get_base_bounds(base_pose)
+            box_const = provider.get_box_const(base_bound=base_bound)
+
             set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
             pose_const = provider.get_pose_const([target_pose])
 
@@ -210,8 +217,18 @@ class FixedPR2MiniFridgeTask(PR2MiniFridgeTaskBase):
     def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
         return CachedRArmFixedPR2ConstProvider
 
+    @classmethod
+    def get_base_bounds(cls, base_pos) -> Optional[Tuple[Tuple[float, ...], Tuple[float, ...]]]:
+        return None
+
 
 class MovingPR2MiniFridgeTask(PR2MiniFridgeTaskBase):
     @classmethod
     def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
         return CachedRArmPR2ConstProvider
+
+    @classmethod
+    def get_base_bounds(cls, base_pos) -> Optional[Tuple[Tuple[float, ...], Tuple[float, ...]]]:
+        lb = base_pos - np.array([0.5, 0.5, 0.5])
+        ub = base_pos + np.array([0.5, 0.5, 0.5])
+        return (tuple(lb), tuple(ub))

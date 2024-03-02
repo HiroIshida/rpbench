@@ -49,6 +49,8 @@ class CachedPR2ConstProvider(ABC):
         # base bound is tuple to enable lru_cache
         if base_bound is not None:
             base_bound_np = (np.array(base_bound[0]), np.array(base_bound[1]))
+        else:
+            base_bound_np = None
         config = cls.get_config()
         return config.get_box_const(base_bound_np)
 
