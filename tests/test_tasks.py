@@ -144,3 +144,32 @@ def test_default_solve(task_type: Type[TaskBase]):
     task = task_type.sample(1)
     task.solve_default()
     # we don't care if tasks are solvable or not
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        FixedPR2MiniFridgeTask,
+        MovingPR2MiniFridgeTask,
+        HumanoidTableReachingTask2,
+        HumanoidTableReachingTask,
+        HumanoidTableClutteredReachingTask,
+        HumanoidTableClutteredReachingTask2,
+        BubblySimpleMeshPointConnectTask,
+        DummyTask,
+        ProbDummyTask,
+    ],
+)
+def test_sampler_statelessness(task_type):
+    np.random.seed(0)
+    task = task_type.sample(3)
+    param1a = task.to_task_params()
+    param1b = task.to_task_params()
+
+    np.random.seed(0)
+    task = task_type.sample(3)
+    param2a = task.to_task_params()
+    param2b = task.to_task_params()
+
+    assert np.allclose(param1a, param2a)
+    assert np.allclose(param1b, param2b)
