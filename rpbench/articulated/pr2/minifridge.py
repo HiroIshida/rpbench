@@ -18,21 +18,19 @@ from rpbench.articulated.pr2.common import (
     CachedRArmFixedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
-from rpbench.articulated.world.minifridge import TabletopClutteredFridgeWorld
+from rpbench.articulated.world.minifridge import MiniFridgeWorld
 from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 
-class TabletopClutteredFridgeReachingTask(
-    TaskBase[TabletopClutteredFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
-):
+class PR2MiniFridgeTask(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]):
     config_provider: ClassVar[
         Type[CachedRArmFixedPR2ConstProvider]
     ] = CachedRArmFixedPR2ConstProvider
 
     @staticmethod
-    def get_world_type() -> Type[TabletopClutteredFridgeWorld]:
-        return TabletopClutteredFridgeWorld
+    def get_world_type() -> Type[MiniFridgeWorld]:
+        return MiniFridgeWorld
 
     @staticmethod
     def get_robot_model() -> RobotModel:
@@ -40,7 +38,7 @@ class TabletopClutteredFridgeReachingTask(
 
     @classmethod
     def sample_descriptions(
-        cls, world: TabletopClutteredFridgeWorld, n_sample: int, standard: bool = False
+        cls, world: MiniFridgeWorld, n_sample: int, standard: bool = False
     ) -> List[Tuple[Coordinates, np.ndarray]]:
 
         if standard:
@@ -90,7 +88,7 @@ class TabletopClutteredFridgeReachingTask(
         return TaskExpression(world_vec, world_mat, other_vec_list)
 
     @classmethod
-    def from_task_params(cls, params: np.ndarray) -> "TabletopClutteredFridgeReachingTask":
+    def from_task_params(cls, params: np.ndarray) -> "PR2MiniFridgeTask":
         world_type = cls.get_world_type()
         world_param_dof = world_type.get_world_dof()
         world = None
@@ -217,19 +215,3 @@ class TabletopClutteredFridgeReachingTask(
 
         obj.viewer.camera_transform = t
         return obj
-
-
-# class TabletopClutteredFridgeReachingManyContentsTask(
-#     TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithManyContents]
-# ):
-#     @staticmethod
-#     def get_world_type() -> Type[TabletopClutteredFridgeWorldWithManyContents]:
-#         return TabletopClutteredFridgeWorldWithManyContents
-#
-#
-# class TabletopClutteredFridgeReachingRealisticTask(
-#     TabletopClutteredFridgeReachingTaskBase[TabletopClutteredFridgeWorldWithRealisticContents]
-# ):
-#     @staticmethod
-#     def get_world_type() -> Type[TabletopClutteredFridgeWorldWithRealisticContents]:
-#         return TabletopClutteredFridgeWorldWithRealisticContents

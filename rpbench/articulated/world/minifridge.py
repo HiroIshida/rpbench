@@ -412,7 +412,7 @@ class FridgeWithContents(CascadedCoords):
 
 
 @dataclass
-class TabletopClutteredFridgeWorld(WorldBase):
+class MiniFridgeWorld(WorldBase):
     table: BoxSkeleton
     fridge_conts: FridgeWithContents
     _heightmap: Optional[np.ndarray] = None  # lazy
@@ -423,7 +423,7 @@ class TabletopClutteredFridgeWorld(WorldBase):
         return self._heightmap
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "TabletopClutteredFridgeWorld":
+    def sample(cls, standard: bool = False) -> "MiniFridgeWorld":
         table_size = np.array([0.6, 3.0, 0.8])
         table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
@@ -455,7 +455,7 @@ class TabletopClutteredFridgeWorld(WorldBase):
         return self.fridge_conts.to_parameter()
 
     @classmethod
-    def from_parameter(cls, param: np.ndarray) -> "TabletopClutteredFridgeWorld":
+    def from_parameter(cls, param: np.ndarray) -> "MiniFridgeWorld":
         table_size = np.array([0.6, 3.0, 0.8])
         table = BoxSkeleton(table_size)
         table.translate(np.array([0.0, 0.0, table_size[2] * 0.5]))
