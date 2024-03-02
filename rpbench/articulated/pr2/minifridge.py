@@ -136,9 +136,14 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
                 base_bound = None
             box_const = provider.get_box_const(base_bound=base_bound)
 
-            set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
             pose_const = provider.get_pose_const([target_pose])
 
+            # set pr2 to the initial state
+            # NOTE: because provider cache's pr2 state and when calling any function
+            # it reset the pr2 state to the original state. So the following
+            # two lines must be placed here right before reflecting the model
+            set_robot_state(pr2, config.get_control_joint_names(), q_start)
+            set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
             pose_const.reflect_skrobot_model(pr2)
             ineq_const.reflect_skrobot_model(pr2)
 
