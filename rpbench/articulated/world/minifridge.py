@@ -29,7 +29,7 @@ class Fridge(CascadedCoords):
     target_region: BoxSkeleton
 
     def __init__(self, angle: float):
-        size = np.array([0.5, 0.5, 0.4])
+        size = np.array([0.5, 0.7, 0.5])
         thickness = 0.06
         CascadedCoords.__init__(self)
         d, w, h = size
@@ -217,11 +217,11 @@ class FridgeWithContents(CascadedCoords):
             center = region2d.sample_point()
             sample_circle = np.random.rand() < 0.5
             if sample_circle:
-                r = np.random.rand() * 0.03 + 0.02
+                r = np.random.rand() * 0.05 + 0.02
                 obj2d = Circle(center, r)
             else:
-                w = np.random.uniform(0.05, 0.1)
-                d = np.random.uniform(0.05, 0.1)
+                w = np.random.uniform(0.05, 0.15)
+                d = np.random.uniform(0.05, 0.15)
                 yaw = np.random.uniform(0.0, np.pi)
                 obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))  # type: ignore
 
