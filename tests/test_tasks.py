@@ -99,35 +99,11 @@ def test_task_hash(task_type: Type[TaskBase]):
         np.testing.assert_almost_equal(vec1, vec2, decimal=5)
 
 
-# @pytest.mark.parametrize(
-#     "task_type",
-#     [
-#         HumanoidTableReachingTask2,
-#         HumanoidTableReachingTask,
-#         HumanoidTableClutteredReachingTask,
-#         HumanoidTableClutteredReachingTask2,
-#         BubblySimpleMeshPointConnectTask,
-#         DummyTask,
-#         ProbDummyTask,
-#     ],
-# )
-# def test_standard(task_type: Type[TaskBase]):
-#     # consistency
-#     param = task_type.sample(1, standard=True).to_task_params()
-#     for _ in range(5):
-#         param2 = task_type.sample(1, standard=True).to_task_params()
-#         np.testing.assert_almost_equal(param, param2, decimal=5)
-#
-#     # solvability
-#     task = task_type.sample(1, standard=True)
-#     res = task.solve_default()[0]
-#     assert res.traj is not None
-
-
 @pytest.mark.parametrize(
     "task_type",
     [
         FixedPR2MiniFridgeTask,
+        MovingPR2MiniFridgeTask,
         HumanoidTableReachingTask2,
         HumanoidTableReachingTask,
         HumanoidTableClutteredReachingTask,
@@ -148,3 +124,24 @@ def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     assert np.allclose(intr_vecs, intr_vecs_again)
     if mat is not None:
         assert np.allclose(mat, mat_again)
+
+
+@pytest.mark.parametrize(
+    "task_type",
+    [
+        FixedPR2MiniFridgeTask,
+        MovingPR2MiniFridgeTask,
+        HumanoidTableReachingTask2,
+        HumanoidTableReachingTask,
+        HumanoidTableClutteredReachingTask,
+        HumanoidTableClutteredReachingTask2,
+        BubblySimpleMeshPointConnectTask,
+        DummyTask,
+        ProbDummyTask,
+    ],
+)
+def test_default_solve(task_type: Type[TaskBase]):
+    task = task_type.sample(5)
+    results = task.solve_default()
+    # we don't care if tasks are solvable or not
+    assert len(results) == 5
