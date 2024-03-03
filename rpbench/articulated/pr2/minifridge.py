@@ -21,13 +21,20 @@ from rpbench.articulated.pr2.common import (
     CachedRArmPR2ConstProvider,
 )
 from rpbench.articulated.world.minifridge import MiniFridgeWorld
-from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
+from rpbench.interface import (
+    Problem,
+    ResultProtocol,
+    TaskExpression,
+    TaskWithWorldCondBase,
+)
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 PR2MiniFridgeTaskT = TypeVar("PR2MiniFridgeTaskT", bound="PR2MiniFridgeTaskBase")
 
 
-class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]):
+class PR2MiniFridgeTaskBase(
+    TaskWithWorldCondBase[MiniFridgeWorld, Tuple[Coordinates, np.ndarray], RobotModel]
+):
     @classmethod
     @abstractmethod
     def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:

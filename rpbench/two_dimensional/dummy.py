@@ -11,7 +11,12 @@ from skmp.constraint import BoxConst, ConfigPointConst, PointCollFreeConst
 from skmp.solver.interface import AbstractScratchSolver, Problem
 from skmp.trajectory import Trajectory
 
-from rpbench.interface import SDFProtocol, TaskBase, TaskExpression, WorldBase
+from rpbench.interface import (
+    SDFProtocol,
+    TaskExpression,
+    TaskWithWorldCondBase,
+    WorldBase,
+)
 from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
 
@@ -184,7 +189,7 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
         return DummyResult(traj, None, n_call)
 
 
-class DummyTaskBase(TaskBase[DummyWorldT, np.ndarray, None]):
+class DummyTaskBase(TaskWithWorldCondBase[DummyWorldT, np.ndarray, None]):
     @classmethod
     def from_task_param(cls: Type[DummyTaskT], param: np.ndarray) -> DummyTaskT:
         world = cls.get_world_type().sample(True)

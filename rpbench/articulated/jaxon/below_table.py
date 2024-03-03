@@ -43,8 +43,8 @@ from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import (
     Problem,
     ResultProtocol,
-    TaskBase,
     TaskExpression,
+    TaskWithWorldCondBase,
     WorldBase,
 )
 from rpbench.timeout_decorator import TimeoutError, timeout
@@ -230,7 +230,7 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
 HumanoidTableTaskT = TypeVar("HumanoidTableTaskT", bound="HumanoidTableReachingTaskBase")
 
 
-class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxon]):
+class HumanoidTableReachingTaskBase(TaskWithWorldCondBase[BelowTableWorldT, Coordinates, Jaxon]):
     config_provider: ClassVar[Type[CachedJaxonConstProvider]] = CachedJaxonConstProvider
 
     @classmethod

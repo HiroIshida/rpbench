@@ -12,7 +12,12 @@ from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
 from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
 import rpbench.two_dimensional.double_integrator_trajopt as diopt
-from rpbench.interface import SDFProtocol, TaskBase, TaskExpression, WorldBase
+from rpbench.interface import (
+    SDFProtocol,
+    TaskExpression,
+    TaskWithWorldCondBase,
+    WorldBase,
+)
 from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryBound,
     TrajectoryCostFunction,
@@ -295,7 +300,7 @@ class BubblyWorldComplex(BubblyWorldBase):
         return BubblyMetaParameter(40, 0.04, 0.08)
 
 
-class BubblyPointConnectTaskBase(TaskBase[BubblyWorldT, np.ndarray, None]):
+class BubblyPointConnectTaskBase(TaskWithWorldCondBase[BubblyWorldT, np.ndarray, None]):
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "BubblyPointConnectTaskBase":
         assert param.ndim == 1

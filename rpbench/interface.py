@@ -29,6 +29,7 @@ from rpbench.utils import temp_seed
 
 WorldT = TypeVar("WorldT", bound="WorldBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
+WCondTaskT = TypeVar("WCondTaskT", bound="TaskWithWorldCondBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
 RobotModelT = TypeVar("RobotModelT", bound=Any)
 
@@ -85,47 +86,27 @@ class TaskExpression:
             return np.hstack([self.world_vec, self.other_vec])
 
 
-class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
-    world: WorldT
+class TaskBase(ABC, Generic[DescriptionT]):
     description: DescriptionT
-
-    def __init__(self, world: WorldT, description: DescriptionT) -> None:
-        self.world = world
-        self.description = description
 
     @classmethod
     @abstractmethod
     def from_task_param(cls: Type[TaskT], param: np.ndarray) -> "TaskT":
         raise NotImplementedError
 
-    def to_task_param(self) -> np.ndarray:
-        param = self.export_task_expression(use_matrix=False).get_vector()
-        return param
-
     @classmethod
+    @abstractmethod
     def sample(
         cls: Type[TaskT],
         standard: bool = False,
         predicate: Optional[Callable[[TaskT], bool]] = None,
         timeout: int = 180,
     ) -> TaskT:
+        raise NotImplementedError
 
-        cls.get_robot_model()  # to create cache of robot model (do we really need this?)
-        world_t = cls.get_world_type()
-
-        t_start = time.time()
-        while True:
-            t_elapsed = time.time() - t_start
-            if t_elapsed > timeout:
-                raise TimeoutError("predicated_sample: timeout!")
-
-            world = world_t.sample(standard=standard)
-            if world is not None:
-                description = cls.sample_description(world, standard)
-                if description is not None:
-                    task = cls(world, description)
-                    if predicate is None or predicate(task):
-                        return task
+    def to_task_param(self) -> np.ndarray:
+        param = self.export_task_expression(use_matrix=False).get_vector()
+        return param
 
     @classmethod
     def distribution_vector(cls: Type[TaskT]) -> np.ndarray:
@@ -150,28 +131,6 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         # but easily affected by the tiny change like order of operations
         return hashlib.md5(cls.distribution_vector().tobytes()).hexdigest()
 
-    # please implement the following methods
-    @staticmethod
-    @abstractmethod
-    def get_world_type() -> Type[WorldT]:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def get_robot_model(cls) -> RobotModelT:
-        """get robot model set by initial joint angles
-        Because loading the model everytime takes time a lot,
-        we assume this function utilize some cache.
-        Also, we assume that robot joint configuration for every
-        call of this method is consistent.
-        """
-        ...
-
-    @classmethod
-    @abstractmethod
-    def sample_description(cls, world: WorldT, standard: bool = False) -> Optional[DescriptionT]:
-        raise NotImplementedError
-
     @abstractmethod
     def export_task_expression(self, use_matrix: bool) -> TaskExpressionProtocol:
         raise NotImplementedError
@@ -183,6 +142,63 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     @abstractmethod
     def export_problem(self) -> Problem:
         raise NotImplementedError
+
+
+class TaskWithWorldBase(TaskBase[DescriptionT], Generic[WorldT, DescriptionT]):
+    world: WorldT
+
+    def __init__(self, world: WorldT, description: DescriptionT) -> None:
+        self.world = world
+        self.description = description
+
+    @staticmethod
+    def get_world_type() -> Type[WorldT]:
+        raise NotImplementedError
+
+
+class TaskWithWorldCondBase(
+    TaskWithWorldBase[WorldT, DescriptionT], Generic[WorldT, DescriptionT, RobotModelT]
+):
+    @classmethod
+    @abstractmethod
+    def sample_description(cls, world: WorldT, standard: bool = False) -> Optional[DescriptionT]:
+        raise NotImplementedError
+
+    @classmethod
+    def sample(
+        cls: Type[WCondTaskT],
+        standard: bool = False,
+        predicate: Optional[Callable[[WCondTaskT], bool]] = None,
+        timeout: int = 180,
+    ) -> WCondTaskT:
+
+        cls.get_robot_model()  # to create cache of robot model (do we really need this?)
+        world_t = cls.get_world_type()
+
+        t_start = time.time()
+        while True:
+            t_elapsed = time.time() - t_start
+            if t_elapsed > timeout:
+                raise TimeoutError("predicated_sample: timeout!")
+
+            world = world_t.sample(standard=standard)
+            if world is not None:
+                description = cls.sample_description(world, standard)
+                if description is not None:
+                    task = cls(world, description)
+                    if predicate is None or predicate(task):
+                        return task
+
+    @classmethod
+    @abstractmethod
+    def get_robot_model(cls) -> RobotModelT:
+        """get robot model set by initial joint angles
+        Because loading the model everytime takes time a lot,
+        we assume this function utilize some cache.
+        Also, we assume that robot joint configuration for every
+        call of this method is consistent.
+        """
+        ...
 
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):

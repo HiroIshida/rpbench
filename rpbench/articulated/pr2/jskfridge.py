@@ -22,14 +22,19 @@ from rpbench.articulated.world.jskfridge import (
     JskFridgeWorld3,
     JskFridgeWorldBase,
 )
-from rpbench.interface import Problem, ResultProtocol, TaskBase, TaskExpression
+from rpbench.interface import (
+    Problem,
+    ResultProtocol,
+    TaskExpression,
+    TaskWithWorldCondBase,
+)
 from rpbench.utils import skcoords_to_pose_vec, temp_seed
 
 DescriptionT = TypeVar("DescriptionT")
 
 
 class JskFridgeReachingTaskBase(
-    TaskBase[JskFridgeWorldBase, Tuple[Coordinates, np.ndarray], RobotModel]
+    TaskWithWorldCondBase[JskFridgeWorldBase, Tuple[Coordinates, np.ndarray], RobotModel]
 ):
 
     config_provider: ClassVar[

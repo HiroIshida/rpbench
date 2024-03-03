@@ -24,7 +24,7 @@ from skrobot.model.primitives import Axis
 from skrobot.models.pr2 import PR2
 from tinyfk import BaseType
 
-from rpbench.interface import TaskBase
+from rpbench.interface import TaskWithWorldBase
 from rpbench.utils import lru_cache_keeping_random_state
 
 
@@ -167,7 +167,7 @@ PR2SolutionViewerT = TypeVar("PR2SolutionViewerT", bound="PR2SolutionViewerBase"
 
 class PR2SolutionViewerBase(SolutionVisualizerBase):
     @classmethod
-    def from_task(cls: Type[PR2SolutionViewerT], task: TaskBase) -> PR2SolutionViewerT:
+    def from_task(cls: Type[PR2SolutionViewerT], task: TaskWithWorldBase) -> PR2SolutionViewerT:
         geometries = []
         co = task.description
         geometries.append(Axis.from_coords(co))
