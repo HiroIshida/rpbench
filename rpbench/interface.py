@@ -61,19 +61,28 @@ class WorldBase(ABC):
         ...
 
 
+class TaskExpressionProtocol(Protocol):
+    def get_matrix(self) -> Optional[np.ndarray]:
+        ...
+
+    def get_vector(self) -> np.ndarray:
+        ...
+
+
 @dataclass(frozen=True)
 class TaskExpression:
     world_vec: Optional[np.ndarray]
     world_mat: Optional[np.ndarray]
     other_vec: np.ndarray
-    # TODO(3/3): define interface. we need only export mat and vec. dont care if its world or not
 
-    def get_desc_vecs(self) -> List[np.ndarray]:
-        # TODO(3/3): vecs to param, list to np.ndarray
+    def get_matrix(self) -> Optional[np.ndarray]:
+        return self.world_mat
+
+    def get_vector(self) -> np.ndarray:
         if self.world_vec is None:
-            return [self.other_vec]
+            return self.other_vec
         else:
-            return [np.hstack([self.world_vec, self.other_vec])]
+            return np.hstack([self.world_vec, self.other_vec])
 
 
 class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
@@ -95,7 +104,9 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         return cls.from_task_param(params[0])
 
     def to_task_params(self) -> np.ndarray:
-        return np.array(self.export_task_expression(use_matrix=False).get_desc_vecs())
+        # TODO(3/3): remove this later
+        param = self.export_task_expression(use_matrix=False).get_vector()
+        return np.array([param])
 
     @classmethod
     def sample(
@@ -168,7 +179,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
         raise NotImplementedError
 
     @abstractmethod
-    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
+    def export_task_expression(self, use_matrix: bool) -> TaskExpressionProtocol:
         raise NotImplementedError
 
     @abstractmethod
