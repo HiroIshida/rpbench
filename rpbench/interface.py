@@ -141,7 +141,7 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
                 task = cls.sample()
                 if task is not None:
                     tasks.append(task)
-        data = np.array([t.to_task_params() for t in tasks])
+        data = np.array([t.to_task_param() for t in tasks])
         return data
 
     @classmethod

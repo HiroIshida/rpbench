@@ -95,12 +95,12 @@ def test_task_hash(task_type: Type[TaskBase]):
 def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     task = task_type.sample(5)
     mat = task.export_task_expression(use_matrix=True).world_mat
-    intr_vecs = task.to_task_params()
-    task_again = task_type.from_task_params(intr_vecs)
+    param = task.to_task_param()
+    task_again = task_type.from_task_param(param)
 
-    intr_vecs_again = task_again.to_task_params()
+    param_again = task_again.to_task_param()
     mat_again = task_again.export_task_expression(use_matrix=True).world_mat
-    assert np.allclose(intr_vecs, intr_vecs_again)
+    assert np.allclose(param, param_again)
     if mat is not None:
         assert np.allclose(mat, mat_again)
 
@@ -116,13 +116,13 @@ def test_default_solve(task_type: Type[TaskBase]):
 def test_sampler_statelessness(task_type):
     np.random.seed(0)
     task = task_type.sample(3)
-    param1a = task.to_task_params()
-    param1b = task.to_task_params()
+    param1a = task.to_task_param()
+    param1b = task.to_task_param()
 
     np.random.seed(0)
     task = task_type.sample(3)
-    param2a = task.to_task_params()
-    param2b = task.to_task_params()
+    param2a = task.to_task_param()
+    param2b = task.to_task_param()
 
     assert np.allclose(param1a, param2a)
     assert np.allclose(param1b, param2b)
