@@ -24,6 +24,7 @@ from skmp.solver.interface import (
     ResultT,
 )
 from skmp.trajectory import Trajectory
+from skmp.visualization.solution_visualizer import VisualizableProtocol
 
 from rpbench.utils import temp_seed
 
@@ -74,9 +75,7 @@ class TaskExpression:
             return np.hstack([self.world_vec, self.other_vec])
 
 
-class TaskBase(ABC, Generic[DescriptionT]):
-    description: DescriptionT
-
+class TaskBase(ABC):
     @classmethod
     @abstractmethod
     def from_task_param(cls: Type[TaskT], param: np.ndarray) -> "TaskT":
@@ -139,7 +138,7 @@ class SamplableWorldBase(ABC):
         ...
 
 
-class TaskWithWorldCondBase(TaskBase[DescriptionT], Generic[WorldT, DescriptionT, RobotModelT]):
+class TaskWithWorldCondBase(TaskBase, Generic[WorldT, DescriptionT, RobotModelT]):
     world: WorldT
 
     def __init__(self, world: WorldT, description: DescriptionT) -> None:
@@ -190,6 +189,16 @@ class TaskWithWorldCondBase(TaskBase[DescriptionT], Generic[WorldT, DescriptionT
         call of this method is consistent.
         """
         ...
+
+
+class Visualizable:
+    @abstractmethod
+    def get_visualizable(self) -> VisualizableProtocol:
+        raise NotImplementedError
+
+
+class VisualizableTaskBase(TaskBase, Visualizable):
+    ...
 
 
 class AbstractTaskSolver(ABC, Generic[TaskT, ConfigT, ResultT]):
