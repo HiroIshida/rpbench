@@ -113,14 +113,11 @@ class JskFridgeReachingTaskBase(
         assert use_matrix, "under construction"
         world_vec = None
         world_mat = self.world.heightmap()
-        other_vec_list = []
-        for desc in self.descriptions:
-            target_pose, init_state = desc
-            vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_state])
-            other_vec_list.append(vec)
-        return TaskExpression(world_vec, world_mat, other_vec_list)
+        target_pose, init_state = self.description
+        other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_state])
+        return TaskExpression(world_vec, world_mat, other_vec)
 
-    def export_problems(self) -> List[Problem]:
+    def export_problem(self) -> Problem:
         pr2 = self.get_robot_model()
 
         provider = self.config_provider
@@ -154,19 +151,17 @@ class JskFridgeReachingTaskBase(
             ]
         )
 
-        problems = []
-        for target_pose, base_pose in self.descriptions:
-            set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
-            pose_const = provider.get_pose_const([target_pose])
+        target_pose, base_pose = self.description
+        set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
+        pose_const = provider.get_pose_const([target_pose])
 
-            pose_const.reflect_skrobot_model(pr2)
-            ineq_const.reflect_skrobot_model(pr2)
+        pose_const.reflect_skrobot_model(pr2)
+        ineq_const.reflect_skrobot_model(pr2)
 
-            problem = Problem(
-                q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
-            )
-            problems.append(problem)
-        return problems
+        problem = Problem(
+            q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
+        )
+        return problem
 
     def solve_default_each(self, problem: Problem) -> ResultProtocol:
         solcon = OMPLSolverConfig(n_max_call=40000, n_max_satisfaction_trial=100, simplify=True)
@@ -185,8 +180,7 @@ class JskFridgeReachingTaskBase(
 
     def create_viewer(self, mode: str, show_wireframe: bool = False) -> Any:
         # copied from rpbench.articulated.pr2.minifridge
-        assert len(self.descriptions) == 1
-        target_co, base_pose = self.descriptions[0]
+        target_co, base_pose = self.description
         geometries = [Axis.from_coords(target_co)]
 
         config = self.config_provider.get_config()  # type: ignore[attr-defined]

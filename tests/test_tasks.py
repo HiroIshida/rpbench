@@ -10,8 +10,19 @@ from rpbench.articulated.jaxon.below_table import (
     HumanoidTableReachingTask,
     HumanoidTableReachingTask2,
 )
+from rpbench.articulated.pr2.minifridge import (
+    FixedPR2MiniFridgeTask,
+    MovingPR2MiniFridgeTask,
+)
 from rpbench.interface import TaskBase
-from rpbench.two_dimensional.dummy import DummyConfig, DummySolver, DummyTask
+from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
+from rpbench.two_dimensional.dummy import (
+    DummyConfig,
+    DummyMeshTask,
+    DummySolver,
+    DummyTask,
+    ProbDummyTask,
+)
 
 np.random.seed(0)
 set_ompl_random_seed(0)
@@ -69,16 +80,16 @@ def test_prob_dummy_task():
 
 
 task_type_list = [
-    # FixedPR2MiniFridgeTask,
-    # MovingPR2MiniFridgeTask,
+    FixedPR2MiniFridgeTask,
+    MovingPR2MiniFridgeTask,
     HumanoidTableReachingTask2,
     HumanoidTableReachingTask,
     HumanoidTableClutteredReachingTask,
     HumanoidTableClutteredReachingTask2,
-    # BubblySimpleMeshPointConnectTask,
-    # DummyTask,
-    # DummyMeshTask,
-    # ProbDummyTask,
+    BubblySimpleMeshPointConnectTask,
+    DummyTask,
+    DummyMeshTask,
+    ProbDummyTask,
 ]
 
 

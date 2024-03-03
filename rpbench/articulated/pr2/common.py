@@ -168,10 +168,9 @@ PR2SolutionViewerT = TypeVar("PR2SolutionViewerT", bound="PR2SolutionViewerBase"
 class PR2SolutionViewerBase(SolutionVisualizerBase):
     @classmethod
     def from_task(cls: Type[PR2SolutionViewerT], task: TaskBase) -> PR2SolutionViewerT:
-        assert len(task.descriptions) == 1
         geometries = []
-        for co in task.descriptions[0]:
-            geometries.append(Axis.from_coords(co))
+        co = task.description
+        geometries.append(Axis.from_coords(co))
 
         config: PR2Config = task.config_provider.get_config()  # type: ignore[attr-defined]
         pr2 = task.config_provider.get_pr2()  # type: ignore[attr-defined]

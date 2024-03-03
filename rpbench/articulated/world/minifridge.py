@@ -126,21 +126,17 @@ class FridgeWithContents(CascadedCoords):
 
     def sample_pregrasp_coords(self) -> Optional[Coordinates]:
         region = self.fridge.target_region
-        n_budget = 100
         sdf = self.get_exact_sdf()
-        for _ in range(n_budget):
-            pos = region.sample_points(1)[0]
-            co = Coordinates(pos)
-            yaw = np.random.uniform(-0.3 * np.pi, 0.3 * np.pi)
-            co.rotate(yaw, "z")
-            co.rotate(0.5 * np.pi, "x")
 
-            if not self.is_obviously_infeasible(sdf, co):
-                return co
-
-        pos = self.transform_vector(np.zeros(3))
+        pos = region.sample_points(1)[0]
         co = Coordinates(pos)
-        return co
+        yaw = np.random.uniform(-0.3 * np.pi, 0.3 * np.pi)
+        co.rotate(yaw, "z")
+        co.rotate(0.5 * np.pi, "x")
+
+        if not self.is_obviously_infeasible(sdf, co):
+            return co
+        return None
 
     @classmethod
     def n_max_obstacle(cls) -> int:

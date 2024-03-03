@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, List, Literal, Tuple, Type, TypeVar, overload
+from typing import Any, Literal, Optional, Tuple, Type, TypeVar, overload
 
 import numpy as np
 from skmp.constraint import CollFreeConst
@@ -42,43 +42,33 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
         return cls.get_config_provider().get_pr2()
 
     @classmethod
-    def sample_descriptions(
-        cls, world: MiniFridgeWorld, n_sample: int, standard: bool = False
-    ) -> List[Tuple[Coordinates, np.ndarray]]:
-
-        if standard:
-            assert n_sample == 1
-
+    def sample_description(
+        cls, world: MiniFridgeWorld, standard: bool = False
+    ) -> Optional[Tuple[Coordinates, np.ndarray]]:
         provider = cls.get_config_provider()
         config = provider.get_config()
 
         with temp_seed(0, use_tempseed=standard):
-            pose_list: List[Coordinates] = []
-            while len(pose_list) < n_sample:
-                pose = world.sample_pregrasp_coords()
-                if pose is not None:
-                    pose_list.append(pose)
+            pose = world.sample_pregrasp_coords()
+            if pose is None:
+                return None
 
-            colkin = provider.get_whole_body_colkin()
-            pr2 = provider.get_pr2()
-            sdf = world.get_exact_sdf()
-            collfree_const = CollFreeConst(colkin, sdf, pr2)
+        colkin = provider.get_whole_body_colkin()
+        pr2 = provider.get_pr2()
+        sdf = world.get_exact_sdf()
+        collfree_const = CollFreeConst(colkin, sdf, pr2)
 
         if standard:
             base_pos = np.array([-0.1, 0.0, 0.0])
         else:
-            while True:
-                base_pos = np.random.randn(3) * np.array([0.1, 0.2, 0.3]) - np.array(
-                    [-0.05, 0.0, 0.0]
-                )
-                set_robot_state(pr2, [], base_pos, base_type=BaseType.PLANER)
-                colkin.reflect_skrobot_model(pr2)
-                q = get_robot_state(pr2, colkin.control_joint_names, base_type=config.base_type)
+            base_pos = np.random.randn(3) * np.array([0.1, 0.2, 0.3]) - np.array([-0.05, 0.0, 0.0])
+            set_robot_state(pr2, [], base_pos, base_type=BaseType.PLANER)
+            colkin.reflect_skrobot_model(pr2)
+            q = get_robot_state(pr2, colkin.control_joint_names, base_type=config.base_type)
 
-                if collfree_const.is_valid(q):
-                    break
-        descriptions = [(pose, base_pos) for pose in pose_list]
-        return descriptions
+            if not collfree_const.is_valid(q):
+                return None
+        return pose, base_pos
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
@@ -88,33 +78,26 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
             world_vec = self.world.to_parameter()
             world_mat = None
 
-        other_vec_list = []
-        for desc in self.descriptions:
-            target_pose, init_pose = desc
-            other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_pose])
-            other_vec_list.append(other_vec)
-        return TaskExpression(world_vec, world_mat, other_vec_list)
+        target_pose, init_pose = self.description
+        other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_pose])
+        return TaskExpression(world_vec, world_mat, other_vec)
 
     @classmethod
-    def from_task_params(cls: Type[PR2MiniFridgeTaskT], params: np.ndarray) -> PR2MiniFridgeTaskT:
+    def from_task_param(cls: Type[PR2MiniFridgeTaskT], param: np.ndarray) -> PR2MiniFridgeTaskT:
         world_type = cls.get_world_type()
         world_param_dof = world_type.get_world_dof()
-        world = None
-        desc_list = []
-        for param in params:
-            world_param = param[:world_param_dof]
-            if world is None:
-                world = world_type.from_parameter(world_param)
-            other_param = param[world_param_dof:]
-            pose_param = other_param[:4]
-            ypr = (pose_param[3], 0, 0)
-            co = Coordinates(pose_param[:3], ypr)
-            base_param = other_param[4:]
-            desc_list.append((co, base_param))
-        assert world is not None
-        return cls(world, desc_list)
+        world_param = param[:world_param_dof]
+        world = world_type.from_parameter(world_param)
 
-    def export_problems(self) -> List[Problem]:
+        other_param = param[world_param_dof:]
+        pose_param = other_param[:4]
+        ypr = (pose_param[3], 0, 0)
+        co = Coordinates(pose_param[:3], ypr)
+        base_param = other_param[4:]
+        desc = (co, base_param)
+        return cls(world, desc)
+
+    def export_problem(self) -> Problem:
         provider = self.get_config_provider()
         config = provider.get_config()
         q_start = provider.get_start_config()
@@ -125,40 +108,36 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
         pr2 = provider.get_pr2()
         motion_step_box = provider.get_config().get_default_motion_step_box()
 
-        problems = []
-        for target_pose, base_pose in self.descriptions:
-            if config.base_type == BaseType.PLANER:
-                lb = base_pose - np.array([0.5, 0.5, 0.5])
-                ub = base_pose + np.array([0.5, 0.5, 0.5])
-                base_bound = (tuple(lb), tuple(ub))
-                q_start[-3:] = base_pose  # dirty...
-            else:
-                base_bound = None
-            box_const = provider.get_box_const(base_bound=base_bound)
+        target_pose, base_pose = self.description
+        if config.base_type == BaseType.PLANER:
+            lb = base_pose - np.array([0.5, 0.5, 0.5])
+            ub = base_pose + np.array([0.5, 0.5, 0.5])
+            base_bound = (tuple(lb), tuple(ub))
+            q_start[-3:] = base_pose  # dirty...
+        else:
+            base_bound = None
+        box_const = provider.get_box_const(base_bound=base_bound)
 
-            pose_const = provider.get_pose_const([target_pose])
+        pose_const = provider.get_pose_const([target_pose])
 
-            # set pr2 to the initial state
-            # NOTE: because provider cache's pr2 state and when calling any function
-            # it reset the pr2 state to the original state. So the following
-            # two lines must be placed here right before reflecting the model
-            set_robot_state(
-                pr2, config.get_control_joint_names(), q_start, base_type=config.base_type
-            )
-            if config.base_type == BaseType.FIXED:
-                set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
-            pose_const.reflect_skrobot_model(pr2)
-            ineq_const.reflect_skrobot_model(pr2)
+        # set pr2 to the initial state
+        # NOTE: because provider cache's pr2 state and when calling any function
+        # it reset the pr2 state to the original state. So the following
+        # two lines must be placed here right before reflecting the model
+        set_robot_state(pr2, config.get_control_joint_names(), q_start, base_type=config.base_type)
+        if config.base_type == BaseType.FIXED:
+            set_robot_state(pr2, [], base_pose, base_type=BaseType.PLANER)
+        pose_const.reflect_skrobot_model(pr2)
+        ineq_const.reflect_skrobot_model(pr2)
 
-            problem = Problem(
-                q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
-            )
-            problems.append(problem)
-        return problems
+        problem = Problem(
+            q_start, box_const, pose_const, ineq_const, None, motion_step_box_=motion_step_box
+        )
+        return problem
 
-    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+    def solve_default(self) -> ResultProtocol:
+        problem = self.export_problem()
         solcon = OMPLSolverConfig(n_max_call=40000, n_max_satisfaction_trial=200, simplify=True)
-
         ompl_solver = OMPLSolver.init(solcon)
         ompl_solver.setup(problem)
         return ompl_solver.solve()
@@ -176,8 +155,7 @@ class PR2MiniFridgeTaskBase(TaskBase[MiniFridgeWorld, Tuple[Coordinates, np.ndar
         ...
 
     def create_viewer(self, mode: str) -> Any:
-        assert len(self.descriptions) == 1
-        target_co, base_pose = self.descriptions[0]
+        target_co, base_pose = self.description
         geometries = [Axis.from_coords(target_co)]
         provider = self.get_config_provider()
         config = provider.get_config()
