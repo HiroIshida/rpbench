@@ -248,31 +248,22 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
         ...
 
     @classmethod
-    def sample_descriptions(
-        cls, world: BelowTableWorldT, n_sample: int, standard: bool = False
-    ) -> List[Coordinates]:
-        # TODO: duplication of tabletop.py
-        if standard:
-            assert n_sample == 1
-        pose_list: List[Coordinates] = []
-        while len(pose_list) < n_sample:
-            pose = cls.sample_target_pose(world, standard)
-            position = np.expand_dims(pose.worldpos(), axis=0)
-            if world.get_exact_sdf()(position)[0] > 1e-3:
-                pose_list.append(pose)
-        return pose_list
+    def sample_description(
+        cls, world: BelowTableWorldT, standard: bool = False
+    ) -> Optional[Coordinates]:
+        pose = cls.sample_target_pose(world, standard)
+        position = np.expand_dims(pose.worldpos(), axis=0)
+        if world.get_exact_sdf()(position)[0] > 1e-3:
+            return pose
+        return None
 
-    def get_intension_params(self) -> List[np.ndarray]:
+    def get_intension_params(self) -> np.ndarray:
         pos_only = self.rarm_rot_type() == RotationType.IGNORE
 
         def process(co):
             return co.worldpos() if pos_only else skcoords_to_pose_vec(co, yaw_only=True)
 
-        desc_vecs = []
-        for desc in self.descriptions:
-            desc_vec = process(desc)
-            desc_vecs.append(desc_vec)
-        return desc_vecs
+        return process(self.description)
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix and hasattr(self.world, "heightmap"):
@@ -290,23 +281,17 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
         ...
 
     @classmethod
-    def from_task_params(cls: Type[HumanoidTableTaskT], params: np.ndarray) -> HumanoidTableTaskT:
+    def from_task_param(cls: Type[HumanoidTableTaskT], param: np.ndarray) -> HumanoidTableTaskT:
         world_t = cast(
             BelowTableWorldT, cls.get_world_type()
         )  # don't know why cast is needed. mypy's bug??
         world_param_dim = world_t.get_param_dim()
-        world = None
-        intention_list = []
-        for param in params:
-            world_param = param[:world_param_dim]
-            if world is None:
-                world = world_t.from_parameter(world_param)
-            intention = cls.param_to_intention(param[world_param_dim:])
-            intention_list.append(intention)
-        assert world is not None
-        return cls(world, intention_list)
+        world_param = param[:world_param_dim]
+        world = world_t.from_parameter(world_param)
+        intention = cls.param_to_intention(param[world_param_dim:])
+        return cls(world, intention)
 
-    def export_problems(self) -> List[Problem]:
+    def export_problem(self) -> Problem:
         provider = self.config_provider
         jaxon_config = provider.get_config()
 
@@ -330,25 +315,23 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
         efkin_legs = jaxon_config.get_endeffector_kin(rarm=False, larm=False)
         global_eq_const = PoseConstraint.from_skrobot_coords(leg_coords_list, efkin_legs, jaxon)  # type: ignore
 
-        problems = []
-        for desc in self.descriptions:
-            goal_eq_const = provider.get_dual_legs_pose_const(
-                jaxon, co_rarm=desc, arm_rot_type=self.rarm_rot_type()
-            )
+        goal_eq_const = provider.get_dual_legs_pose_const(
+            jaxon, co_rarm=self.description, arm_rot_type=self.rarm_rot_type()
+        )
 
-            problem = Problem(
-                q_start,
-                box_const,
-                goal_eq_const,
-                ineq_const,
-                global_eq_const,
-                motion_step_box_=jaxon_config.get_motion_step_box() * 0.5,
-                skip_init_feasibility_check=True,
-            )
-            problems.append(problem)
-        return problems
+        problem = Problem(
+            q_start,
+            box_const,
+            goal_eq_const,
+            ineq_const,
+            global_eq_const,
+            motion_step_box_=jaxon_config.get_motion_step_box() * 0.5,
+            skip_init_feasibility_check=True,
+        )
+        return problem
 
-    def solve_default_each(self, problem: Problem) -> ResultProtocol:
+    def solve_default(self) -> ResultProtocol:
+        problem = self.export_problem()
         try:
             return self._solve_default_each(problem)
         except TimeoutError:
@@ -392,8 +375,7 @@ class HumanoidTableReachingTaskBase(TaskBase[BelowTableWorldT, Coordinates, Jaxo
         ...
 
     def create_viewer(self, mode: str) -> Any:
-        assert len(self.descriptions) == 1
-        target_co = self.descriptions[0][0]
+        target_co = self.description
         geometries = [Axis.from_coords(target_co)]
 
         config = self.config_provider.get_config()  # type: ignore[attr-defined]

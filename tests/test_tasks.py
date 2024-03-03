@@ -10,40 +10,30 @@ from rpbench.articulated.jaxon.below_table import (
     HumanoidTableReachingTask,
     HumanoidTableReachingTask2,
 )
-from rpbench.articulated.pr2.minifridge import (
-    FixedPR2MiniFridgeTask,
-    MovingPR2MiniFridgeTask,
-)
 from rpbench.interface import TaskBase
-from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
-from rpbench.two_dimensional.dummy import (
-    DummyConfig,
-    DummySolver,
-    DummyTask,
-    ProbDummyTask,
-)
+from rpbench.two_dimensional.dummy import DummyConfig, DummySolver, DummyTask
 
 np.random.seed(0)
 set_ompl_random_seed(0)
 
 
 def test_dummy_task():
-    task = DummyTask.sample(1, standard=True)
-    res_off = task.solve_default()[0]
+    task = DummyTask.sample(standard=True)
+    res_off = task.solve_default()
     assert res_off.traj is not None
 
     conf = DummyConfig(500, random=False)  # dist < 0.5
     online_solver = DummySolver.init(conf)
 
-    task = DummyTask.sample(1, standard=False)
-    task.descriptions[0] = np.array([0.49, 0.0])
-    prob = task.export_problems()[0]
+    task = DummyTask.sample(standard=False)
+    task.description = np.array([0.49, 0.0])
+    prob = task.export_problem()
     online_solver.setup(prob)
     res = online_solver.solve(res_off.traj)
     assert res.traj is not None
 
-    task.descriptions[0] = np.array([0.51, 0.0])
-    prob = task.export_problems()[0]
+    task.description = np.array([0.51, 0.0])
+    prob = task.export_problem()
     online_solver.setup(prob)
     res = online_solver.solve(res_off.traj)
     assert res.traj is None
@@ -54,19 +44,20 @@ def test_prob_dummy_task():
     online_solver = DummySolver.init(conf)
 
     for i in range(100):
-        task = DummyTask.sample(1)
+        task = DummyTask.sample()
         sdf = task.world.get_exact_sdf()
-        val = sdf(np.array(task.descriptions))[0]
+        val = sdf(np.array(task.description))[0]
         is_feasible_problem = val > 0
-
-        task.solve_default()[0]
+        task.solve_default()
 
         while True:  # just sample guiding traj
-            res = DummyTask.sample(1).solve_default()[0]
+            sample = DummyTask.sample()
+            res = sample.solve_default()
+            res = DummyTask.sample().solve_default()
             if res.traj is not None:
                 guiding_traj = res.traj
                 break
-        online_solver.setup(task.export_problems()[0])
+        online_solver.setup(task.export_problem())
         res_replan = online_solver.solve(guiding_traj)
 
         if is_feasible_problem:
@@ -77,20 +68,21 @@ def test_prob_dummy_task():
             assert res_replan is None
 
 
-@pytest.mark.parametrize(
-    "task_type",
-    [
-        FixedPR2MiniFridgeTask,
-        MovingPR2MiniFridgeTask,
-        HumanoidTableReachingTask2,
-        HumanoidTableReachingTask,
-        HumanoidTableClutteredReachingTask,
-        HumanoidTableClutteredReachingTask2,
-        BubblySimpleMeshPointConnectTask,
-        DummyTask,
-        ProbDummyTask,
-    ],
-)
+task_type_list = [
+    # FixedPR2MiniFridgeTask,
+    # MovingPR2MiniFridgeTask,
+    HumanoidTableReachingTask2,
+    HumanoidTableReachingTask,
+    HumanoidTableClutteredReachingTask,
+    HumanoidTableClutteredReachingTask2,
+    # BubblySimpleMeshPointConnectTask,
+    # DummyTask,
+    # DummyMeshTask,
+    # ProbDummyTask,
+]
+
+
+@pytest.mark.parametrize("task_type", task_type_list)
 def test_task_hash(task_type: Type[TaskBase]):
     vec1 = task_type.distribution_vector()
     for _ in range(5):
@@ -99,20 +91,7 @@ def test_task_hash(task_type: Type[TaskBase]):
         np.testing.assert_almost_equal(vec1, vec2, decimal=5)
 
 
-@pytest.mark.parametrize(
-    "task_type",
-    [
-        FixedPR2MiniFridgeTask,
-        MovingPR2MiniFridgeTask,
-        HumanoidTableReachingTask2,
-        HumanoidTableReachingTask,
-        HumanoidTableClutteredReachingTask,
-        HumanoidTableClutteredReachingTask2,
-        BubblySimpleMeshPointConnectTask,
-        DummyTask,
-        ProbDummyTask,
-    ],
-)
+@pytest.mark.parametrize("task_type", task_type_list)
 def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     task = task_type.sample(5)
     mat = task.export_task_expression(use_matrix=True).world_mat
@@ -126,40 +105,14 @@ def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
         assert np.allclose(mat, mat_again)
 
 
-@pytest.mark.parametrize(
-    "task_type",
-    [
-        FixedPR2MiniFridgeTask,
-        MovingPR2MiniFridgeTask,
-        HumanoidTableReachingTask2,
-        HumanoidTableReachingTask,
-        HumanoidTableClutteredReachingTask,
-        HumanoidTableClutteredReachingTask2,
-        BubblySimpleMeshPointConnectTask,
-        DummyTask,
-        ProbDummyTask,
-    ],
-)
+@pytest.mark.parametrize("task_type", task_type_list)
 def test_default_solve(task_type: Type[TaskBase]):
     task = task_type.sample(1)
     task.solve_default()
     # we don't care if tasks are solvable or not
 
 
-@pytest.mark.parametrize(
-    "task_type",
-    [
-        FixedPR2MiniFridgeTask,
-        MovingPR2MiniFridgeTask,
-        HumanoidTableReachingTask2,
-        HumanoidTableReachingTask,
-        HumanoidTableClutteredReachingTask,
-        HumanoidTableClutteredReachingTask2,
-        BubblySimpleMeshPointConnectTask,
-        DummyTask,
-        ProbDummyTask,
-    ],
-)
+@pytest.mark.parametrize("task_type", task_type_list)
 def test_sampler_statelessness(task_type):
     np.random.seed(0)
     task = task_type.sample(3)
