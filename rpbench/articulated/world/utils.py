@@ -100,8 +100,11 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
         box.newcoords(self.copy_worldcoords())
         return box
 
-    def sample_points(self, n_sample: int, wrt: Literal["world", "local"] = "world") -> np.ndarray:
-        points_local = np.random.rand(n_sample, 3) * self.extents[None, :] - 0.5 * self.extents
+    def sample_points(
+        self, n_sample: int, wrt: Literal["world", "local"] = "world", margin: float = 0.0
+    ) -> np.ndarray:
+        extents = self.extents - margin * 2
+        points_local = np.random.rand(n_sample, 3) * extents[None, :] - 0.5 * extents
         if wrt == "local":
             return points_local
         else:

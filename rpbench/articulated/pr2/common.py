@@ -24,7 +24,7 @@ from skrobot.model.primitives import Axis
 from skrobot.models.pr2 import PR2
 from tinyfk import BaseType
 
-from rpbench.interface import TaskWithWorldBase
+from rpbench.interface import VisualizableTaskBase
 from rpbench.utils import lru_cache_keeping_random_state
 
 
@@ -167,7 +167,7 @@ PR2SolutionViewerT = TypeVar("PR2SolutionViewerT", bound="PR2SolutionViewerBase"
 
 class PR2SolutionViewerBase(SolutionVisualizerBase):
     @classmethod
-    def from_task(cls: Type[PR2SolutionViewerT], task: TaskWithWorldBase) -> PR2SolutionViewerT:
+    def from_task(cls: Type[PR2SolutionViewerT], task: VisualizableTaskBase) -> PR2SolutionViewerT:
         geometries = []
         co = task.description
         geometries.append(Axis.from_coords(co))
@@ -178,7 +178,13 @@ class PR2SolutionViewerBase(SolutionVisualizerBase):
         def robot_updator(robot, q):
             set_robot_state(pr2, config._get_control_joint_names(), q, config.base_type)
 
-        obj = cls(pr2, geometry=geometries, visualizable=task.world, robot_updator=robot_updator)
+        # violation
+        obj = cls(
+            pr2,
+            geometry=geometries,
+            visualizable=task.get_visualizable(),
+            robot_updator=robot_updator,
+        )
         obj.viewer.camera_transform = t
         return obj
 
