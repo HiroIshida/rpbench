@@ -98,15 +98,9 @@ class TaskBase(ABC, Generic[WorldT, DescriptionT, RobotModelT]):
     def from_task_param(cls: Type[TaskT], param: np.ndarray) -> "TaskT":
         raise NotImplementedError
 
-    @classmethod
-    def from_task_params(cls: Type[TaskT], params: np.ndarray) -> "TaskT":
-        # TODO(3/3): remove this later
-        return cls.from_task_param(params[0])
-
-    def to_task_params(self) -> np.ndarray:
-        # TODO(3/3): remove this later
+    def to_task_param(self) -> np.ndarray:
         param = self.export_task_expression(use_matrix=False).get_vector()
-        return np.array([param])
+        return param
 
     @classmethod
     def sample(
