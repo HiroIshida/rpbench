@@ -27,7 +27,7 @@ from skmp.trajectory import Trajectory
 
 from rpbench.utils import temp_seed
 
-WorldT = TypeVar("WorldT", bound="WorldBase")
+WorldT = TypeVar("WorldT", bound="SamplableWorldBase")
 TaskT = TypeVar("TaskT", bound="TaskBase")
 WCondTaskT = TypeVar("WCondTaskT", bound="TaskWithWorldCondBase")
 DescriptionT = TypeVar("DescriptionT", bound=Any)
@@ -47,18 +47,6 @@ class SDFProtocol(Protocol):
         sd: np.ndarray[float, 1]
             1dim (n_point) array of signed distances of each points
         """
-        ...
-
-
-class WorldBase(ABC):
-    @classmethod
-    @abstractmethod
-    def sample(cls: Type[WorldT], standard: bool = False) -> Optional[WorldT]:
-        ...
-
-    @abstractmethod
-    def get_exact_sdf(self) -> SDFProtocol:
-        """get an exact sdf"""
         ...
 
 
@@ -144,7 +132,14 @@ class TaskBase(ABC, Generic[DescriptionT]):
         raise NotImplementedError
 
 
-class TaskWithWorldBase(TaskBase[DescriptionT], Generic[WorldT, DescriptionT]):
+class SamplableWorldBase(ABC):
+    @classmethod
+    @abstractmethod
+    def sample(cls: Type[WorldT], standard: bool = False) -> Optional[WorldT]:
+        ...
+
+
+class TaskWithWorldCondBase(TaskBase[DescriptionT], Generic[WorldT, DescriptionT, RobotModelT]):
     world: WorldT
 
     def __init__(self, world: WorldT, description: DescriptionT) -> None:
@@ -155,10 +150,6 @@ class TaskWithWorldBase(TaskBase[DescriptionT], Generic[WorldT, DescriptionT]):
     def get_world_type() -> Type[WorldT]:
         raise NotImplementedError
 
-
-class TaskWithWorldCondBase(
-    TaskWithWorldBase[WorldT, DescriptionT], Generic[WorldT, DescriptionT, RobotModelT]
-):
     @classmethod
     @abstractmethod
     def sample_description(cls, world: WorldT, standard: bool = False) -> Optional[DescriptionT]:

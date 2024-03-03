@@ -10,7 +10,7 @@ from voxbloxpy.core import Grid
 
 from rpbench.articulated.vision import Camera, RayMarchingConfig
 from rpbench.articulated.world.utils import BoxSkeleton
-from rpbench.interface import WorldBase
+from rpbench.interface import SamplableWorldBase
 from rpbench.two_dimensional.utils import Grid2d
 from rpbench.utils import SceneWrapper
 
@@ -20,7 +20,7 @@ _HMAP_INF_SUBST = -1.0
 
 
 @dataclass
-class GroundWorldBase(WorldBase):
+class GroundWorldBase(SamplableWorldBase):
     ground: BoxSkeleton
     foot_box: BoxSkeleton
     obstacles: List[BoxSkeleton]

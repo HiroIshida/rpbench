@@ -16,7 +16,7 @@ from rpbench.articulated.world.utils import (
     CylinderSkelton,
     PrimitiveSkelton,
 )
-from rpbench.interface import WorldBase
+from rpbench.interface import SamplableWorldBase
 from rpbench.planer_box_utils import Box2d, Circle, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
@@ -408,7 +408,7 @@ class FridgeWithContents(CascadedCoords):
 
 
 @dataclass
-class MiniFridgeWorld(WorldBase):
+class MiniFridgeWorld(SamplableWorldBase):
     table: BoxSkeleton
     fridge_conts: FridgeWithContents
     _heightmap: Optional[np.ndarray] = None  # lazy

@@ -13,10 +13,10 @@ from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpS
 
 import rpbench.two_dimensional.double_integrator_trajopt as diopt
 from rpbench.interface import (
+    SamplableWorldBase,
     SDFProtocol,
     TaskExpression,
     TaskWithWorldCondBase,
-    WorldBase,
 )
 from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryBound,
@@ -168,7 +168,7 @@ class BubblyMetaParameter:
 
 
 @dataclass
-class BubblyWorldBase(WorldBase):
+class BubblyWorldBase(SamplableWorldBase):
     obstacles: List[CircleObstacle]
 
     @classmethod

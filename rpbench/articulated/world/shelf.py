@@ -10,7 +10,7 @@ from skrobot.viewers import TrimeshSceneViewer
 
 from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import BoxSkeleton
-from rpbench.interface import SDFProtocol, WorldBase
+from rpbench.interface import SamplableWorldBase, SDFProtocol
 from rpbench.planer_box_utils import Box2d, PlanerCoords, sample_box
 from rpbench.utils import SceneWrapper
 
@@ -276,7 +276,7 @@ ShelfWorldT = TypeVar("ShelfWorldT", bound="ShelfWorldBase")
 
 
 @dataclass
-class ShelfWorldBase(WorldBase):
+class ShelfWorldBase(SamplableWorldBase):
     shelf: ShelfMock
     _heightmap: Optional[np.ndarray] = None  # lazy
 

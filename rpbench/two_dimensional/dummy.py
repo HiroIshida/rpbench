@@ -12,10 +12,10 @@ from skmp.solver.interface import AbstractScratchSolver, Problem
 from skmp.trajectory import Trajectory
 
 from rpbench.interface import (
+    SamplableWorldBase,
     SDFProtocol,
     TaskExpression,
     TaskWithWorldCondBase,
-    WorldBase,
 )
 from rpbench.two_dimensional.utils import Grid2d, Grid2dSDF
 from rpbench.utils import temp_seed
@@ -25,13 +25,17 @@ DummyTaskT = TypeVar("DummyTaskT", bound="DummyTaskBase")
 
 
 @dataclass
-class DummyWorldBase(WorldBase):
+class DummyWorldBase(SamplableWorldBase):
     kde: gaussian_kde
     b_min: np.ndarray
     b_max: np.ndarray
 
     @abstractmethod
     def visualize(self, fax) -> None:
+        ...
+
+    @abstractmethod
+    def get_exact_sdf(self) -> SDFProtocol:
         ...
 
 

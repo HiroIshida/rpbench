@@ -43,9 +43,9 @@ from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import (
     Problem,
     ResultProtocol,
+    SamplableWorldBase,
     TaskExpression,
     TaskWithWorldCondBase,
-    WorldBase,
 )
 from rpbench.timeout_decorator import TimeoutError, timeout
 from rpbench.utils import SceneWrapper, skcoords_to_pose_vec
@@ -54,7 +54,7 @@ BelowTableWorldT = TypeVar("BelowTableWorldT", bound="BelowTableWorldBase")
 
 
 @dataclass
-class BelowTableWorldBase(WorldBase):
+class BelowTableWorldBase(SamplableWorldBase):
     target_region: BoxSkeleton
     table: BoxSkeleton
     obstacles: List[BoxSkeleton]

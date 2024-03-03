@@ -17,7 +17,7 @@ from rpbench.articulated.world.utils import (
     MeshSkelton,
     PrimitiveSkelton,
 )
-from rpbench.interface import WorldBase
+from rpbench.interface import SamplableWorldBase
 from rpbench.planer_box_utils import Box2d, Circle, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
@@ -321,7 +321,7 @@ def randomize_region3(region: Region, n_obstacles: int = 5):
 
 
 @dataclass
-class JskFridgeWorldBase(WorldBase):
+class JskFridgeWorldBase(SamplableWorldBase):
     fridge: FridgeModel
     _heightmap: Optional[np.ndarray] = None  # lazy
     attention_region_index: ClassVar[int] = 1
