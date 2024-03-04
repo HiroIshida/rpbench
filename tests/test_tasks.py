@@ -100,6 +100,15 @@ def test_task_hash(task_type: Type[TaskBase]):
 
 
 @pytest.mark.parametrize("task_type", task_type_list)
+def test_sample_validity(task_type: Type[TaskBase]):
+    for i in range(100):
+        task = task_type.sample(timeout=5.0)
+        problem = task.export_problem()
+        valid, _ = problem.check_init_feasibility()
+        assert valid, f"Failed to sample {task_type.__name__} at {i}-th trial"
+
+
+@pytest.mark.parametrize("task_type", task_type_list)
 def test_reconstruction_from_intrinsic(task_type: Type[TaskBase]):
     task = task_type.sample()
     mat = task.export_task_expression(use_matrix=True).world_mat
