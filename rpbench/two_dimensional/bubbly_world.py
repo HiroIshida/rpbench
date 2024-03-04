@@ -193,7 +193,8 @@ class BubblyWorldBase(SamplableWorldBase):
         return 0.01
 
     @classmethod
-    def sample(cls: Type[BubblyWorldT], standard: bool = False) -> BubblyWorldT:
+    def sample(cls: Type[BubblyWorldT]) -> BubblyWorldT:
+        standard = False
         meta_param = cls.get_meta_parameter()
         n_obs = meta_param.n_obs
         r_min = meta_param.circle_r_min

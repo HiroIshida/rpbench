@@ -26,14 +26,15 @@ set_ompl_random_seed(0)
 
 
 def test_dummy_task():
-    task = DummyTask.sample(standard=True)
-    res_off = task.solve_default()
+    sample = DummyTask.sample()
+    sample.description = np.array([0.0, 0.0])
+    res_off = sample.solve_default()
     assert res_off.traj is not None
 
     conf = DummyConfig(500, random=False)  # dist < 0.5
     online_solver = DummySolver.init(conf)
 
-    task = DummyTask.sample(standard=False)
+    task = DummyTask.sample()
     task.description = np.array([0.49, 0.0])
     prob = task.export_problem()
     online_solver.setup(prob)

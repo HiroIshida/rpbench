@@ -256,13 +256,13 @@ class PR2MiniFridgeTaskBase(VisualizableTaskBase):
     @classmethod
     def sample(
         cls: Type[PR2MiniFridgeTaskT],
-        standard: bool = False,
         predicate: Optional[Callable[[PR2MiniFridgeTaskT], bool]] = None,
         timeout: int = 180,
     ) -> PR2MiniFridgeTaskT:
         # sample base pos first and then sample the world
         provider = cls.get_config_provider()
         config = provider.get_config()
+        standard = False
 
         while True:
             fridge = cls.get_empty_fridge()

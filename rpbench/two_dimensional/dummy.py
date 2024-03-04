@@ -41,7 +41,7 @@ class DummyWorldBase(SamplableWorldBase):
 
 class DummyWorld(DummyWorldBase):
     @classmethod
-    def sample(cls, standard: bool = False) -> "DummyWorld":
+    def sample(cls) -> "DummyWorld":
         with temp_seed(100, True):
             n_data = 10
             y = np.random.randn(n_data)
@@ -86,7 +86,7 @@ class DummyWorld(DummyWorldBase):
 
 class ProbDummyWorld(DummyWorldBase):
     @classmethod
-    def sample(cls, standard: bool = False) -> "ProbDummyWorld":
+    def sample(cls) -> "ProbDummyWorld":
         with temp_seed(2, True):
             width = np.array([0.6, 1.0])
             margin = 0.15
@@ -196,7 +196,7 @@ class DummySolver(AbstractScratchSolver[DummyConfig, DummyResult]):
 class DummyTaskBase(TaskWithWorldCondBase[DummyWorldT, np.ndarray, None]):
     @classmethod
     def from_task_param(cls: Type[DummyTaskT], param: np.ndarray) -> DummyTaskT:
-        world = cls.get_world_type().sample(True)
+        world = cls.get_world_type().sample()
         # split desc_vecs by dof of this task get_task_dof
         return cls(world, param)
 
@@ -255,8 +255,9 @@ class DummyTask(DummyTaskBase[DummyWorld]):
         return DummyWorld
 
     @classmethod
-    def sample_description(cls, world: DummyWorld, standard: bool = False) -> Optional[np.ndarray]:
+    def sample_description(cls, world: DummyWorld) -> Optional[np.ndarray]:
         sdf = world.get_exact_sdf()
+        standard = False
         if standard:
             return np.zeros(2)
         else:
@@ -282,8 +283,9 @@ class ProbDummyTask(DummyTaskBase[ProbDummyWorld]):
         return ProbDummyWorld
 
     @classmethod
-    def sample_description(cls, world: ProbDummyWorld, standard: bool = False) -> np.ndarray:
+    def sample_description(cls, world: ProbDummyWorld) -> np.ndarray:
         world.get_exact_sdf()
+        standard = False
         if standard:
             return np.zeros(2)
         else:

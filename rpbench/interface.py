@@ -85,7 +85,6 @@ class TaskBase(ABC):
     @abstractmethod
     def sample(
         cls: Type[TaskT],
-        standard: bool = False,
         predicate: Optional[Callable[[TaskT], bool]] = None,
         timeout: int = 180,
     ) -> TaskT:
@@ -134,7 +133,7 @@ class TaskBase(ABC):
 class SamplableWorldBase(ABC):
     @classmethod
     @abstractmethod
-    def sample(cls: Type[WorldT], standard: bool = False) -> Optional[WorldT]:
+    def sample(cls: Type[WorldT]) -> Optional[WorldT]:
         ...
 
 
@@ -151,13 +150,12 @@ class TaskWithWorldCondBase(TaskBase, Generic[WorldT, DescriptionT, RobotModelT]
 
     @classmethod
     @abstractmethod
-    def sample_description(cls, world: WorldT, standard: bool = False) -> Optional[DescriptionT]:
+    def sample_description(cls, world: WorldT) -> Optional[DescriptionT]:
         raise NotImplementedError
 
     @classmethod
     def sample(
         cls: Type[WCondTaskT],
-        standard: bool = False,
         predicate: Optional[Callable[[WCondTaskT], bool]] = None,
         timeout: int = 180,
     ) -> WCondTaskT:
@@ -171,9 +169,9 @@ class TaskWithWorldCondBase(TaskBase, Generic[WorldT, DescriptionT, RobotModelT]
             if t_elapsed > timeout:
                 raise TimeoutError("predicated_sample: timeout!")
 
-            world = world_t.sample(standard=standard)
+            world = world_t.sample()
             if world is not None:
-                description = cls.sample_description(world, standard)
+                description = cls.sample_description(world)
                 if description is not None:
                     task = cls(world, description)
                     if predicate is None or predicate(task):

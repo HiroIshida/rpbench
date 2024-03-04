@@ -146,8 +146,9 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
         return 1
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "BelowTableSingleObstacleWorld":
+    def sample(cls) -> "BelowTableSingleObstacleWorld":
 
+        standard = False
         table, target_region = cls.sample_table_and_target_region(standard)
         table.worldpos()
 
@@ -180,7 +181,8 @@ class BelowTableClutteredWorld(BelowTableWorldBase):
         return 8
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "BelowTableClutteredWorld":
+    def sample(cls) -> "BelowTableClutteredWorld":
+        standard = False
         table, target_region = cls.sample_table_and_target_region(standard)
         table_position = table.worldpos()
 
@@ -239,7 +241,7 @@ class HumanoidTableReachingTaskBase(TaskWithWorldCondBase[BelowTableWorldT, Coor
 
     @classmethod
     @abstractmethod
-    def sample_target_pose(cls, world: BelowTableWorldT, standard: bool) -> Coordinates:
+    def sample_target_pose(cls, world: BelowTableWorldT) -> Coordinates:
         ...
 
     @staticmethod
@@ -248,10 +250,8 @@ class HumanoidTableReachingTaskBase(TaskWithWorldCondBase[BelowTableWorldT, Coor
         ...
 
     @classmethod
-    def sample_description(
-        cls, world: BelowTableWorldT, standard: bool = False
-    ) -> Optional[Coordinates]:
-        pose = cls.sample_target_pose(world, standard)
+    def sample_description(cls, world: BelowTableWorldT) -> Optional[Coordinates]:
+        pose = cls.sample_target_pose(world)
         position = np.expand_dims(pose.worldpos(), axis=0)
         if world.get_exact_sdf()(position)[0] > 1e-3:
             return pose
@@ -432,9 +432,8 @@ class HumanoidTableNotClutteredReachingTaskBase(
         return BelowTableSingleObstacleWorld
 
     @classmethod
-    def sample_target_pose(
-        cls, world: BelowTableSingleObstacleWorld, standard: bool
-    ) -> Coordinates:
+    def sample_target_pose(cls, world: BelowTableSingleObstacleWorld) -> Coordinates:
+        standard = False
         if standard:
             co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
             return co
@@ -495,7 +494,8 @@ class HumanoidTableClutteredReachingTaskBase(
         return BelowTableClutteredWorld
 
     @classmethod
-    def sample_target_pose(cls, world: BelowTableClutteredWorld, standard: bool) -> Coordinates:
+    def sample_target_pose(cls, world: BelowTableClutteredWorld) -> Coordinates:
+        standard = False
         if standard:
             co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
             return co
