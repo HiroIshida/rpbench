@@ -459,7 +459,7 @@ class PR2MiniFridgeTaskBase(VisualizableTaskBase):
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
         solcon = OMPLSolverConfig(
-            n_max_call=10000000000, n_max_satisfaction_trial=10000000, simplify=True, timeout=30
+            n_max_call=30000, n_max_satisfaction_trial=300, simplify=True, timeout=30
         )
         ompl_solver = OMPLSolver.init(solcon)
         ompl_solver.setup(problem)
