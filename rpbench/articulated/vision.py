@@ -2,7 +2,7 @@ import copy
 import logging
 import time
 from dataclasses import dataclass
-from typing import Callable, Optional, Sequence
+from typing import Callable, List, Optional, Sequence
 
 import numpy as np
 import threadpoolctl
@@ -12,7 +12,11 @@ from skrobot.model.primitives import Axis, Coordinates
 from skrobot.sdf import UnionSDF
 from voxbloxpy.core import CameraPose, EsdfMap
 
-from rpbench.articulated.world.utils import BoxSkeleton, PrimitiveSkelton
+from rpbench.articulated.world.utils import (
+    BoxSkeleton,
+    CylinderSkelton,
+    PrimitiveSkelton,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +170,72 @@ def create_synthetic_esdf(
     return esdf
 
 
+def create_heightmap_z_slice(
+    target_region: BoxSkeleton, objects: List[PrimitiveSkelton], resolution: int
+) -> np.ndarray:
+    extent_plane = target_region.extents[:2]
+    xlin = np.linspace(-0.5 * extent_plane[0], +0.5 * extent_plane[0], resolution)
+    ylin = np.linspace(-0.5 * extent_plane[1], +0.5 * extent_plane[1], resolution)
+    X, Y = np.meshgrid(xlin, ylin)
+    pts = np.column_stack((X.ravel(), Y.ravel(), np.zeros_like(X.ravel())))
+    pts = target_region.transform_vector(pts)
+
+    z_region_bottom = target_region.worldpos()[2] - 0.5 * target_region.extents[2]
+
+    hmap_flatten = np.zeros_like(X.ravel())  # later we will reshape this
+    for obj in objects:
+        if isinstance(obj, BoxSkeleton):
+            pos = obj.worldpos()
+            h_max_obj = pos[2] + obj.extents[2] * 0.5
+        elif isinstance(obj, CylinderSkelton):
+            pos = obj.worldpos()
+            h_max_obj = pos[2] + obj.height * 0.5
+        else:
+            raise ValueError("not supported type")
+        pts[:, 2] = pos[2]
+        bools_isinside = obj.sdf(pts) < 0.0
+        hmap_flatten[bools_isinside] = h_max_obj - z_region_bottom
+    hmap = hmap_flatten.reshape((resolution, resolution))
+    return hmap
+
+
+def create_heightmap_ray_projection(
+    target_region: BoxSkeleton,
+    objects: List[PrimitiveSkelton],
+    resolution: int,
+    inf_subst_value: float = -1.0,
+    height_lower_cutoff: float = 0.0,
+) -> np.ndarray:
+    raymarching_conf = RayMarchingConfig()
+
+    extent_plane = target_region.extents[:2]
+    xlin = np.linspace(-0.5 * extent_plane[0], +0.5 * extent_plane[0], resolution)
+    ylin = np.linspace(-0.5 * extent_plane[1], +0.5 * extent_plane[1], resolution)
+    X, Y = np.meshgrid(xlin, ylin)
+    height = target_region.extents[2]
+    Z = np.zeros_like(X) + 0.5 * height
+
+    points_wrt_region = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
+    points_wrt_world = target_region.transform_vector(points_wrt_region)
+    dirs = np.tile(np.array([0, 0, -1]), (len(points_wrt_world), 1))
+
+    # we must consider "ground" as obstacle
+    ground = target_region.detach_clone()
+    ground.translate([0.0, 0.0, -ground.extents[2]])
+
+    union_sdf = UnionSDF([o.sdf for o in objects] + [ground.sdf])
+
+    dists = Camera.ray_marching(points_wrt_world, dirs, union_sdf, raymarching_conf)
+    is_valid = dists < height + 1e-3
+
+    dists_from_ground = height - dists
+    dists_from_ground[~is_valid] = inf_subst_value
+
+    heightmap = dists_from_ground.reshape((resolution, resolution))
+    heightmap[heightmap < height_lower_cutoff] = height_lower_cutoff
+    return heightmap
+
+
 @dataclass
 class HeightmapConfig:
     resol_x: int = 112
@@ -179,6 +249,9 @@ class LocatedHeightmap:
     surrounding_box: BoxSkeleton
     config: HeightmapConfig
     debug_points: Optional[np.ndarray]
+
+    def __post_init__(self):
+        print("LocatedHeightmap is currently deprecated.")
 
     @classmethod
     def by_raymarching(

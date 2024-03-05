@@ -35,7 +35,7 @@ from rpbench.articulated.pr2.common import (
     CachedRArmFixedPR2ConstProvider,
     CachedRArmPR2ConstProvider,
 )
-from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
+from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.utils import (
     BoxSkeleton,
     CylinderSkelton,
@@ -213,11 +213,8 @@ class MiniFridgeWorld:
         return cls(fridge, contents)
 
     def create_heightmap(self, n_grid: int = 56) -> np.ndarray:
-        hmap_config = HeightmapConfig(n_grid, n_grid)
-        hmap = LocatedHeightmap.by_raymarching(
-            self.fridge.target_region, self.contents, conf=hmap_config
-        )
-        return hmap.heightmap
+        hmap = create_heightmap_z_slice(self.fridge.target_region, self.contents, n_grid)
+        return hmap
 
     def get_exact_sdf(self) -> UnionSDF:
         fridge_sdf = self.fridge.get_exact_sdf()
