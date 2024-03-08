@@ -137,6 +137,9 @@ class Trajectory(HasTrajectoryConfigMixin):
         U = traj_array[n_steps * n_dim * 2 :].reshape(n_steps - 1, n_dim)
         return cls(traj_conf, X, V, U)
 
+    def get_length(self) -> float:
+        return np.sum(np.linalg.norm(self.X[1:] - self.X[:-1], axis=1))
+
 
 @dataclass
 class TrajectoryBound:

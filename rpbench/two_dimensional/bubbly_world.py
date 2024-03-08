@@ -7,7 +7,7 @@ import disbmp
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.sparse as sparse
-from disbmp import BoundingBox, FastMarchingTree, State
+from disbmp import RRT, BoundingBox, FastMarchingTree, State
 from skmp.solver.interface import AbstractScratchSolver, Problem, ResultProtocol
 from skmp.solver.nlp_solver.osqp_sqp import Differentiable, OsqpSqpConfig, OsqpSqpSolver
 
@@ -138,6 +138,75 @@ class DoubleIntegratorOptimizationSolver(
             return DoubleIntegratorPlanningResult(traj, None, ret.nit)
         else:
             return DoubleIntegratorPlanningResult(None, None, ret.nit)
+
+
+@dataclass
+class DoubleIntegratorRRTConfig:
+    dt: float = 1.0
+    n_max_call: int = 100000
+    timeout: Optional[float] = None
+
+
+@dataclass
+class DoubleIntegratorRRTResult:
+    traj: Optional[disbmp.Trajectory]
+    time_elapsed: Optional[float]
+    n_call: int
+
+    @classmethod
+    def abnormal(cls) -> "DoubleIntegratorPlanningResult":
+        return cls(None, None, -1)
+
+
+@dataclass
+class DoubleIntegratorRRTSolver(
+    AbstractScratchSolver[DoubleIntegratorRRTConfig, DoubleIntegratorRRTResult]
+):
+    config: DoubleIntegratorRRTConfig
+    problem: Optional[DoubleIntegratorPlanningProblem]
+    rrt: Optional[RRT]
+    _n_call: Optional[int]
+
+    def get_result_type(self) -> Type[DoubleIntegratorPlanningResult]:
+        return DoubleIntegratorPlanningResult
+
+    @classmethod
+    def init(cls, conf: DoubleIntegratorRRTConfig) -> "DoubleIntegratorRRTSolver":
+        return cls(conf, None, None, None)
+
+    def _setup(self, problem: DoubleIntegratorPlanningProblem) -> None:
+        s_min = np.hstack([problem.tbound.x_min, problem.tbound.v_min])
+        s_max = np.hstack([problem.tbound.x_max, problem.tbound.v_max])
+        bbox = BoundingBox(s_min, s_max)
+        s_start = State(np.hstack([problem.start, np.zeros(2)]))
+        s_goal = State(np.hstack([problem.goal, np.zeros(2)]))
+
+        self._n_call = 0
+
+        def is_obstacle_free(state: State) -> bool:
+            self._n_call += 1
+            x = state.to_vector()[:2]
+            return problem.sdf(np.expand_dims(x, axis=0))[0] > 0.0
+
+        assert (
+            self.config.dt > problem.dt
+        )  # trajectory piece dt must be larger than collision check dt
+        rrt = RRT(s_start, s_goal, is_obstacle_free, bbox, self.config.dt, problem.dt)
+        self.rrt = rrt
+
+    def _solve(self, guiding_traj: Optional[disbmp.Trajectory]) -> DoubleIntegratorPlanningResult:
+        assert guiding_traj is None
+        assert self.problem is not None
+        assert self.rrt is not None
+        is_solved = self.rrt.solve(self.config.n_max_call)
+        assert self._n_call is not None
+        n_call = self._n_call
+        self._n_call = None
+        if is_solved:
+            traj = self.rrt.get_solution()
+            return DoubleIntegratorPlanningResult(traj, None, n_call)
+        else:
+            return DoubleIntegratorPlanningResult.abnormal()
 
 
 @dataclass
