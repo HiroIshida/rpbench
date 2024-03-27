@@ -520,7 +520,8 @@ class Taskvisualizer:
     def __init__(self, task: BubblyPointConnectTaskBase):
         fig, ax = plt.subplots()
         task.world.visualize((fig, ax))
-        start, goal = task.description
+        goal = task.description
+        start = np.ones(2) * 0.1
         ax.plot(start[0], start[1], "mo", markersize=10, label="start")
         ax.plot(goal[0], goal[1], "m*", markersize=10, label="goal")
         ax.set_xlim([-0.1, 1.1])
