@@ -110,13 +110,9 @@ class BelowTableWorldBase(SamplableWorldBase):
         return UnionSDF([self.table.sdf] + [obs.sdf for obs in self.obstacles])
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        # self.target_region.visual_mesh.visual.face_colors = [255, 255, 255, 120]
-        # viewer.add(self.target_region)
         viewer.add(self.table.to_visualizable())
         for obs in self.obstacles:
-            skobs = obs.to_visualizable()
-            # skobs.visual_mesh.visual.face_colors = [255, 0, 0, 150]
-            skobs.visual_mesh.visual.face_colors = [0, 255, 0, 200]
+            skobs = obs.to_visualizable([0, 255, 0, 200])
             viewer.add(skobs)
 
     @staticmethod
