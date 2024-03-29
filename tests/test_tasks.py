@@ -9,6 +9,7 @@ from rpbench.articulated.jaxon.below_table import (
     HumanoidTableClutteredReachingTask2,
     HumanoidTableReachingTask,
     HumanoidTableReachingTask2,
+    HumanoidTableReachingTask3,
 )
 from rpbench.articulated.pr2.minifridge import FixedPR2MiniFridgeTask, PR2MiniFridgeTask
 from rpbench.interface import TaskBase
@@ -80,6 +81,7 @@ def test_prob_dummy_task():
 task_type_list = [
     FixedPR2MiniFridgeTask,
     PR2MiniFridgeTask,
+    HumanoidTableReachingTask3,
     HumanoidTableReachingTask2,
     HumanoidTableReachingTask,
     HumanoidTableClutteredReachingTask,

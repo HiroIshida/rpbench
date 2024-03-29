@@ -169,6 +169,43 @@ class BelowTableSingleObstacleWorld(BelowTableWorldBase):
 
 
 @dataclass
+class BelowTableDualObstacleWorld(BelowTableWorldBase):
+    @classmethod
+    def get_n_obstacles(cls) -> int:
+        return 2
+
+    @classmethod
+    def sample(cls) -> "BelowTableDualObstacleWorld":
+
+        standard = False
+        table, target_region = cls.sample_table_and_target_region(standard)
+        table.worldpos()
+
+        # determine obstacle
+        if standard:
+            obs = BoxSkeleton([0.1, 0.1, 0.5], pos=[0.6, -0.2, 0.25])
+            obs_list = [obs]
+        else:
+            region_width = np.array(target_region._extents[:2])
+            region_center = target_region.worldpos()[:2]
+            b_min = region_center - region_width * 0.5
+            b_max = region_center + region_width * 0.5
+
+            obs_list = []
+            for _ in range(2):
+                obs_width = np.random.rand(2) * np.ones(2) * 0.2 + np.ones(2) * 0.1
+                obs_height = 0.3 + np.random.rand() * 0.5
+                b_min = region_center - region_width * 0.5 + 0.5 * obs_width
+                b_max = region_center + region_width * 0.5 - 0.5 * obs_width
+                pos2d = np.random.rand(2) * (b_max - b_min) + b_min
+                pos = np.hstack([pos2d, obs_height * 0.5])
+                obs = BoxSkeleton(np.hstack([obs_width, obs_height]), pos=pos)
+                obs_list.append(obs)
+
+        return cls(target_region, table, obs_list)
+
+
+@dataclass
 class BelowTableClutteredWorld(BelowTableWorldBase):
     _heightmap: Optional[np.ndarray] = None  # lazy
 
@@ -450,6 +487,36 @@ class HumanoidTableNotClutteredReachingTaskBase(
         assert False
 
 
+class HumanoidTableDualObstacleReachingTaskBase(
+    HumanoidTableReachingTaskBase[BelowTableDualObstacleWorld]
+):
+    @staticmethod
+    def get_world_type() -> Type[BelowTableDualObstacleWorld]:
+        return BelowTableDualObstacleWorld
+
+    @classmethod
+    def sample_target_pose(cls, world: BelowTableDualObstacleWorld) -> Coordinates:
+        standard = False
+        if standard:
+            co = Coordinates([0.55, -0.6, 0.45], rot=[0, -0.5 * np.pi, 0])
+            return co
+
+        sdf = world.get_exact_sdf()
+
+        n_max_trial = 100
+        ext = np.array(world.target_region._extents)
+        for _ in range(n_max_trial):
+            p_local = -0.5 * ext + np.random.rand(3) * ext
+            co = world.target_region.copy_worldcoords()
+            co.translate(p_local)
+            points = np.expand_dims(co.worldpos(), axis=0)
+            sd_val = sdf(points)[0]
+            if sd_val > 0.03:
+                co.rotate(-0.5 * np.pi, "y")
+                return co
+        assert False
+
+
 class RotIgnoreMixin:
     @staticmethod
     def rarm_rot_type() -> RotationType:
@@ -479,6 +546,10 @@ class HumanoidTableReachingTask(RotXYZWMixin, HumanoidTableNotClutteredReachingT
 
 
 class HumanoidTableReachingTask2(RotIgnoreMixin, HumanoidTableNotClutteredReachingTaskBase):
+    ...
+
+
+class HumanoidTableReachingTask3(RotIgnoreMixin, HumanoidTableDualObstacleReachingTaskBase):
     ...
 
 
