@@ -142,8 +142,8 @@ class Fridge(CascadedCoords):
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         for panel in self.panels.values():
-            viewer.add(panel.to_visualizable((255, 0, 0, 150)))
-        viewer.add(self.table.to_visualizable((0, 255, 0, 150)))
+            viewer.add(panel.to_visualizable((100, 100, 100, 255)))
+        viewer.add(self.table.to_visualizable((255, 255, 255, 255)))
 
     def get_exact_sdf(self) -> UnionSDF:
         # sdf = UnionSDF([p.sdf for p in self.panels.values()] + [self.table.sdf])
@@ -225,7 +225,7 @@ class MiniFridgeWorld:
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.fridge.visualize(viewer)
         for obj in self.contents:
-            viewer.add(obj.to_visualizable((0, 0, 255, 150)))
+            viewer.add(obj.to_visualizable((255, 144, 0, 255)))
 
     @classmethod
     def get_world_dof(cls) -> int:
@@ -504,20 +504,37 @@ class PR2MiniFridgeTaskBase(VisualizableTaskBase):
         else:
             assert False
 
+        # t = np.array(
+        #     [
+        #         [-0.74452768, 0.59385861, -0.30497620, -0.28438419],
+        #         [-0.66678662, -0.68392597, 0.29604201, 0.80949977],
+        #         [-0.03277405, 0.42376552, 0.90517879, 3.65387983],
+        #         [0.0, 0.0, 0.0, 1.0],
+        #     ]
+        # )
+
+        # [[-0.96504012  0.24337892 -0.09728443  0.09135017]
+        #  [-0.25206112 -0.7600211   0.59902681  2.13899281]
+        #  [ 0.07185228  0.60260653  0.79479722  3.0997331 ]
+        #  [ 0.          0.          0.          1.        ]]
+
+        # t = np.array(
+        #     [
+        #         [-0.96504012, 0.24337892, -0.09728443, 0.09135017],
+        #         [-0.25206112, -0.7600211, 0.59902681, 2.13899281],
+        #         [0.07185228, 0.60260653, 0.79479722, 3.0997331],
+        #         [0.0, 0.0, 0.0, 1.0],
+        #     ]
+        # )
+
         t = np.array(
             [
-                [-0.74452768, 0.59385861, -0.30497620, -0.28438419],
-                [-0.66678662, -0.68392597, 0.29604201, 0.80949977],
-                [-0.03277405, 0.42376552, 0.90517879, 3.65387983],
+                [-0.016508, 0.95212135, -0.30527433, -0.38716263],
+                [-0.99249958, -0.05259143, -0.11035726, 0.04694729],
+                [-0.12112832, 0.30116287, 0.94584822, 3.22317438],
                 [0.0, 0.0, 0.0, 1.0],
             ]
         )
-
-        # the below for specifically for visualizing the container contents
-        # t = np.array([[-0.00814724,  0.72166326, -0.69219633, -0.01127641],
-        #               [-0.99957574,  0.01348003,  0.02581901,  0.06577777],
-        #               [ 0.02796346,  0.69211302,  0.72124726,  1.52418492],
-        #               [ 0.        ,  0.        ,  0.        ,  1.        ]])
 
         obj.viewer.camera_transform = t
         return obj
