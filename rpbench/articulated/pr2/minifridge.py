@@ -216,6 +216,23 @@ class MiniFridgeWorld:
         hmap = create_heightmap_z_slice(self.fridge.target_region, self.contents, n_grid)
         return hmap
 
+    def create_voxelmap(self, n_grid: int = 56) -> np.ndarray:
+        hmap = self.create_heightmap(n_grid)
+        # repat hmap n_grid time to create 3d voxelmap
+        # voxelmap = np.repeat(hmap[:, :, np.newaxis], n_grid, axis=2)
+        # return voxelmap
+
+        target_region = self.fridge.target_region
+        target_region.worldpos()
+        extent = target_region.extents
+
+        n_half_grid = n_grid // 2
+        boolean_voxelmap = np.zeros((n_grid, n_grid, n_half_grid), dtype=bool)
+        for i in range(n_half_grid):
+            h = extent[2] * (i / n_grid)
+            boolean_voxelmap[:, :, i] = h < hmap
+        return boolean_voxelmap
+
     def get_exact_sdf(self) -> UnionSDF:
         fridge_sdf = self.fridge.get_exact_sdf()
         sdfs = [c.sdf for c in self.contents] + [fridge_sdf]
@@ -550,3 +567,21 @@ class PR2MiniFridgeTask(PR2MiniFridgeTaskBase):
     @classmethod
     def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
         return CachedRArmPR2ConstProvider
+
+
+class PR2MiniFridgeVoxelTask(PR2MiniFridgeTaskBase):
+    @classmethod
+    def get_config_provider(cls) -> Type[CachedPR2ConstProvider]:
+        return CachedRArmPR2ConstProvider
+
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
+        if use_matrix:
+            world_vec = np.array([self.world.fridge.angle])
+            world_mat = self.world.create_voxelmap()  # using voxelmap!!!
+        else:
+            world_vec = self.world.to_parameter()
+            world_mat = None
+
+        target_pose, init_pose = self.vector_param
+        other_vec = np.hstack([skcoords_to_pose_vec(target_pose, yaw_only=True), init_pose])
+        return TaskExpression(world_vec, world_mat, other_vec)
