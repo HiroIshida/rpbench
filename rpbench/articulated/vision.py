@@ -199,6 +199,22 @@ def create_heightmap_z_slice(
     return hmap
 
 
+def create_voxelmap(
+    target_region: BoxSkeleton,
+    objects: List[PrimitiveSkelton],
+    resolution: int,
+    voxel_size: float,
+    inf_subst_value: float = -1.0,
+) -> np.ndarray:
+    center = target_region.worldpos()
+    extent = target_region.extents
+    xlin = np.linspace(center[0] - 0.5 * extent[0], center[0] + 0.5 * extent[0], resolution)
+    ylin = np.linspace(center[1] - 0.5 * extent[1], center[1] + 0.5 * extent[1], resolution)
+    zlin = np.linspace(center[2] - 0.5 * extent[2], center[2] + 0.5 * extent[2], resolution)
+    X, Y, Z = np.meshgrid(xlin, ylin, zlin)
+    np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
+
+
 def create_heightmap_ray_projection(
     target_region: BoxSkeleton,
     objects: List[PrimitiveSkelton],
