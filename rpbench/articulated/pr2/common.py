@@ -8,10 +8,7 @@ from skmp.constraint import (
     PairWiseSelfCollFreeConst,
     PoseConstraint,
 )
-from skmp.kinematics import (
-    ArticulatedCollisionKinematicsMap,
-    ArticulatedEndEffectorKinematicsMap,
-)
+from skmp.kinematics import CollSphereKinematicsMap, EndEffectorKinematicsMap
 from skmp.robot.pr2 import PR2Config
 from skmp.robot.utils import get_robot_state, set_robot_state
 from skmp.visualization.solution_visualizer import (
@@ -84,19 +81,19 @@ class CachedPR2ConstProvider(ABC):
 
     @classmethod
     @lru_cache_keeping_random_state
-    def get_efkin(cls) -> ArticulatedEndEffectorKinematicsMap:
+    def get_efkin(cls) -> EndEffectorKinematicsMap:
         config = cls.get_config()
         return config.get_endeffector_kin()
 
     @classmethod
     @lru_cache_keeping_random_state
-    def get_colkin(cls) -> ArticulatedCollisionKinematicsMap:
+    def get_colkin(cls) -> CollSphereKinematicsMap:
         config = cls.get_config()
         return config.get_collision_kin()
 
     @classmethod
     @lru_cache_keeping_random_state
-    def get_whole_body_colkin(cls) -> ArticulatedCollisionKinematicsMap:
+    def get_whole_body_colkin(cls) -> CollSphereKinematicsMap:
         config = cls.get_config()
         return config.get_collision_kin(whole_body=True)
 
