@@ -60,7 +60,7 @@ class JskTable(CascadedCoords):
 @dataclass
 class JskMessyTableWorld(SamplableWorldBase):
     table: JskTable
-    obstacle_list: List[BoxSkeleton]
+    tabletop_obstacle_list: List[BoxSkeleton]
     obstacle_env_region: BoxSkeleton
     N_MAX_OBSTACLE: ClassVar[int] = 25
 
@@ -114,9 +114,12 @@ class JskMessyTableWorld(SamplableWorldBase):
                 obstacle_env_region.assoc(obj, relative_coords="local")
             return cls(table, obj_list, obstacle_env_region)
 
+    def get_all_obstacles(self) -> List[BoxSkeleton]:
+        return self.tabletop_obstacle_list + self.table.table_primitives
+
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.table.visualize(viewer)
-        for obs in self.obstacle_list:
+        for obs in self.tabletop_obstacle_list:
             viewer.add(obs.to_visualizable((100, 100, 100, 255)))
         viewer.add(self.obstacle_env_region.to_visualizable((0, 255, 0, 50)))
 
