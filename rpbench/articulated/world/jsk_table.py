@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import List, Union
+from typing import ClassVar, List, Union
 
 import numpy as np
 from skrobot.coordinates import CascadedCoords
-from skrobot.viewers import TrimeshSceneViewer
+from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import SamplableWorldBase
@@ -13,11 +13,9 @@ from rpbench.utils import SceneWrapper
 BROWN_COLOR = (204, 102, 0, 200)
 
 
-class JskTable:
-    # this table must be fixed in the world
+class JskTable(CascadedCoords):
     size: List[float]
     table_primitives: List[BoxSkeleton]
-    co_surface_center: CascadedCoords
 
     def __init__(self):
         super().__init__()
@@ -44,12 +42,14 @@ class JskTable:
         )
         primitive_list = [plate, leg1, leg2, leg3, leg4]
 
-        co_surface_center = CascadedCoords()
-        co_surface_center.newcoords(plate.copy_worldcoords())
+        # the table's coordinates equals to the center of the plate
+        co_surface_center = plate.copy_worldcoords()
         co_surface_center.translate([0, 0, 0.5 * plate_d])
+        self.newcoords(co_surface_center)
+        for prim in primitive_list:
+            self.assoc(prim)
 
         self.size = size
-        self.co_surface_center = co_surface_center
         self.table_primitives = primitive_list
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
@@ -62,6 +62,7 @@ class JskMessyTableWorld(SamplableWorldBase):
     table: JskTable
     obstacle_list: List[BoxSkeleton]
     obstacle_env_region: BoxSkeleton
+    N_MAX_OBSTACLE: ClassVar[int] = 25
 
     @classmethod
     def sample(cls, standard: bool = False) -> "JskMessyTableWorld":
@@ -70,7 +71,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         obstacle_h_min = 0.05
         region_size = [table.size[0], table.size[1], obstacle_h_max + 0.05]
         obstacle_env_region = BoxSkeleton(region_size)
-        table.co_surface_center.assoc(obstacle_env_region, relative_coords="local")
+        table.assoc(obstacle_env_region, relative_coords="local")
         obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
 
         if standard:
@@ -83,7 +84,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         else:
             # implement obstacle distribution
             n_min_obstacle = 5
-            n_max_obstacle = 25
+            n_max_obstacle = cls.N_MAX_OBSTACLE
             n_obstacle = np.random.randint(n_min_obstacle, n_max_obstacle)
 
             # consider sampling boxes inside a planer box (table)
@@ -117,16 +118,21 @@ class JskMessyTableWorld(SamplableWorldBase):
         self.table.visualize(viewer)
         for obs in self.obstacle_list:
             viewer.add(obs.to_visualizable((100, 100, 100, 255)))
-        # debug visualization
         viewer.add(self.obstacle_env_region.to_visualizable((0, 255, 0, 50)))
 
 
 if __name__ == "__main__":
+    from skrobot.models import Fetch
+
+    fetch = Fetch()
+    fetch.reset_pose()
     world = JskMessyTableWorld.sample(standard=False)
-    # v = PyrenderViewer()
-    v = TrimeshSceneViewer()
+    world.table.translate([0.6, 0.0, 0.0])
+    v = PyrenderViewer()
+    # v = TrimeshSceneViewer()
     world.visualize(v)
     v.show()
+    v.add(fetch)
     import time
 
     time.sleep(1000)
