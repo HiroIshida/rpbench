@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from typing import ClassVar, List, Union
 
 import numpy as np
-from skrobot.coordinates import CascadedCoords
+from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.coordinates.math import rpy_angle
+from skrobot.sdf import UnionSDF
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
 from rpbench.articulated.world.utils import BoxSkeleton
@@ -81,8 +82,27 @@ class JskMessyTableWorld(SamplableWorldBase):
             co_obstacle.translate([-0.2, 0.0, 0.15])
             box = BoxSkeleton([0.3, 0.3, 0.3])
             box.newcoords(co_obstacle)
+            table.translate([0.6, 0.0, 0.0])
             return cls(table, [box], obstacle_env_region)
         else:
+
+            def table_collide_with_fetch():
+                # NOTE: this jsk_table world is not originally designed to be used only with fetch
+                # But for the sake of simplicity, we will check the collision with fetch
+                # appoximate fetch's base by a sphere with radius 0.3 at z=0.25
+                sdf = UnionSDF([p.sdf for p in table.table_primitives])
+                dist = sdf(np.array([[0.0, 0.0, 0.25]]))[0]
+                return dist < 0.3
+
+            while True:
+                co = Coordinates()
+                x_position = np.random.uniform(0.6, 0.8)
+                y_position = np.random.uniform(-0.5 * table.size[1], 0.5 * table.size[1])
+                co.translate([x_position, y_position, 0.0])
+                table.newcoords(co)
+                if not table_collide_with_fetch():
+                    break
+
             # implement obstacle distribution
             n_min_obstacle = 5
             n_max_obstacle = cls.N_MAX_OBSTACLE
@@ -113,6 +133,7 @@ class JskMessyTableWorld(SamplableWorldBase):
                 obj.translate([0.0, 0.0, 0.5 * h - region_size[2] * 0.5])
                 obj_list.append(obj)
                 obstacle_env_region.assoc(obj, relative_coords="local")
+
             return cls(table, obj_list, obstacle_env_region)
 
     def get_all_obstacles(self) -> List[BoxSkeleton]:
@@ -128,7 +149,8 @@ class JskMessyTableWorld(SamplableWorldBase):
         pos = self.table.worldpos()
         rot = self.table.worldrot()
         ypr = rpy_angle(rot)[0]
-        table_pose = np.array([pos[0], pos[1], ypr[0]])
+        np.testing.assert_allclose(ypr, np.zeros(3))
+        table_pose = np.array([pos[0], pos[1]])
 
         head = 0
         obstacle_param = np.zeros(6 * self.N_MAX_OBSTACLE)
@@ -143,17 +165,16 @@ class JskMessyTableWorld(SamplableWorldBase):
 
     @classmethod
     def from_parameter(cls, param: np.ndarray) -> "JskMessyTableWorld":
-        table_pose = param[:3]
+        table_pose = param[:2]
         table = JskTable()
-        table.translate(np.hstack([table_pose[:2], 0]))
-        table.rotate(table_pose[2], "z")
+        table.translate(np.hstack([table_pose, 0]))
 
         region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
         obstacle_env_region = BoxSkeleton(region_size)
         table.assoc(obstacle_env_region, relative_coords="local")
         obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
 
-        obstacle_param = param[3:]
+        obstacle_param = param[2:]
         n_obstacle = len(obstacle_param) // 6
         obstacle_list = []
         head = 0
@@ -178,14 +199,12 @@ if __name__ == "__main__":
     fetch = Fetch()
     fetch.reset_pose()
     world = JskMessyTableWorld.sample(standard=False)
-    world.table.translate([0.2, 0.0, 0.0])
+
     param = world.to_parameter()
     world = JskMessyTableWorld.from_parameter(param)
     param_again = world.to_parameter()
-    world.table.translate([0.4, 0.0, 0.0])
     np.testing.assert_allclose(param, param_again)
-    print(param)
-    print(param_again)
+
     v = PyrenderViewer()
     world.visualize(v)
     v.show()
