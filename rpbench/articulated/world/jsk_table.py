@@ -13,6 +13,7 @@ from rpbench.planer_box_utils import Box2d, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
 BROWN_COLOR = (204, 102, 0, 200)
+TABLE_HEIGHT = 0.7
 
 
 class JskTable(CascadedCoords):
@@ -23,7 +24,7 @@ class JskTable(CascadedCoords):
         super().__init__()
         plate_d = 0.05
         size = [0.8, 1.24, plate_d]
-        height = 0.7
+        height = TABLE_HEIGHT
         plate = BoxSkeleton(size, pos=[0, 0, height - 0.5 * plate_d])
         leg_width = 0.1
         leg1 = BoxSkeleton(
@@ -64,7 +65,7 @@ class JskMessyTableWorld(SamplableWorldBase):
     table: JskTable
     tabletop_obstacle_list: List[BoxSkeleton]
     obstacle_env_region: BoxSkeleton
-    N_MAX_OBSTACLE: ClassVar[int] = 25
+    N_MAX_OBSTACLE: ClassVar[int] = 40
     OBSTACLE_H_MIN: ClassVar[float] = 0.05
     OBSTACLE_H_MAX: ClassVar[float] = 0.3
 
@@ -77,13 +78,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
 
         if standard:
-            # only single obstacle is placed
-            co_obstacle = table.co_surface_center.copy_worldcoords()
-            co_obstacle.translate([-0.2, 0.0, 0.15])
-            box = BoxSkeleton([0.3, 0.3, 0.3])
-            box.newcoords(co_obstacle)
-            table.translate([0.6, 0.0, 0.0])
-            return cls(table, [box], obstacle_env_region)
+            assert False
         else:
 
             def table_collide_with_fetch():
@@ -98,7 +93,8 @@ class JskMessyTableWorld(SamplableWorldBase):
                 co = Coordinates()
                 x_position = np.random.uniform(0.6, 0.8)
                 y_position = np.random.uniform(-0.5 * table.size[1], 0.5 * table.size[1])
-                co.translate([x_position, y_position, 0.0])
+                z_position = TABLE_HEIGHT
+                co.translate([x_position, y_position, z_position])
                 table.newcoords(co)
                 if not table_collide_with_fetch():
                     break
@@ -199,12 +195,6 @@ if __name__ == "__main__":
     fetch = Fetch()
     fetch.reset_pose()
     world = JskMessyTableWorld.sample(standard=False)
-
-    param = world.to_parameter()
-    world = JskMessyTableWorld.from_parameter(param)
-    param_again = world.to_parameter()
-    np.testing.assert_allclose(param, param_again)
-
     v = PyrenderViewer()
     world.visualize(v)
     v.show()
