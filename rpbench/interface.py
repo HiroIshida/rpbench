@@ -139,6 +139,7 @@ class SamplableWorldBase(ABC):
 
 class TaskWithWorldCondBase(TaskBase, Generic[WorldT, DescriptionT, RobotModelT]):
     world: WorldT
+    description: DescriptionT
 
     def __init__(self, world: WorldT, description: DescriptionT) -> None:
         self.world = world
