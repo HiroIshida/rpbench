@@ -57,7 +57,7 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         if use_matrix:
             world_vec = self.world.table.worldpos()[:2]
             world_mat = create_heightmap_z_slice(
-                self.world.obstacle_env_region, self.world.tabletop_obstacle_list, 56
+                self.world.obstacle_env_region, self.world.tabletop_obstacle_list, 112
             )
         else:
             world_vec = self.world.to_parameter()
