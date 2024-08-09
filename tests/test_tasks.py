@@ -13,7 +13,14 @@ from rpbench.articulated.jaxon.below_table import (
 )
 from rpbench.articulated.pr2.minifridge import FixedPR2MiniFridgeTask, PR2MiniFridgeTask
 from rpbench.interface import TaskBase
-from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
+
+try:
+    from rpbench.two_dimensional.bubbly_world import BubblySimpleMeshPointConnectTask
+
+    DISBMP_INSTALLED = True
+except ImportError:
+    DISBMP_INSTALLED = False
+
 from rpbench.two_dimensional.dummy import (
     DummyConfig,
     DummyMeshTask,
@@ -86,11 +93,12 @@ task_type_list = [
     HumanoidTableReachingTask,
     HumanoidTableClutteredReachingTask,
     HumanoidTableClutteredReachingTask2,
-    BubblySimpleMeshPointConnectTask,
     DummyTask,
     DummyMeshTask,
     ProbDummyTask,
 ]
+if DISBMP_INSTALLED:
+    task_type_list.append(BubblySimpleMeshPointConnectTask)
 
 
 @pytest.mark.parametrize("task_type", task_type_list)

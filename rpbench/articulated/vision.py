@@ -10,7 +10,20 @@ from skrobot.coordinates.geo import orient_coords_to_axis
 from skrobot.coordinates.math import matrix2quaternion, rotation_matrix_from_axis
 from skrobot.model.primitives import Axis, Coordinates
 from skrobot.sdf import UnionSDF
-from voxbloxpy.core import CameraPose, EsdfMap
+
+try:
+    from voxbloxpy.core import CameraPose, EsdfMap
+
+    VOXBLOX_INSTALLED = True
+except ImportError:
+
+    class CameraPose:
+        ...
+
+    class EsdfMap:
+        ...
+
+    VOXBLOX_INSTALLED = False
 
 from rpbench.articulated.world.utils import (
     BoxSkeleton,

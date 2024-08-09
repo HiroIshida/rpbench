@@ -3,7 +3,13 @@ from typing import Callable, List, Tuple
 import numpy as np
 import tqdm
 from skrobot.model.primitives import Sphere
-from voxbloxpy.core import EsdfMap, IntegratorType
+
+try:
+    from voxbloxpy.core import EsdfMap, IntegratorType
+
+    VOXBLOX_INSTALLED = True
+except ImportError:
+    VOXBLOX_INSTALLED = False
 
 from rpbench.articulated.vision import Camera, CameraConfig, RayMarchingConfig
 
@@ -53,6 +59,8 @@ def test_generate_point_cloud():
 
 
 def test_synthetic_esdf():
+    if not VOXBLOX_INSTALLED:
+        return
     radius = 0.4
     resol = 0.02
     sphere = Sphere(radius, with_sdf=True)
