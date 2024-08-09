@@ -2,13 +2,14 @@ from typing import Optional, Type
 
 import numpy as np
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, OMPLSolverResult, Problem
+from plainmp.psdf import UnionSDF
 from plainmp.robot_spec import FetchSpec
 from plainmp.utils import sksdf_to_cppsdf
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
 from skrobot.model.primitives import Axis
 from skrobot.models.fetch import Fetch
-from skrobot.sdf import UnionSDF
+from skrobot.sdf import UnionSDF as skUnionSDF
 from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.vision import create_heightmap_z_slice
@@ -31,9 +32,10 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
 
         pose_cst = fetch_spec.create_gripper_pose_const(np_pose)
 
-        sdfs = [sksdf_to_cppsdf(o.sdf) for o in self.world.get_all_obstacles()]
+        create_bvh = True
+        sdf = UnionSDF([sksdf_to_cppsdf(o.sdf) for o in self.world.get_all_obstacles()], create_bvh)
         ineq_cst = fetch_spec.create_collision_const()
-        ineq_cst.set_sdfs(sdfs)
+        ineq_cst.set_sdf(sdf)
 
         lb, ub = fetch_spec.angle_bounds()
         motion_step_box = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.2, 0.2]
@@ -84,7 +86,7 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
                 break
 
         # Collision check with objects on the table
-        sdf = UnionSDF([o.sdf for o in world.get_all_obstacles()])
+        sdf = skUnionSDF([o.sdf for o in world.get_all_obstacles()])
         dist = sdf(np.array([co.worldpos()]))[0]
         if dist < 0.1:
             return None
