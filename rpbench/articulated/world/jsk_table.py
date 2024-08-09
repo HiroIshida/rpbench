@@ -70,6 +70,22 @@ class JskMessyTableWorld(SamplableWorldBase):
     OBSTACLE_H_MAX: ClassVar[float] = 0.3
 
     @classmethod
+    def from_semantic_params(
+        cls, table_2dpos: np.ndarray, bbox_param_list: List[np.ndarray]
+    ) -> "JskMessyTableWorld":
+        """
+        Args:
+            table_2dpos: [x, y]
+            bbox_param_list: [[x, y, yaw, w, d, h], ...]
+        NOTE: all in world (robot's root) frame
+        """
+        param = np.zeros(2 + 6 * cls.N_MAX_OBSTACLE)
+        param[:2] = table_2dpos
+        for i, bbox in enumerate(bbox_param_list):
+            param[2 + 6 * i : 2 + 6 * (i + 1)] = bbox
+        return cls.from_parameter(param)
+
+    @classmethod
     def sample(cls, standard: bool = False) -> "JskMessyTableWorld":
         table = JskTable()
         region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]

@@ -1,4 +1,4 @@
-from typing import Optional, Type
+from typing import List, Optional, Type
 
 import numpy as np
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, OMPLSolverResult, Problem
@@ -19,6 +19,23 @@ from rpbench.interface import TaskExpression, TaskWithWorldCondBase
 
 class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):
     FETCH_REACHABLE_RADIUS = 1.0
+
+    @classmethod
+    def from_semantic_params(
+        cls, table_2dpos: np.ndarray, bbox_param_list: List[np.ndarray], target_pose: np.ndarray
+    ) -> "TidyupTableTask":
+        """
+        Args:
+            table_2dpos: 2D position of the table
+            bbox_param_list: List of bbox parameters [[x, y, yaw, w, d, h], ...]
+            target_pose: Reaching target pose (x, y, z, yaw)
+        NOTE: all in world (robot's root) frame
+        """
+        table = JskMessyTableWorld.from_semantic_params(table_2dpos, bbox_param_list)
+        co = Coordinates()
+        co.translate(target_pose[:3])
+        co.rotate(target_pose[3], [0, 0, 1])
+        return cls(table, co)
 
     @staticmethod
     def get_world_type() -> Type[JskMessyTableWorld]:
@@ -117,21 +134,24 @@ if __name__ == "__main__":
 
     from skmp.robot.utils import set_robot_state
 
-    while True:
-        task = TidyupTableTask.sample()
-        task = TidyupTableTask.from_task_param(task.to_task_param())
-        ret = task.solve_default()
-        if ret.traj is not None:
-            print(ret)
-            fs = FetchSpec()
-            fetch = Fetch()
-            fetch.reset_pose()
-            v = task.create_viewer()
-            v.add(fetch)
-            v.show()
-            time.sleep(1)
-            for q in ret.traj.numpy():
-                set_robot_state(fetch, fs.control_joint_names, q)
-                v.redraw()
-                time.sleep(0.3)
-            time.sleep(1000000000)
+    table_pos = np.array([0.8, 0.0])
+    bbox_param_list = [
+        np.array([0.8, 0.2, 0.4, 0.1, 0.1, 0.2]),
+        np.array([0.6, -0.4, 0.0, 0.1, 0.2, 0.25]),
+    ]
+    task = TidyupTableTask.from_semantic_params(table_pos, bbox_param_list, [0.6, 0.0, 0.8, 0.0])
+    ret = task.solve_default()
+    print(ret)
+    v = task.create_viewer()
+    fs = FetchSpec()
+    fetch = Fetch()
+    fetch.reset_pose()
+    v.add(fetch)
+    v.show()
+    time.sleep(1)
+
+    for q in ret.traj.numpy():
+        set_robot_state(fetch, fs.control_joint_names, q)
+        v.redraw()
+        time.sleep(0.3)
+    time.sleep(1000000000)
