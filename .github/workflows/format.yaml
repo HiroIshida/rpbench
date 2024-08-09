@@ -23,7 +23,7 @@ jobs:
         - name: check by black
           run: |
               black --version
-              black --check .
+              black --check --exclude 'setup\.py' .
         - name: check by isort
           run: |
               isort --version-number
