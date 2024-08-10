@@ -5,7 +5,6 @@ setup_requires = []
 install_requires = [
     "numpy",
     "scikit-motionplan",
-    "voxbloxpy",
     "threadpoolctl",
     "ycb_utils",
     "plainmp",
