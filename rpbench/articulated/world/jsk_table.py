@@ -13,18 +13,20 @@ from rpbench.planer_box_utils import Box2d, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
 BROWN_COLOR = (204, 102, 0, 200)
-TABLE_HEIGHT = 0.7
 
 
 class JskTable(CascadedCoords):
     size: List[float]
     table_primitives: List[BoxSkeleton]
+    TABLE_HEIGHT: ClassVar[float] = 0.7
+    TABLE_DEPTH: ClassVar[float] = 0.8
+    TABLE_WIDTH: ClassVar[float] = 1.24
 
     def __init__(self):
         super().__init__()
         plate_d = 0.05
-        size = [0.8, 1.24, plate_d]
-        height = TABLE_HEIGHT
+        size = [self.TABLE_DEPTH, self.TABLE_WIDTH, plate_d]
+        height = self.TABLE_HEIGHT
         plate = BoxSkeleton(size, pos=[0, 0, height - 0.5 * plate_d])
         leg_width = 0.1
         leg1 = BoxSkeleton(
@@ -66,8 +68,12 @@ class JskMessyTableWorld(SamplableWorldBase):
     tabletop_obstacle_list: List[BoxSkeleton]
     obstacle_env_region: BoxSkeleton
     N_MAX_OBSTACLE: ClassVar[int] = 40
+    OBSTACLE_W_MIN: ClassVar[float] = 0.05
+    OBSTACLE_W_MAX: ClassVar[float] = 0.2
     OBSTACLE_H_MIN: ClassVar[float] = 0.05
     OBSTACLE_H_MAX: ClassVar[float] = 0.3
+    TABLE_XPOS_MIN: ClassVar[float] = 0.6
+    TABLE_XPOS_MAX: ClassVar[float] = 0.8
 
     @classmethod
     def from_semantic_params(
@@ -84,6 +90,27 @@ class JskMessyTableWorld(SamplableWorldBase):
         for i, bbox in enumerate(bbox_param_list):
             param[2 + 6 * i : 2 + 6 * (i + 1)] = bbox
         return cls.from_parameter(param)
+
+    def is_out_of_distribution(self) -> bool:
+        if len(self.tabletop_obstacle_list) > self.N_MAX_OBSTACLE:
+            return True
+        co = self.table.copy_worldcoords()
+        pos = co.worldpos()
+        if not (self.TABLE_XPOS_MIN <= pos[0] <= self.TABLE_XPOS_MAX):
+            return True
+        if not (-0.5 * self.table.TABLE_WIDTH <= pos[1] <= 0.5 * self.table.TABLE_WIDTH):
+            return True
+        yaw = rpy_angle(co.worldrot())[0][0]
+        if not np.isclose(yaw, 0.0):
+            return True
+        for obs in self.tabletop_obstacle_list:
+            h = obs.extents[2]
+            if not (self.OBSTACLE_H_MIN <= h <= self.OBSTACLE_H_MAX):
+                return True
+            # TODO: check positions ...
+            # all obstacles are on the table and should not extend outside the table
+            # but checking this is bit tidious
+        return False
 
     @classmethod
     def sample(cls, standard: bool = False) -> "JskMessyTableWorld":
@@ -107,9 +134,9 @@ class JskMessyTableWorld(SamplableWorldBase):
 
             while True:
                 co = Coordinates()
-                x_position = np.random.uniform(0.6, 0.8)
+                x_position = np.random.uniform(cls.TABLE_XPOS_MIN, cls.TABLE_XPOS_MAX)
                 y_position = np.random.uniform(-0.5 * table.size[1], 0.5 * table.size[1])
-                z_position = TABLE_HEIGHT
+                z_position = table.TABLE_HEIGHT
                 co.translate([x_position, y_position, z_position])
                 table.newcoords(co)
                 if not table_collide_with_fetch():
@@ -124,8 +151,8 @@ class JskMessyTableWorld(SamplableWorldBase):
             region2d = Box2d(np.array(table.size[:2]), PlanerCoords.standard())
             obj2d_list = []  # type: ignore
             for _ in range(n_obstacle):
-                w = np.random.uniform(0.05, 0.2)
-                d = np.random.uniform(0.05, 0.2)
+                w = np.random.uniform(cls.OBSTACLE_W_MIN, cls.OBSTACLE_W_MAX)
+                d = np.random.uniform(cls.OBSTACLE_W_MIN, cls.OBSTACLE_W_MAX)
                 yaw = np.random.uniform(0.0, np.pi)
                 center = region2d.sample_point()
                 obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))  # type: ignore

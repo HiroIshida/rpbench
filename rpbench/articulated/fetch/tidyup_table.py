@@ -1,4 +1,4 @@
-from typing import List, Optional, Type
+from typing import ClassVar, List, Optional, Type
 
 import numpy as np
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, OMPLSolverResult, Problem
@@ -18,7 +18,11 @@ from rpbench.interface import TaskExpression, TaskWithWorldCondBase
 
 
 class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):
-    FETCH_REACHABLE_RADIUS = 1.0
+    FETCH_REACHABLE_RADIUS: ClassVar[float] = 1.0
+    REACHING_HEIGHT_MIN: ClassVar[float] = 0.07
+    REACHING_HEIGHT_MAX: ClassVar[float] = 0.2
+    REACHING_YAW_MIN: ClassVar[float] = -0.25 * np.pi
+    REACHING_YAW_MAX: ClassVar[float] = 0.25 * np.pi
 
     @classmethod
     def from_semantic_params(
@@ -89,13 +93,38 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         solver = OMPLSolver(conf)
         return solver.solve(prob)
 
+    def is_out_of_distribution(self) -> bool:
+        co = self.description
+        pos = co.worldpos()
+        table_pos = self.world.table.worldpos()
+        if self.world.is_out_of_distribution():
+            return True
+        if np.linalg.norm(pos[:2]) > self.FETCH_REACHABLE_RADIUS:
+            return True
+
+        if not abs(pos[0] - table_pos[0]) <= 0.5 * self.world.table.TABLE_DEPTH:
+            return True
+        if not abs(pos[1] - table_pos[1]) <= 0.5 * self.world.table.TABLE_WIDTH:
+            return True
+        if not (self.REACHING_HEIGHT_MIN <= pos[2] - table_pos[2] <= self.REACHING_HEIGHT_MAX):
+            return True
+        yaw = rpy_angle(co.worldrot())[0][0]
+        if not (self.REACHING_YAW_MIN <= yaw <= self.REACHING_YAW_MAX):
+            return True
+        # TODO: we need to check the collision with obstale condition...
+        return False
+
     @classmethod
     def sample_description(cls, world: JskMessyTableWorld) -> Optional[Coordinates]:
         while True:
-            x = np.random.uniform(low=-0.5 * world.table.size[0], high=0.5 * world.table.size[0])
-            y = np.random.uniform(low=-0.5 * world.table.size[1], high=0.5 * world.table.size[1])
-            z = np.random.uniform(low=0.07, high=0.2)
-            yaw = np.random.uniform(low=-0.25 * np.pi, high=0.25 * np.pi)
+            x = np.random.uniform(
+                low=-0.5 * world.table.TABLE_DEPTH, high=0.5 * world.table.TABLE_DEPTH
+            )
+            y = np.random.uniform(
+                low=-0.5 * world.table.TABLE_WIDTH, high=0.5 * world.table.TABLE_WIDTH
+            )
+            z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX)
+            yaw = np.random.uniform(low=cls.REACHING_YAW_MIN, high=cls.REACHING_YAW_MAX)
             co = world.table.copy_worldcoords()
             co.translate([x, y, z])
             co.rotate(yaw, [0, 0, 1])
