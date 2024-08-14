@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import ClassVar, List, Union
 
 import numpy as np
-from skrobot.coordinates import CascadedCoords, Coordinates
+from skrobot.coordinates import CascadedCoords, Coordinates, Transform
 from skrobot.coordinates.math import rpy_angle
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
@@ -72,36 +72,39 @@ class JskMessyTableWorld(SamplableWorldBase):
     OBSTACLE_W_MAX: ClassVar[float] = 0.2
     OBSTACLE_H_MIN: ClassVar[float] = 0.05
     OBSTACLE_H_MAX: ClassVar[float] = 0.3
-    TABLE_XPOS_MIN: ClassVar[float] = 0.6
-    TABLE_XPOS_MAX: ClassVar[float] = 0.8
+    FETCH_X_POS_MIN: ClassVar[float] = -0.8
+    FETCH_X_POS_MAX: ClassVar[float] = -0.6
+    FETCH_YAW_MIN: ClassVar[float] = -3.14159 * 0.25
+    FETCH_YAW_MAX: ClassVar[float] = +3.14159 * 0.25
 
     @classmethod
     def from_semantic_params(
-        cls, table_2dpos: np.ndarray, bbox_param_list: List[np.ndarray]
+        cls, relative_fetch_pose: np.ndarray, bbox_param_list: List[np.ndarray]
     ) -> "JskMessyTableWorld":
         """
         Args:
-            table_2dpos: [x, y]
-            bbox_param_list: [[x, y, yaw, w, d, h], ...]
+            relative_fetch_pose: [x, y, yaw]
+            bbox_param_list: [[x, y, yaw, w, d, h], ...] where x, y, yaw is relative to table
         NOTE: all in world (robot's root) frame
         """
-        param = np.zeros(2 + 6 * cls.N_MAX_OBSTACLE)
-        param[:2] = table_2dpos
+        param = np.zeros(3 + 6 * cls.N_MAX_OBSTACLE)
+        param[:3] = relative_fetch_pose
         for i, bbox in enumerate(bbox_param_list):
-            param[2 + 6 * i : 2 + 6 * (i + 1)] = bbox
+            param[3 + 6 * i : 3 + 6 * (i + 1)] = bbox
         return cls.from_parameter(param)
 
     def is_out_of_distribution(self) -> bool:
         if len(self.tabletop_obstacle_list) > self.N_MAX_OBSTACLE:
             return True
         co = self.table.copy_worldcoords()
-        pos = co.worldpos()
-        if not (self.TABLE_XPOS_MIN <= pos[0] <= self.TABLE_XPOS_MAX):
+        co_inv = co.inverse_transformation()
+        pos = co_inv.worldpos()
+        if not (self.FETCH_X_POS_MIN <= pos[0] <= self.FETCH_X_POS_MAX):
             return True
         if not (-0.5 * self.table.TABLE_WIDTH <= pos[1] <= 0.5 * self.table.TABLE_WIDTH):
             return True
         yaw = rpy_angle(co.worldrot())[0][0]
-        if not np.isclose(yaw, 0.0):
+        if not (self.FETCH_YAW_MIN <= yaw <= self.FETCH_YAW_MAX):
             return True
         for obs in self.tabletop_obstacle_list:
             h = obs.extents[2]
@@ -134,11 +137,15 @@ class JskMessyTableWorld(SamplableWorldBase):
 
             while True:
                 co = Coordinates()
-                x_position = np.random.uniform(cls.TABLE_XPOS_MIN, cls.TABLE_XPOS_MAX)
+                x_position = np.random.uniform(cls.FETCH_X_POS_MIN, cls.FETCH_X_POS_MAX)
                 y_position = np.random.uniform(-0.5 * table.size[1], 0.5 * table.size[1])
-                z_position = table.TABLE_HEIGHT
-                co.translate([x_position, y_position, z_position])
-                table.newcoords(co)
+                yaw = np.random.uniform(cls.FETCH_YAW_MIN, cls.FETCH_YAW_MAX)
+                co.translate([x_position, y_position, 0.0])
+                co.rotate(yaw, "z")
+                co_inv = co.inverse_transformation()
+                co_inv.translate([0.0, 0.0, table.TABLE_HEIGHT])
+
+                table.newcoords(co_inv)
                 if not table_collide_with_fetch():
                     break
 
@@ -188,32 +195,36 @@ class JskMessyTableWorld(SamplableWorldBase):
         pos = self.table.worldpos()
         rot = self.table.worldrot()
         ypr = rpy_angle(rot)[0]
-        np.testing.assert_allclose(ypr, np.zeros(3))
-        table_pose = np.array([pos[0], pos[1]])
+        table_pose = np.array([pos[0], pos[1], ypr[0]])
 
         head = 0
         obstacle_param = np.zeros(6 * self.N_MAX_OBSTACLE)
         for obs in self.tabletop_obstacle_list:
-            pos = obs.worldpos()
-            rot = obs.worldrot()
-            ypr = rpy_angle(rot)[0]
-            obstacle_pose = np.array([pos[0], pos[1], ypr[0]])
+            tf_table2world = self.table.get_transform()
+            tf_obs2world: Transform = obs.get_transform()
+            tf_obs2table: Transform = tf_obs2world * tf_table2world.inverse_transformation()
+
+            obs_pos = tf_obs2table.translation
+            obs_rot = tf_obs2table.rotation
+            obs_ypr = rpy_angle(obs_rot)[0]
+            obstacle_pose = np.array([obs_pos[0], obs_pos[1], obs_ypr[0]])
             obstacle_param[head : head + 6] = np.hstack([obstacle_pose, obs.extents])
             head += 6
         return np.hstack([table_pose, obstacle_param])
 
     @classmethod
     def from_parameter(cls, param: np.ndarray) -> "JskMessyTableWorld":
-        table_pose = param[:2]
+        table_pose = param[:3]
         table = JskTable()
-        table.translate(np.hstack([table_pose, 0]))
+        table.translate(np.hstack([table_pose[:2], 0]))
+        table.rotate(table_pose[2], "z")
 
         region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
         obstacle_env_region = BoxSkeleton(region_size)
         table.assoc(obstacle_env_region, relative_coords="local")
         obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
 
-        obstacle_param = param[2:]
+        obstacle_param = param[3:]
         n_obstacle = len(obstacle_param) // 6
         obstacle_list = []
         head = 0
@@ -223,8 +234,8 @@ class JskMessyTableWorld(SamplableWorldBase):
                 break
             pose_param, extent = sub_param[:3], sub_param[3:]
             box = BoxSkeleton(extent)
-            trans = table.worldpos()[2] + 0.5 * extent[2]
-            box.translate(np.hstack([pose_param[:2], trans]))
+            box.newcoords(table.copy_worldcoords())
+            box.translate(np.hstack([pose_param[:2], 0.5 * extent[2]]))
             box.rotate(pose_param[2], "z")
             obstacle_env_region.assoc(box, relative_coords="world")
             obstacle_list.append(box)
@@ -235,9 +246,15 @@ class JskMessyTableWorld(SamplableWorldBase):
 if __name__ == "__main__":
     from skrobot.models import Fetch
 
+    # np.random.seed(1)
+
     fetch = Fetch()
     fetch.reset_pose()
     world = JskMessyTableWorld.sample(standard=False)
+    assert not world.is_out_of_distribution()
+    param = world.to_parameter()
+    world = world.from_parameter(param)
+    assert not world.is_out_of_distribution()
     v = PyrenderViewer()
     world.visualize(v)
     v.show()
