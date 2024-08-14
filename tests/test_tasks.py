@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from ompl import set_ompl_random_seed
 
+from rpbench.articulated.fetch.tidyup_table import TidyupTableTask
 from rpbench.articulated.jaxon.below_table import (
     HumanoidTableClutteredReachingTask,
     HumanoidTableClutteredReachingTask2,
@@ -86,6 +87,7 @@ def test_prob_dummy_task():
 
 
 task_type_list = [
+    TidyupTableTask,
     FixedPR2MiniFridgeTask,
     PR2MiniFridgeTask,
     HumanoidTableReachingTask3,
