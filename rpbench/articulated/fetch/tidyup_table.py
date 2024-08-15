@@ -19,27 +19,31 @@ from rpbench.interface import TaskExpression, TaskWithWorldCondBase
 
 class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):
     FETCH_REACHABLE_RADIUS: ClassVar[float] = 1.0
-    REACHING_HEIGHT_MIN: ClassVar[float] = 0.07
-    REACHING_HEIGHT_MAX: ClassVar[float] = 0.2
-    REACHING_YAW_MIN: ClassVar[float] = -0.25 * np.pi
-    REACHING_YAW_MAX: ClassVar[float] = 0.25 * np.pi
+    RELATIVE_REACHING_HEIGHT_MIN: ClassVar[float] = 0.07
+    RELATIVE_REACHING_HEIGHT_MAX: ClassVar[float] = 0.2
+    RELATIVE_REACHING_YAW_MIN: ClassVar[float] = -0.25 * np.pi
+    RELATIVE_REACHING_YAW_MAX: ClassVar[float] = 0.25 * np.pi
+    MAX_ATTACK_ANGLE: ClassVar[float] = 0.5 * np.pi
 
     @classmethod
     def from_semantic_params(
-        cls, table_2dpos: np.ndarray, bbox_param_list: List[np.ndarray], target_pose: np.ndarray
+        cls,
+        relative_fetch_pose: np.ndarray,
+        bbox_param_list: List[np.ndarray],
+        relative_target_pose: np.ndarray,
     ) -> "TidyupTableTask":
         """
         Args:
-            table_2dpos: 2D position of the table
-            bbox_param_list: List of bbox parameters [[x, y, yaw, w, d, h], ...]
+            relative_fetch_pose: [x, y, yaw]
+            bbox_param_list: List of bbox parameters [[x, y, yaw, w, d, h], ...] where pose of the bbox is relative to table
             target_pose: Reaching target pose (x, y, z, yaw)
         NOTE: all in world (robot's root) frame
         """
-        table = JskMessyTableWorld.from_semantic_params(table_2dpos, bbox_param_list)
-        co = Coordinates()
-        co.translate(target_pose[:3])
-        co.rotate(target_pose[3], [0, 0, 1])
-        return cls(table, co)
+        world = JskMessyTableWorld.from_semantic_params(relative_fetch_pose, bbox_param_list)
+        co = world.table.copy_worldcoords()
+        co.translate(relative_target_pose[:3])
+        co.rotate(relative_target_pose[3], "z")
+        return cls(world, co)
 
     @staticmethod
     def get_world_type() -> Type[JskMessyTableWorld]:
@@ -64,9 +68,9 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
 
     @classmethod
     def from_task_param(cls: Type["TidyupTableTask"], param: np.ndarray) -> "TidyupTableTask":
-        world_param, other_param = param[:-4], param[-4:]
+        world_param, relative_reaching_pose = param[:-4], param[-4:]
         world = JskMessyTableWorld.from_parameter(world_param)
-        x, y, z, yaw = other_param
+        x, y, z, yaw = relative_reaching_pose
         co = Coordinates()
         co.translate([x, y, z])
         co.rotate(yaw, [0, 0, 1])
@@ -94,22 +98,29 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         return solver.solve(prob)
 
     def is_out_of_distribution(self) -> bool:
-        co = self.description
-        pos = co.worldpos()
-        table_pos = self.world.table.worldpos()
         if self.world.is_out_of_distribution():
             return True
-        if np.linalg.norm(pos[:2]) > self.FETCH_REACHABLE_RADIUS:
+
+        co_reaching = self.description
+        # check in world coords
+        xy_pos = co_reaching.worldpos()[:2]
+        if np.linalg.norm(xy_pos) > self.FETCH_REACHABLE_RADIUS:
+            return True
+        yaw = rpy_angle(co_reaching.worldrot())[0][0]
+        if abs(yaw) > self.MAX_ATTACK_ANGLE:
             return True
 
-        if not abs(pos[0] - table_pos[0]) <= 0.5 * self.world.table.TABLE_DEPTH:
+        # check in table coords
+        tf_reach2world = co_reaching.get_transform()
+        tf_table2world = self.world.table.get_transform()
+        tf_reach2table = tf_reach2world * tf_table2world.inverse_transformation()
+        x, y, _ = tf_reach2table.translation
+        if not abs(x) <= 0.5 * self.world.table.TABLE_DEPTH:
             return True
-        if not abs(pos[1] - table_pos[1]) <= 0.5 * self.world.table.TABLE_WIDTH:
+        if not abs(y) <= 0.5 * self.world.table.TABLE_WIDTH:
             return True
-        if not (self.REACHING_HEIGHT_MIN <= pos[2] - table_pos[2] <= self.REACHING_HEIGHT_MAX):
-            return True
-        yaw = rpy_angle(co.worldrot())[0][0]
-        if not (self.REACHING_YAW_MIN <= yaw <= self.REACHING_YAW_MAX):
+        yaw = rpy_angle(tf_reach2table.rotation)[0][0]
+        if not (self.RELATIVE_REACHING_YAW_MIN <= yaw <= self.RELATIVE_REACHING_YAW_MAX):
             return True
         # TODO: we need to check the collision with obstale condition...
         return False
@@ -123,23 +134,31 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
             y = np.random.uniform(
                 low=-0.5 * world.table.TABLE_WIDTH, high=0.5 * world.table.TABLE_WIDTH
             )
-            z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX)
-            yaw = np.random.uniform(low=cls.REACHING_YAW_MIN, high=cls.REACHING_YAW_MAX)
+            z = np.random.uniform(low=cls.RELATIVE_REACHING_HEIGHT_MIN, high=cls.RELATIVE_REACHING_HEIGHT_MAX)
+            yaw = np.random.uniform(low=cls.RELATIVE_REACHING_YAW_MIN, high=cls.RELATIVE_REACHING_YAW_MAX)
             co = world.table.copy_worldcoords()
             co.translate([x, y, z])
             co.rotate(yaw, [0, 0, 1])
-            if np.linalg.norm(co.worldpos()[:2]) < cls.FETCH_REACHABLE_RADIUS:
+            if np.linalg.norm(co.worldpos()[:2]) > cls.FETCH_REACHABLE_RADIUS:
+                continue
+            ypr = rpy_angle(co.worldrot())[0]
+            yaw = ypr[0]
+            if abs(yaw) < cls.MAX_ATTACK_ANGLE:
                 break
 
         # Collision check with objects on the table
-        sdf = skUnionSDF([o.sdf for o in world.get_all_obstacles()])
-        dist = sdf(np.array([co.worldpos()]))[0]
-        if dist < 0.1:
+        fs = FetchSpec()
+        cst = fs.create_collision_const(False)
+        sksdf = skUnionSDF([o.sdf for o in world.get_all_obstacles()])
+        sdf = sksdf_to_cppsdf(sksdf)
+        cst.set_sdf(sdf)
+        if not cst.is_valid(fs.q_reset_pose()):
             return None
 
         co_slided = co.copy_worldcoords()
         co_slided.translate([-0.1, 0.0, 0.0])
-        dist = sdf(np.array([co_slided.worldpos()]))[0]
+        point = np.array(co_slided.worldpos())
+        dist = sdf.evaluate(point)
         if dist < 0.1:
             return None
 
@@ -163,14 +182,16 @@ if __name__ == "__main__":
 
     from skmp.robot.utils import set_robot_state
 
-    table_pos = np.array([0.8, 0.0])
+    np.random.seed(0)
+
+    table_pos = np.array([0.8, 0.0, 0.6])
     bbox_param_list = [
         np.array([0.8, 0.2, 0.4, 0.1, 0.1, 0.2]),
         np.array([0.6, -0.4, 0.0, 0.1, 0.2, 0.25]),
     ]
-    task = TidyupTableTask.from_semantic_params(table_pos, bbox_param_list, [0.6, 0.0, 0.8, 0.0])
-    ret = task.solve_default()
-    print(ret)
+    # task = TidyupTableTask.from_semantic_params(table_pos, bbox_param_list, [-0.3, 0.0, 0.1, 0.0])
+    task = TidyupTableTask.sample()
+    task = task.from_task_param(task.to_task_param())
     v = task.create_viewer()
     fs = FetchSpec()
     fetch = Fetch()
@@ -179,8 +200,15 @@ if __name__ == "__main__":
     v.show()
     time.sleep(1)
 
-    for q in ret.traj.numpy():
-        set_robot_state(fetch, fs.control_joint_names, q)
-        v.redraw()
-        time.sleep(0.3)
-    time.sleep(1000000000)
+    solve = False
+
+    if solve:
+        ret = task.solve_default()
+
+        for q in ret.traj.numpy():
+            set_robot_state(fetch, fs.control_joint_names, q)
+            v.redraw()
+            time.sleep(0.3)
+        time.sleep(1000000000)
+    else:
+        time.sleep(1000000000)
