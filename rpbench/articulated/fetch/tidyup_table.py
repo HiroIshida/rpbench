@@ -151,14 +151,18 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
                 break
 
         # Collision check with objects on the table
-        sdf = skUnionSDF([o.sdf for o in world.get_all_obstacles()])
-        dist = sdf(np.array([co.worldpos()]))[0]
-        if dist < 0.1:
+        fs = FetchSpec()
+        cst = fs.create_collision_const(False)
+        sksdf = skUnionSDF([o.sdf for o in world.get_all_obstacles()])
+        sdf = sksdf_to_cppsdf(sksdf)
+        cst.set_sdf(sdf)
+        if not cst.is_valid(fs.q_reset_pose()):
             return None
 
         co_slided = co.copy_worldcoords()
         co_slided.translate([-0.1, 0.0, 0.0])
-        dist = sdf(np.array([co_slided.worldpos()]))[0]
+        point = np.array(co_slided.worldpos())
+        dist = sdf.evaluate(point)
         if dist < 0.1:
             return None
 
