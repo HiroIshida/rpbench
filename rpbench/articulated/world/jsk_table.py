@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import ClassVar, List, Union
 
 import numpy as np
-from skrobot.coordinates import CascadedCoords, Coordinates, Transform
+from skrobot.coordinates import CascadedCoords, Coordinates, Transform, rpy_matrix
 from skrobot.coordinates.math import rpy_angle
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
@@ -88,7 +88,17 @@ class JskMessyTableWorld(SamplableWorldBase):
         NOTE: all in world (robot's root) frame
         """
         param = np.zeros(3 + 6 * cls.N_MAX_OBSTACLE)
-        param[:3] = relative_fetch_pose
+
+        # convert relative fetch_pose to table pose
+        tf_fetch2table = Transform(
+            np.hstack([relative_fetch_pose[:2], 0.0]), rpy_matrix(relative_fetch_pose[2], 0, 0)
+        )
+        tf_table2fetch = tf_fetch2table.inverse_transformation()
+        table_pose_param = np.hstack(
+            [tf_table2fetch.translation[:2], rpy_angle(tf_table2fetch.rotation)[0][0]]
+        )
+        param[:3] = table_pose_param
+
         for i, bbox in enumerate(bbox_param_list):
             param[3 + 6 * i : 3 + 6 * (i + 1)] = bbox
         return cls.from_parameter(param)
