@@ -7,7 +7,7 @@ install_requires = [
     "scikit-motionplan",
     "threadpoolctl",
     "ycb_utils",
-    "plainmp",
+    "plainmp>=0.0.2",
 ]
 
 setup(
