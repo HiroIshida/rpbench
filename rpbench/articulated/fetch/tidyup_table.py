@@ -1,10 +1,6 @@
 from typing import ClassVar, List, Optional, Type
 
 import numpy as np
-from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, OMPLSolverResult, Problem
-from plainmp.psdf import UnionSDF
-from plainmp.robot_spec import FetchSpec
-from plainmp.utils import sksdf_to_cppsdf
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
 from skrobot.model.primitives import Axis
@@ -15,6 +11,19 @@ from skrobot.viewers import PyrenderViewer
 from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.jsk_table import JskMessyTableWorld
 from rpbench.interface import TaskExpression, TaskWithWorldCondBase
+
+try:
+    from plainmp.ompl_solver import (
+        OMPLSolver,
+        OMPLSolverConfig,
+        OMPLSolverResult,
+        Problem,
+    )
+    from plainmp.psdf import UnionSDF
+    from plainmp.robot_spec import FetchSpec
+    from plainmp.utils import sksdf_to_cppsdf
+except ImportError:
+    raise ImportError("Please install plainmp (private repo) to run this task.")
 
 
 class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):

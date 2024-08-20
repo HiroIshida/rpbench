@@ -7,8 +7,9 @@ install_requires = [
     "scikit-motionplan",
     "threadpoolctl",
     "ycb_utils",
-    "plainmp>=0.0.2",
 ]
+private_requires = ["plainmp>=0.0.2"]
+
 
 setup(
     name="rpbench",
@@ -17,6 +18,7 @@ setup(
     author="Hirokazu Ishida",
     author_email="h-ishida@jsk.imi.i.u-tokyo.ac.jp",
     install_requires=install_requires,
+    extras_require={"private": private_requires},
     packages=find_packages(exclude=("tests", "docs")),
     package_data={"rpbench": ["py.typed"]},
 )

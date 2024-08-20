@@ -4,7 +4,12 @@ import numpy as np
 import pytest
 from ompl import set_ompl_random_seed
 
-from rpbench.articulated.fetch.tidyup_table import TidyupTableTask
+try:
+    from rpbench.articulated.fetch.tidyup_table import TidyupTableTask
+
+    PLAINMP_INSTALLED = True
+except ImportError:
+    PLAINMP_INSTALLED = False
 from rpbench.articulated.jaxon.below_table import (
     HumanoidTableClutteredReachingTask,
     HumanoidTableClutteredReachingTask2,
@@ -87,7 +92,6 @@ def test_prob_dummy_task():
 
 
 task_type_list = [
-    TidyupTableTask,
     FixedPR2MiniFridgeTask,
     PR2MiniFridgeTask,
     HumanoidTableReachingTask3,
@@ -99,6 +103,8 @@ task_type_list = [
     DummyMeshTask,
     ProbDummyTask,
 ]
+if PLAINMP_INSTALLED:
+    task_type_list.append(TidyupTableTask)
 if DISBMP_INSTALLED:
     task_type_list.append(BubblySimpleMeshPointConnectTask)
 
