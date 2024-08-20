@@ -267,7 +267,7 @@ class JskMessyTableWorld2(JskMessyTableWorldBase):
     @classmethod
     def get_table_position_minmax(cls) -> Tuple[float, float, float, float]:
         margin = 0.2
-        return 0.82, 1.0, JskTable.TABLE_DEPTH * -0.5 - margin, JskTable.TABLE_DEPTH * 0.5 + margin
+        return 0.9, 1.1, JskTable.TABLE_DEPTH * -0.5 - margin, JskTable.TABLE_DEPTH * 0.5 + margin
 
 
 if __name__ == "__main__":

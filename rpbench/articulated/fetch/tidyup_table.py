@@ -1,4 +1,5 @@
-from typing import ClassVar, List, Optional, Type
+from abc import abstractmethod
+from typing import ClassVar, List, Optional, Tuple, Type
 
 import numpy as np
 from skrobot.coordinates import Coordinates
@@ -9,7 +10,12 @@ from skrobot.sdf import UnionSDF as skUnionSDF
 from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.vision import create_heightmap_z_slice
-from rpbench.articulated.world.jsk_table import JskMessyTableWorld
+from rpbench.articulated.world.jsk_table import (
+    JskMessyTableWorld,
+    JskMessyTableWorld2,
+    JskMessyTableWorldBase,
+    JskTable,
+)
 from rpbench.interface import TaskExpression, TaskWithWorldCondBase
 
 try:
@@ -26,7 +32,7 @@ except ImportError:
     raise ImportError("Please install plainmp (private repo) to run this task.")
 
 
-class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):
+class TidyupTableTaskBase(TaskWithWorldCondBase[JskMessyTableWorldBase, Coordinates, None]):
     FETCH_REACHABLE_RADIUS: ClassVar[float] = 1.0
     REACHING_HEIGHT_MIN: ClassVar[float] = 0.07
     REACHING_HEIGHT_MAX: ClassVar[float] = 0.2
@@ -36,7 +42,7 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
     @classmethod
     def from_semantic_params(
         cls, table_2dpos: np.ndarray, bbox_param_list: List[np.ndarray], target_pose: np.ndarray
-    ) -> "TidyupTableTask":
+    ) -> "TidyupTableTaskBase":
         """
         Args:
             table_2dpos: 2D position of the table
@@ -44,15 +50,12 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
             target_pose: Reaching target pose (x, y, z, yaw)
         NOTE: all in world (robot's root) frame
         """
-        table = JskMessyTableWorld.from_semantic_params(table_2dpos, bbox_param_list)
+        wt = cls.get_world_type()
+        table = wt.from_semantic_params(table_2dpos, bbox_param_list)
         co = Coordinates()
         co.translate(target_pose[:3])
         co.rotate(target_pose[3], [0, 0, 1])
         return cls(table, co)
-
-    @staticmethod
-    def get_world_type() -> Type[JskMessyTableWorld]:
-        return JskMessyTableWorld
 
     def export_problem(self) -> Problem:
         fetch_spec = FetchSpec()
@@ -72,9 +75,12 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         return Problem(fetch_spec.q_reset_pose(), lb, ub, pose_cst, ineq_cst, None, motion_step_box)
 
     @classmethod
-    def from_task_param(cls: Type["TidyupTableTask"], param: np.ndarray) -> "TidyupTableTask":
+    def from_task_param(
+        cls: Type["TidyupTableTaskBase"], param: np.ndarray
+    ) -> "TidyupTableTaskBase":
         world_param, other_param = param[:-4], param[-4:]
-        world = JskMessyTableWorld.from_parameter(world_param)
+        wt = cls.get_world_type()
+        world = wt.from_parameter(world_param)
         x, y, z, yaw = other_param
         co = Coordinates()
         co.translate([x, y, z])
@@ -102,6 +108,12 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         solver = OMPLSolver(conf)
         return solver.solve(prob)
 
+    @classmethod
+    @abstractmethod
+    def reaching_target_xy_minmax(cls) -> Tuple[float, float, float, float]:
+        # return (x_min, x_max, y_min, y_max)
+        pass
+
     def is_out_of_distribution(self) -> bool:
         co = self.description
         pos = co.worldpos()
@@ -111,6 +123,7 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         if np.linalg.norm(pos[:2]) > self.FETCH_REACHABLE_RADIUS:
             return True
 
+        assert False, "TODO: implement the collision check with the table"
         if not abs(pos[0] - table_pos[0]) <= 0.5 * self.world.table.TABLE_DEPTH:
             return True
         if not abs(pos[1] - table_pos[1]) <= 0.5 * self.world.table.TABLE_WIDTH:
@@ -124,14 +137,11 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         return False
 
     @classmethod
-    def sample_description(cls, world: JskMessyTableWorld) -> Optional[Coordinates]:
+    def sample_description(cls, world: JskMessyTableWorldBase) -> Optional[Coordinates]:
         while True:
-            x = np.random.uniform(
-                low=-0.5 * world.table.TABLE_DEPTH, high=0.5 * world.table.TABLE_DEPTH
-            )
-            y = np.random.uniform(
-                low=-0.5 * world.table.TABLE_WIDTH, high=0.5 * world.table.TABLE_WIDTH
-            )
+            x_min, x_max, y_min, y_max = cls.reaching_target_xy_minmax()
+            x = np.random.uniform(low=x_min, high=x_max)
+            y = np.random.uniform(low=y_min, high=y_max)
             z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX)
             yaw = np.random.uniform(low=cls.REACHING_YAW_MIN, high=cls.REACHING_YAW_MAX)
             co = world.table.copy_worldcoords()
@@ -167,17 +177,44 @@ class TidyupTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, Non
         return v
 
 
+class TidyupTableTask(TidyupTableTaskBase):
+    @classmethod
+    def reaching_target_xy_minmax(cls) -> Tuple[float, float, float, float]:
+        return (
+            -0.5 * JskTable.TABLE_DEPTH,
+            0.5 * JskTable.TABLE_DEPTH,
+            -0.5 * JskTable.TABLE_WIDTH,
+            0.5 * JskTable.TABLE_WIDTH,
+        )
+
+    @staticmethod
+    def get_world_type() -> Type[JskMessyTableWorld]:
+        return JskMessyTableWorld
+
+
+class TidyupTableTask2(TidyupTableTaskBase):
+    @classmethod
+    def reaching_target_xy_minmax(cls) -> Tuple[float, float, float, float]:
+        return (
+            -0.5 * JskTable.TABLE_WIDTH,
+            0.5 * JskTable.TABLE_WIDTH,
+            -0.5 * JskTable.TABLE_DEPTH,
+            0.5 * JskTable.TABLE_DEPTH,
+        )
+
+    @staticmethod
+    def get_world_type() -> Type[JskMessyTableWorld2]:
+        return JskMessyTableWorld2
+
+
 if __name__ == "__main__":
     import time
 
     from skmp.robot.utils import set_robot_state
 
     table_pos = np.array([0.8, 0.0])
-    bbox_param_list = [
-        np.array([0.8, 0.2, 0.4, 0.1, 0.1, 0.2]),
-        np.array([0.6, -0.4, 0.0, 0.1, 0.2, 0.25]),
-    ]
-    task = TidyupTableTask.from_semantic_params(table_pos, bbox_param_list, [0.6, 0.0, 0.8, 0.0])
+    bbox_param_list = []
+    task = TidyupTableTask2.from_semantic_params(table_pos, bbox_param_list, [0.6, 0.0, 0.8, 0.0])
     ret = task.solve_default()
     print(ret)
     v = task.create_viewer()
