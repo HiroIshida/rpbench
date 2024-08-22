@@ -25,7 +25,7 @@ try:
         OMPLSolverResult,
         Problem,
     )
-    from plainmp.psdf import UnionSDF
+    from plainmp.psdf import GroundSDF, UnionSDF
     from plainmp.robot_spec import FetchSpec
     from plainmp.utils import sksdf_to_cppsdf
 except ImportError:
@@ -65,8 +65,11 @@ class TidyupTableTaskBase(TaskWithWorldCondBase[JskMessyTableWorldBase, Coordina
 
         pose_cst = fetch_spec.create_gripper_pose_const(np_pose)
 
+        sdf_list = [sksdf_to_cppsdf(o.sdf) for o in self.world.get_all_obstacles()] + [
+            GroundSDF(0.0)
+        ]
         create_bvh = False  # plainmp bvh is buggy
-        sdf = UnionSDF([sksdf_to_cppsdf(o.sdf) for o in self.world.get_all_obstacles()], create_bvh)
+        sdf = UnionSDF(sdf_list, create_bvh)
         ineq_cst = fetch_spec.create_collision_const()
         ineq_cst.set_sdf(sdf)
 
