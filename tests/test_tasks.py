@@ -5,7 +5,7 @@ import pytest
 from ompl import set_ompl_random_seed
 
 try:
-    from rpbench.articulated.fetch.tidyup_table import TidyupTableTask
+    from rpbench.articulated.fetch.tidyup_table import TidyupTableTask, TidyupTableTask2
 
     PLAINMP_INSTALLED = True
 except ImportError:
@@ -104,7 +104,7 @@ task_type_list = [
     ProbDummyTask,
 ]
 if PLAINMP_INSTALLED:
-    task_type_list.append(TidyupTableTask)
+    task_type_list.extend([TidyupTableTask, TidyupTableTask2])
 if DISBMP_INSTALLED:
     task_type_list.append(BubblySimpleMeshPointConnectTask)
 
