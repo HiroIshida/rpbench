@@ -144,7 +144,8 @@ class TidyupTableTaskBase(TaskWithWorldCondBase[JskMessyTableWorldBase, Coordina
             y = np.random.uniform(low=y_min, high=y_max)
             z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX)
             yaw = np.random.uniform(low=cls.REACHING_YAW_MIN, high=cls.REACHING_YAW_MAX)
-            co = world.table.copy_worldcoords()
+            table_pos = world.table.worldpos()
+            co = Coordinates(table_pos)
             co.translate([x, y, z])
             co.rotate(yaw, [0, 0, 1])
             if np.linalg.norm(co.worldpos()[:2]) < cls.FETCH_REACHABLE_RADIUS:
