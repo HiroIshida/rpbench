@@ -105,9 +105,6 @@ class JskMessyTableWorldBase(SamplableWorldBase):
             return True
         if not (y_min <= pos[1] <= y_max):
             return True
-        yaw = rpy_angle(co.worldrot())[0][0]
-        if not np.isclose(yaw, 0.0):
-            return True
         for obs in self.tabletop_obstacle_list:
             h = obs.extents[2]
             if not (self.OBSTACLE_H_MIN <= h <= self.OBSTACLE_H_MAX):
