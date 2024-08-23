@@ -123,10 +123,10 @@ class TidyupTableTaskBase(TaskWithWorldCondBase[JskMessyTableWorldBase, Coordina
         if np.linalg.norm(pos[:2]) > self.FETCH_REACHABLE_RADIUS:
             return True
 
-        assert False, "TODO: implement the collision check with the table"
-        if not abs(pos[0] - table_pos[0]) <= 0.5 * self.world.table.TABLE_DEPTH:
+        x_min, x_max, y_min, y_max = self.reaching_target_xy_minmax()
+        if not (x_min <= pos[0] - table_pos[0] <= x_max):
             return True
-        if not abs(pos[1] - table_pos[1]) <= 0.5 * self.world.table.TABLE_WIDTH:
+        if not (y_min <= pos[1] - table_pos[1] <= y_max):
             return True
         if not (self.REACHING_HEIGHT_MIN <= pos[2] - table_pos[2] <= self.REACHING_HEIGHT_MAX):
             return True
