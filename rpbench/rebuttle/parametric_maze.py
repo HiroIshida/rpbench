@@ -63,7 +63,7 @@ class PureRRTC(AbstractSolver[PureRRTCConfig, PureRRTCResult, Trajectory]):
         self.ertc = ERTConnectPlanner(
             [0, 0], [1, 1], is_valid, self.config.n_max_call, [0.001, 0.001]
         )
-        self.ertc.set_parameters(eps=0.1)
+        self.ertc.set_parameters(eps=0.5)
 
     def _solve(self, guiding_traj: Optional[Trajectory]) -> PureRRTCResult:
         if guiding_traj is None:
@@ -88,7 +88,7 @@ class PureRRTC(AbstractSolver[PureRRTCConfig, PureRRTCResult, Trajectory]):
 
 class ParametricMaze:
     wall_thickness = 0.03
-    holl_width = 0.03
+    holl_width = 0.05
 
     def __init__(self, param: np.ndarray):
         self.n = len(param)
@@ -162,7 +162,7 @@ class ParametricMazeTaskBase(TaskBase):
     dof: ClassVar[int]
 
     @classmethod
-    def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTask":
+    def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTaskBase":
         return cls(ParametricMaze(param))
 
     @classmethod
@@ -216,6 +216,19 @@ class ParametricMazeTaskD6(ParametricMazeTaskBase):
 
 
 if __name__ == "__main__":
-    task = ParametricMazeTaskD6.sample()
+    task = ParametricMazeTaskD5.sample()
     r = task.solve_default()
-    task.world.visualize(r.traj)
+    assert r.traj is not None
+    solver_conf = PureRRTCConfig(n_max_call=1000000)
+    solver = PureRRTC.init(solver_conf)
+    exp = task.export_task_expression(False)
+    param = exp.get_vector()
+    param += 0.05
+    task2 = ParametricMazeTaskD6.from_task_param(param)
+    task2.world.visualize()
+    p = task2.export_problem()
+    solver.setup(p)
+    r = solver.solve(r.traj)
+    task2.world.visualize(r.traj)
+
+
