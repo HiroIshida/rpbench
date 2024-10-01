@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, Type
+from typing import Callable, ClassVar, Optional, Tuple, Type
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -27,13 +27,14 @@ class PureRRTCResult(ResultProtocol):
 class PureRRTCConfig(ConfigProtocol):
     n_max_call: int = 300000
     timeout: Optional[float] = None
+    simplify: bool = False
 
 
 @dataclass
 class PureProblem:
     start: np.ndarray
     goal: np.ndarray
-    is_valid: Callable[Tuple[float, float], bool]
+    is_valid: Callable[[Tuple[float, float]], bool]
 
     def check_init_feasibility(self):
         return True, "dummy"
@@ -66,10 +67,14 @@ class PureRRTC(AbstractSolver[PureRRTCConfig, PureRRTCResult, Trajectory]):
 
     def _solve(self, guiding_traj: Optional[Trajectory]) -> PureRRTCResult:
         if guiding_traj is None:
-            ret = self.rrtc.solve(self.problem.start, self.problem.goal)
+            ret = self.rrtc.solve(
+                self.problem.start, self.problem.goal, simplify=self.config.simplify
+            )
         else:
             self.ertc.set_heuristic(guiding_traj.numpy())
-            ret = self.ertc.solve(self.problem.start, self.problem.goal, guiding_traj)
+            ret = self.ertc.solve(
+                self.problem.start, self.problem.goal, simplify=self.config.simplify
+            )
         if ret is None:
             self._n_call = 0
             return PureRRTCResult.abnormal()
@@ -154,6 +159,7 @@ class ParametricMaze:
 @dataclass
 class ParametricMazeTaskBase(TaskBase):
     world: ParametricMaze
+    dof: ClassVar[int]
 
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTask":
@@ -165,7 +171,7 @@ class ParametricMazeTaskBase(TaskBase):
         predicate: Optional[Callable] = None,
         timeout: int = 180,
     ) -> "ParametricMazeTaskBase":
-        task = cls(ParametricMaze.sample(8))
+        task = cls(ParametricMaze.sample(cls.dof))
         return task
 
     def sample_description(self) -> None:
@@ -175,7 +181,7 @@ class ParametricMazeTaskBase(TaskBase):
         return TaskExpression(self.world.holl_xs, None, np.empty(0))
 
     def solve_default(self) -> PureRRTCResult:
-        conf = PureRRTCConfig(n_max_call=500000)
+        conf = PureRRTCConfig(n_max_call=1000000, simplify=True)
         solver = PureRRTC.init(conf)
         solver.setup(self.export_problem())
         return solver.solve()
@@ -185,7 +191,31 @@ class ParametricMazeTaskBase(TaskBase):
         return PureProblem(np.array([0.02, 0.02]), np.array([0.98, 0.98]), is_valid)
 
 
+class ParametricMazeTaskD1(ParametricMazeTaskBase):
+    dof = 1
+
+
+class ParametricMazeTaskD2(ParametricMazeTaskBase):
+    dof = 2
+
+
+class ParametricMazeTaskD3(ParametricMazeTaskBase):
+    dof = 3
+
+
+class ParametricMazeTaskD4(ParametricMazeTaskBase):
+    dof = 4
+
+
+class ParametricMazeTaskD5(ParametricMazeTaskBase):
+    dof = 5
+
+
+class ParametricMazeTaskD6(ParametricMazeTaskBase):
+    dof = 6
+
+
 if __name__ == "__main__":
-    task = ParametricMazeTaskBase.sample()
+    task = ParametricMazeTaskD6.sample()
     r = task.solve_default()
     task.world.visualize(r.traj)
