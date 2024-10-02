@@ -34,9 +34,8 @@ class ParametricMaze:
     ptr: ctypes.c_void_p
     n: int
     param: np.ndarray
-    wall_thickness = 0.1
-    holl_width = 0.1
-    # holl_width = 0.03
+    wall_thickness = 0.05
+    holl_width = 0.05
 
     def __init__(self, param: np.ndarray):
         self.ptr = lib.create_parametric_maze_boxes(
@@ -72,6 +71,13 @@ class ParametricMaze:
         ax.set_ylim(0, 1)
         wall_ys = np.linspace(0, 1, self.n + 2)[1:-1]
         holl_xs = self.param
+
+        xlin, ylin = np.linspace(0.0, 1.0, 100), np.linspace(0.0, 1.0, 100)
+        X, Y = np.meshgrid(xlin, ylin)
+        pts = np.stack([X.ravel(), Y.ravel()], axis=1)
+        dist = self.signed_distance_batch(pts[:, 0], pts[:, 1])
+        dist = dist.reshape(100, 100)
+        ax.imshow(dist < 0.0, extent=(0, 1, 0, 1), origin="lower", cmap="gray", alpha=0.5)
 
         for i in range(self.n):
             wall_y = wall_ys[i]

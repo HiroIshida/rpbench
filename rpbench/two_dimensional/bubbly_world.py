@@ -563,6 +563,8 @@ class ParametricMazeTaskBase(TaskBase):
     def visualize(self, trajs, **kwargs):
         fig, ax = plt.subplots()
         self.world.visualize((fig, ax))
+        if trajs is None:
+            return
 
         if isinstance(trajs, diopt.Trajectory):
             trajs = [trajs]
@@ -609,8 +611,10 @@ class ParametricMazeTaskBase(TaskBase):
         s_goal = State(np.hstack([problem.goal, np.zeros(2)]))
 
         def is_obstacle_free(state: State) -> bool:
+            # with margin
             x = state.to_vector()[:2]
-            sdfs = problem.sdf(np.expand_dims(x, axis=0))
+            margin = 0.01
+            sdfs = problem.sdf(np.expand_dims(x, axis=0)) - margin
             return sdfs[0] > 0.0
 
         N = 5000
@@ -631,16 +635,17 @@ class ParametricMazeTaskBase(TaskBase):
         tbound = TrajectoryBound(
             np.array([0.0, 0.0]),
             np.array([1.0, 1.0]),
-            np.array([-0.3, -0.3]),
-            np.array([0.3, 0.3]),
-            np.array([-0.1, -0.1]),
-            np.array([0.1, 0.1]),
+            np.array([-0.2, -0.2]),
+            np.array([0.2, 0.2]),
+            np.array([-0.05, -0.05]),
+            np.array([0.05, 0.05]),
         )
         return DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
 
 
 if __name__ == "__main__":
-    task = ParametricMazeTaskBase.sample()
+    # task = ParametricMazeTaskBase.from_task_param(np.array([0.8, 0.2, 0.8, 0.2]))
+    task = ParametricMazeTaskBase.from_task_param(np.array([0.8, 0.8, 0.8, 0.8]))
     result = task.solve_default()
     assert result.traj is not None
     print("solved")
@@ -650,11 +655,13 @@ if __name__ == "__main__":
     # task2 = ParametricMazeTaskBase.from_task_param(param)
     # task2.vis
 
-    solver_config = DoubleIntegratorPlanningConfig(200, 30)
+    solver_config = DoubleIntegratorPlanningConfig(600, 30)
     solver = DoubleIntegratorOptimizationSolver.init(solver_config)
     solver.setup(task.export_problem())
     result2 = solver.solve(result.traj)
     print(result2.time_elapsed)
-    assert result2.traj is not None
-    task.visualize([result2.traj], color="r")
+    if result2.traj is None:
+        task.visualize(None)
+    else:
+        task.visualize([result2.traj], color="r")
     plt.show()
