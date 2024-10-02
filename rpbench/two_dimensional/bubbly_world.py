@@ -569,7 +569,7 @@ class ParametricMazeTaskBase(TaskBase):
 
         if isinstance(trajs[0], diopt.Trajectory):
             for traj in trajs:
-                ax.plot(traj.X[:, 0], traj.X[:, 1], **kwargs)
+                ax.plot(traj.X[:, 0], traj.X[:, 1], "ro-", markersize=2)
                 ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
         else:
             for traj in trajs:
@@ -580,7 +580,7 @@ class ParametricMazeTaskBase(TaskBase):
                 X = [traj.interpolate(t) for t in np.arange(0, t_duration, t_resolution)]
                 X = np.array(X)
                 ax.plot(X[:, 0], X[:, 1], **kwargs)
-                ax.plot(X[-1, 0], X[-1, 1], "o", color=kwargs["color"], markersize=2)
+                ax.plot(X[-1, 0], X[-1, 1], "o-", color=kwargs["color"], markersize=2)
 
     @classmethod
     def sample(
@@ -650,10 +650,11 @@ if __name__ == "__main__":
     # task2 = ParametricMazeTaskBase.from_task_param(param)
     # task2.vis
 
-    solver_config = DoubleIntegratorPlanningConfig(800, 30)
+    solver_config = DoubleIntegratorPlanningConfig(200, 30)
     solver = DoubleIntegratorOptimizationSolver.init(solver_config)
     solver.setup(task.export_problem())
     result2 = solver.solve(result.traj)
+    print(result2.time_elapsed)
     assert result2.traj is not None
     task.visualize([result2.traj], color="r")
     plt.show()
