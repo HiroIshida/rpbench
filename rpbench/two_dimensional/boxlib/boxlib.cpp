@@ -66,6 +66,9 @@ void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickne
   std::vector<double> xmaxs(2 * n_dof);
   std::vector<double> ymins(2 * n_dof);
   std::vector<double> ymaxs(2 * n_dof);
+  double half_wall_thickness = wall_thickness * 0.5;
+  double half_hole_size = hole_size * 0.5;
+
   double interval = 1.0 / (n_dof + 1.0);
   for(int i = 0; i < n_dof; i++) {
     auto wall_y = interval * (i + 1);
@@ -73,15 +76,15 @@ void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickne
 
     // left
     xmins[2 * i + 0] = 0.0;
-    xmaxs[2 * i + 0] = holl_x - hole_size;
-    ymins[2 * i + 0] = wall_y - wall_thickness;
-    ymaxs[2 * i + 0] = wall_y + wall_thickness;
+    xmaxs[2 * i + 0] = holl_x - half_hole_size;
+    ymins[2 * i + 0] = wall_y - half_wall_thickness;
+    ymaxs[2 * i + 0] = wall_y + half_wall_thickness;
 
     // right
-    xmins[2 * i + 1] = holl_x + hole_size;
+    xmins[2 * i + 1] = holl_x + half_hole_size;
     xmaxs[2 * i + 1] = 1.0;
-    ymins[2 * i + 1] = wall_y - wall_thickness;
-    ymaxs[2 * i + 1] = wall_y + wall_thickness;
+    ymins[2 * i + 1] = wall_y - half_wall_thickness;
+    ymaxs[2 * i + 1] = wall_y + half_wall_thickness;
   }
   void* boxes = make_boxes(xmins.data(), xmaxs.data(), ymins.data(), ymaxs.data(), 2 * n_dof);
   return boxes;
