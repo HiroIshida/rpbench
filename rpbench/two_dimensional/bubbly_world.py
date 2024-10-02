@@ -1,7 +1,7 @@
 import time
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Type, TypeVar, Union
+from typing import Callable, ClassVar, List, Optional, Tuple, Type, TypeVar, Union
 
 import disbmp
 import matplotlib.pyplot as plt
@@ -15,9 +15,11 @@ import rpbench.two_dimensional.double_integrator_trajopt as diopt
 from rpbench.interface import (
     SamplableWorldBase,
     SDFProtocol,
+    TaskBase,
     TaskExpression,
     TaskWithWorldCondBase,
 )
+from rpbench.two_dimensional.boxlib import ParametricMaze
 from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryBound,
     TrajectoryCostFunction,
@@ -299,7 +301,7 @@ class BubblyWorldBase(SamplableWorldBase):
     def export_intrinsic_description(self) -> np.ndarray:
         return np.hstack([obs.as_vector() for obs in self.obstacles])
 
-    def get_grid(self) -> Grid2d:
+    def grid(self) -> Grid2d:
         # return Grid2d(np.zeros(2), np.ones(2), (112, 112))
         return Grid2d(np.zeros(2), np.ones(2), (56, 56))
 
@@ -541,3 +543,117 @@ class Taskvisualizer:
         for traj in trajs:
             ax.plot(traj.X[:, 0], traj.X[:, 1], **kwargs)
             ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
+
+
+@dataclass
+class ParametricMazeTaskBase(TaskBase):
+    world: ParametricMaze
+    dof: ClassVar[int] = 2
+
+    @dataclass
+    class _FMTResult:
+        traj: Optional[disbmp.Trajectory]
+        time_elapsed: float
+        n_call: int
+
+    @classmethod
+    def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTaskBase":
+        return cls(ParametricMaze(param))
+
+    def visualize(self, trajs, **kwargs):
+        fig, ax = plt.subplots()
+        self.world.visualize((fig, ax))
+
+        if isinstance(trajs, diopt.Trajectory):
+            trajs = [trajs]
+
+        if isinstance(trajs[0], diopt.Trajectory):
+            for traj in trajs:
+                ax.plot(traj.X[:, 0], traj.X[:, 1], **kwargs)
+                ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
+        else:
+            for traj in trajs:
+                t_duration = traj.get_duration()
+                t_resolution = 0.01
+                for t in np.arange(0, t_duration, t_resolution):
+                    traj.interpolate(t)
+                X = [traj.interpolate(t) for t in np.arange(0, t_duration, t_resolution)]
+                X = np.array(X)
+                ax.plot(X[:, 0], X[:, 1], **kwargs)
+                ax.plot(X[-1, 0], X[-1, 1], "o", color=kwargs["color"], markersize=2)
+
+    @classmethod
+    def sample(
+        cls,
+        predicate: Optional[Callable] = None,
+        timeout: int = 180,
+    ) -> "ParametricMazeTaskBase":
+        t_start = time.time()
+        while True:
+            t_elapsed = time.time() - t_start
+            if t_elapsed > timeout:
+                raise TimeoutError("predicated_sample: timeout!")
+            task = cls(ParametricMaze.sample(cls.dof))
+            if predicate is None or predicate(task):
+                return task
+
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
+        return TaskExpression(self.world.param, None, np.empty(0))
+
+    def solve_default(self) -> ResultProtocol:
+        problem = self.export_problem()
+        s_min = np.hstack([problem.tbound.x_min, problem.tbound.v_min])
+        s_max = np.hstack([problem.tbound.x_max, problem.tbound.v_max])
+        bbox = BoundingBox(s_min, s_max)
+        s_start = State(np.hstack([problem.start, np.zeros(2)]))
+        s_goal = State(np.hstack([problem.goal, np.zeros(2)]))
+
+        def is_obstacle_free(state: State) -> bool:
+            x = state.to_vector()[:2]
+            sdfs = problem.sdf(np.expand_dims(x, axis=0))
+            return sdfs[0] > 0.0
+
+        N = 5000
+        ts = time.time()
+        fmt = FastMarchingTree(s_start, s_goal, is_obstacle_free, bbox, problem.dt, 1.0, N)
+        is_solved = fmt.solve(N)
+        time_elapsed = time.time() - ts
+        if is_solved:
+            traj = fmt.get_solution()
+            return self._FMTResult(traj, time_elapsed, 0)  # 0 is dummy
+        else:
+            return self._FMTResult(None, time_elapsed, 0)  # 0 is dummy
+
+    def export_problem(self) -> DoubleIntegratorPlanningProblem:
+        sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1])
+        start = np.array([0.02, 0.02])
+        goal = np.array([0.98, 0.98])
+        tbound = TrajectoryBound(
+            np.array([0.0, 0.0]),
+            np.array([1.0, 1.0]),
+            np.array([-0.3, -0.3]),
+            np.array([0.3, 0.3]),
+            np.array([-0.1, -0.1]),
+            np.array([0.1, 0.1]),
+        )
+        return DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
+
+
+if __name__ == "__main__":
+    task = ParametricMazeTaskBase.sample()
+    result = task.solve_default()
+    assert result.traj is not None
+    print("solved")
+    # expr = task.export_task_expression(False)
+    # param = expr.get_vector()
+    # param += 0.0
+    # task2 = ParametricMazeTaskBase.from_task_param(param)
+    # task2.vis
+
+    solver_config = DoubleIntegratorPlanningConfig(800, 30)
+    solver = DoubleIntegratorOptimizationSolver.init(solver_config)
+    solver.setup(task.export_problem())
+    result2 = solver.solve(result.traj)
+    assert result2.traj is not None
+    task.visualize([result2.traj], color="r")
+    plt.show()
