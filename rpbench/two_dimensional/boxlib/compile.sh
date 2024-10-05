@@ -1,1 +1,1 @@
-g++ -shared -fPIC boxlib.cpp -o boxlib.so 
+g++ -shared -fPIC -O3 boxlib.cpp -o boxlib.so

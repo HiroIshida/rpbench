@@ -34,8 +34,8 @@ class ParametricMaze:
     ptr: ctypes.c_void_p
     n: int
     param: np.ndarray
-    wall_thickness = 0.05
-    holl_width = 0.05
+    wall_thickness = 0.2
+    holl_width = 0.08
 
     def __init__(self, param: np.ndarray):
         self.ptr = lib.create_parametric_maze_boxes(
