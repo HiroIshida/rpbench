@@ -9,6 +9,13 @@ from numpy.ctypeslib import ndpointer
 
 this_source_path = Path(path.abspath(__file__))
 lib_path = this_source_path.parent / "boxlib.so"
+if not lib_path.exists():
+    import subprocess
+
+    cmd = f"g++ -shared -fPIC -O3 -o {lib_path} {this_source_path.parent}/boxlib.cpp"
+    ret = subprocess.run(cmd, shell=True)
+    assert ret.returncode == 0
+
 lib = ctypes.CDLL(str(lib_path))
 lib.create_parametric_maze_boxes.argtypes = [
     ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
