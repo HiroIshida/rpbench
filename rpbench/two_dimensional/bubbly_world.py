@@ -54,6 +54,7 @@ class DoubleIntegratorPlanningConfig:
     timeout: Optional[float] = None
     step_size_init: float = 1.0
     step_size_step: float = 0.0
+    only_closest: bool = False
 
 
 @dataclass
@@ -105,7 +106,9 @@ class DoubleIntegratorOptimizationSolver(
             jac = sparse.vstack(jacs)
             return val, jac
 
-        ineq_const = TrajectoryObstacleAvoidanceConstraint(traj_conf, problem.sdf)
+        ineq_const = TrajectoryObstacleAvoidanceConstraint(
+            traj_conf, problem.sdf, only_closest=self.config.only_closest
+        )
 
         cost_fun = TrajectoryCostFunction(traj_conf)
         lb = problem.tbound.lower_bound(traj_conf.n_steps)
@@ -133,9 +136,12 @@ class DoubleIntegratorOptimizationSolver(
             n_max_eval=self.config.n_max_call,
             step_size_init=self.config.step_size_init,
             step_size_step=self.config.step_size_step,
+            verbose=True,
         )
         ret = self.osqp_solver.solve(traj_guess.to_array(), osqp_conf)
         if ret.success:
+            X = ret.x.reshape(-1, self.traj_conf.n_dim)
+            self.problem.sdf(X)
             traj = diopt.Trajectory.from_array(ret.x, self.traj_conf)
             return DoubleIntegratorPlanningResult(traj, None, ret.nit)
         else:
@@ -272,7 +278,7 @@ class BubblyWorldBase(SamplableWorldBase):
         r_max = meta_param.circle_r_max
 
         if n_obs == 0:
-            dummy_circle = CircleObstacle(np.ones(2) * 0.5, 0.0)
+            dummy_circle = CircleObstacle(np.ones(2) * 1.0, 0.0)
             return cls([dummy_circle])
 
         obstacles = []

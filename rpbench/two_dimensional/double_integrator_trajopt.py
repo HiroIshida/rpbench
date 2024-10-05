@@ -307,18 +307,50 @@ class TrajectoryObstacleAvoidanceConstraint(HasTrajectoryConfigMixin):
     traj_conf: TrajectoryConfig
     sdf: Callable[[np.ndarray], np.ndarray]  # signed distance function
     is_sparse: bool
+    only_closest: bool
 
     def __init__(
         self,
         traj_conf: TrajectoryConfig,
         sdf: Callable[[np.ndarray], np.ndarray],
         is_sparse: bool = True,
+        only_closest: bool = False,
     ):
         self.traj_conf = traj_conf
         self.sdf = sdf
         self.is_sparse = is_sparse
+        self.only_closest = only_closest
 
     def __call__(self, traj: np.ndarray) -> Tuple[np.ndarray, Union[np.ndarray, csc_matrix]]:
+        if self.only_closest:
+            return self._call_impl_only_closest(traj)
+        else:
+            return self._call_impl_default(traj)
+
+    def _call_impl_only_closest(
+        self, traj: np.ndarray
+    ) -> Tuple[np.ndarray, Union[np.ndarray, csc_matrix]]:
+        S = traj[: self.n_steps * self.n_dim * 2].reshape(self.n_steps, self.n_dim * 2)
+        X = S[:, : self.n_dim]  # positions
+        vals = self.sdf(X)
+        min_idx = np.argmin(vals)
+        x_min = X[min_idx]
+        min_val = vals[min_idx]
+
+        n_opt_dim = len(traj)
+        grad = np.zeros((1, n_opt_dim))
+        eps = 1e-6
+        for i in range(self.n_dim):
+            x_plus = copy.deepcopy(x_min)
+            x_plus[i] += eps
+            val_plus = self.sdf(np.array([x_plus]))[0]
+            grad[0, self.n_dim * min_idx + i] = (val_plus - min_val) / eps
+        grad_as_csc = sparse.csc_matrix(grad)
+        return np.array([min_val]), grad_as_csc
+
+    def _call_impl_default(
+        self, traj: np.ndarray
+    ) -> Tuple[np.ndarray, Union[np.ndarray, csc_matrix]]:
         S = traj[: self.n_steps * self.n_dim * 2].reshape(self.n_steps, self.n_dim * 2)
         X = S[:, : self.n_dim]  # positions
 
