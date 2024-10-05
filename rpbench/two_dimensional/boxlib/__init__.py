@@ -15,6 +15,7 @@ lib.create_parametric_maze_boxes.argtypes = [
     ctypes.c_int,
     ctypes.c_double,
     ctypes.c_double,
+    ctypes.c_double,
 ]
 lib.create_parametric_maze_boxes.restype = ctypes.c_void_p
 
@@ -34,15 +35,18 @@ class ParametricMaze:
     ptr: ctypes.c_void_p
     n: int
     param: np.ndarray
+    y_length: float
     wall_thickness = 0.2
     holl_width = 0.08
 
     def __init__(self, param: np.ndarray):
+        y_length = (len(param) + 1) * 0.5
         self.ptr = lib.create_parametric_maze_boxes(
-            param, len(param), self.wall_thickness, self.holl_width
+            param, len(param), self.wall_thickness, self.holl_width, y_length
         )
         self.n = len(param)
         self.param = param
+        self.y_length = y_length
 
     @classmethod
     def sample(cls, n: int):
@@ -68,16 +72,16 @@ class ParametricMaze:
     def visualize(self, fax):
         fig, ax = fax
         ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        wall_ys = np.linspace(0, 1, self.n + 2)[1:-1]
+        ax.set_ylim(0, self.y_length)
+        wall_ys = np.linspace(0, self.y_length, self.n + 2)[1:-1]
         holl_xs = self.param
 
-        xlin, ylin = np.linspace(0.0, 1.0, 100), np.linspace(0.0, 1.0, 100)
-        X, Y = np.meshgrid(xlin, ylin)
-        pts = np.stack([X.ravel(), Y.ravel()], axis=1)
-        dist = self.signed_distance_batch(pts[:, 0], pts[:, 1])
-        dist = dist.reshape(100, 100)
-        ax.imshow(dist < 0.0, extent=(0, 1, 0, 1), origin="lower", cmap="gray", alpha=0.5)
+        # xlin, ylin = np.linspace(0.0, 1.0, 100), np.linspace(0.0, 1.0, 100)
+        # X, Y = np.meshgrid(xlin, ylin)
+        # pts = np.stack([X.ravel(), Y.ravel()], axis=1)
+        # dist = self.signed_distance_batch(pts[:, 0], pts[:, 1])
+        # dist = dist.reshape(100, 100)
+        # ax.imshow(dist < 0.0, extent=(0, 1, 0, 1), origin="lower", cmap="gray", alpha=0.5)
 
         for i in range(self.n):
             wall_y = wall_ys[i]
@@ -97,7 +101,9 @@ class ParametricMaze:
                     (holl_x_max, wall_y_min), 1 - holl_x_max, self.wall_thickness, color="black"
                 )
                 ax.add_patch(right_wall)
-        boundary = patches.Rectangle((0, 0), 1, 1, fill=False, edgecolor="black", linewidth=2)
+        boundary = patches.Rectangle(
+            (0, 0), 1, self.y_length, fill=False, edgecolor="black", linewidth=2
+        )
 
         ax.add_patch(boundary)
         ax.set_aspect("equal")
@@ -108,13 +114,11 @@ class ParametricMaze:
 
 
 if __name__ == "__main__":
-    maze = ParametricMaze(np.array([0.2]))
+    maze = ParametricMaze(np.array([0.2, 0.5]))
     xlin = np.linspace(0.0, 1.0, 100)
-    ylin = np.linspace(0.0, 1.0, 100)
+    ylin = np.linspace(0.0, maze.y_length, 100)
     X, Y = np.meshgrid(xlin, ylin)
     pts = np.stack([X.ravel(), Y.ravel()], axis=1)
     dist = maze.signed_distance_batch(pts[:, 0], pts[:, 1])
-    import matplotlib.pyplot as plt
-
     plt.imshow(dist.reshape(100, 100) < 0.0)
     plt.show()

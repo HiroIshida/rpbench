@@ -572,15 +572,13 @@ class ParametricMazeTaskBase(TaskBase):
         if trajs is None:
             return
 
-        if isinstance(trajs, diopt.Trajectory):
-            trajs = [trajs]
-
-        if isinstance(trajs[0], diopt.Trajectory):
-            for traj in trajs:
+        # if isinstance(trajs, diopt.Trajectory):
+        #     trajs = [trajs]
+        for traj in trajs:
+            if isinstance(traj, diopt.Trajectory):
                 ax.plot(traj.X[:, 0], traj.X[:, 1], "ro-", markersize=2)
                 ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
-        else:
-            for traj in trajs:
+            else:
                 t_duration = traj.get_duration()
                 t_resolution = 0.01
                 for t in np.arange(0, t_duration, t_resolution):
@@ -637,10 +635,10 @@ class ParametricMazeTaskBase(TaskBase):
     def export_problem(self) -> DoubleIntegratorPlanningProblem:
         sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1])
         start = np.array([0.02, 0.02])
-        goal = np.array([0.98, 0.98])
+        goal = np.array([0.98, self.world.y_length - 0.02])
         tbound = TrajectoryBound(
             np.array([0.0, 0.0]),
-            np.array([1.0, 1.0]),
+            np.array([1.0, self.world.y_length]),
             np.array([-0.2, -0.2]),
             np.array([0.2, 0.2]),
             np.array([-0.05, -0.05]),
@@ -651,7 +649,7 @@ class ParametricMazeTaskBase(TaskBase):
 
 if __name__ == "__main__":
     # task = ParametricMazeTaskBase.from_task_param(np.array([0.8, 0.2, 0.8, 0.2]))
-    task = ParametricMazeTaskBase.from_task_param(np.array([0.8, 0.8, 0.8, 0.8]))
+    task = ParametricMazeTaskBase.from_task_param(np.array([0.5, 0.2, 0.4]))
     result = task.solve_default()
     assert result.traj is not None
     print("solved")
@@ -661,13 +659,19 @@ if __name__ == "__main__":
     # task2 = ParametricMazeTaskBase.from_task_param(param)
     # task2.vis
 
-    solver_config = DoubleIntegratorPlanningConfig(600, 30)
+    solver_config = DoubleIntegratorPlanningConfig(600, 30, only_closest=False)
     solver = DoubleIntegratorOptimizationSolver.init(solver_config)
-    solver.setup(task.export_problem())
+    task2 = ParametricMazeTaskBase.from_task_param(np.array([0.60, 0.25, 0.5]))
+    solver.setup(task2.export_problem())
+    from pyinstrument import Profiler
+
+    profiler = Profiler()
+    profiler.start()
     result2 = solver.solve(result.traj)
-    print(result2.time_elapsed)
+    profiler.stop()
     if result2.traj is None:
-        task.visualize(None)
+        task2.visualize(None)
     else:
-        task.visualize([result2.traj], color="r")
+        print("solved!")
+        task2.visualize([result.traj, result2.traj], color="r")
     plt.show()

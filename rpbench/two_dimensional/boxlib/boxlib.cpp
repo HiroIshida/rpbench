@@ -5,7 +5,7 @@
 #include<iostream>
 
 extern "C" {
-    void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickness, double hole_size);
+    void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickness, double hole_size, double y_length);
     void* make_boxes(double* xmin, double* xmax, double* ymin, double* ymax, int n);
     void delete_boxes(void* boxes);
     double signed_distance(double x, double y, void* boxes);
@@ -61,7 +61,7 @@ void delete_boxes(void* boxes) {
   delete static_cast<Boxes*>(boxes);
 }
 
-void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickness, double hole_size) {
+void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickness, double hole_size, double y_length) {
   std::vector<double> xmins(2 * n_dof);
   std::vector<double> xmaxs(2 * n_dof);
   std::vector<double> ymins(2 * n_dof);
@@ -69,7 +69,7 @@ void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickne
   double half_wall_thickness = wall_thickness * 0.5;
   double half_hole_size = hole_size * 0.5;
 
-  double interval = 1.0 / (n_dof + 1.0);
+  double interval = y_length / (n_dof + 1.0);
   for(int i = 0; i < n_dof; i++) {
     auto wall_y = interval * (i + 1);
     auto holl_x = param[i];
