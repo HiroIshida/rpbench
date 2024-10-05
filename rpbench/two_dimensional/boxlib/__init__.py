@@ -36,7 +36,7 @@ class ParametricMaze:
     n: int
     param: np.ndarray
     y_length: float
-    wall_thickness = 0.2
+    wall_thickness = 0.20
     holl_width = 0.08
 
     def __init__(self, param: np.ndarray):

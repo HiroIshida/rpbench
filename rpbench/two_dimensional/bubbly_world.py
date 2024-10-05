@@ -554,7 +554,7 @@ class Taskvisualizer:
 @dataclass
 class ParametricMazeTaskBase(TaskBase):
     world: ParametricMaze
-    dof: ClassVar[int] = 2
+    dof: ClassVar[int]
 
     @dataclass
     class _FMTResult:
@@ -564,6 +564,7 @@ class ParametricMazeTaskBase(TaskBase):
 
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTaskBase":
+        assert len(param) == cls.dof
         return cls(ParametricMaze(param))
 
     def visualize(self, trajs, **kwargs):
@@ -621,7 +622,8 @@ class ParametricMazeTaskBase(TaskBase):
             sdfs = problem.sdf(np.expand_dims(x, axis=0)) - margin
             return sdfs[0] > 0.0
 
-        N = 5000
+        N = 3000 + 500 * self.dof
+        print(f"start solving with N={N}")
         ts = time.time()
         fmt = FastMarchingTree(s_start, s_goal, is_obstacle_free, bbox, problem.dt, 1.0, N)
         is_solved = fmt.solve(N)
@@ -633,7 +635,8 @@ class ParametricMazeTaskBase(TaskBase):
             return self._FMTResult(None, time_elapsed, 0)  # 0 is dummy
 
     def export_problem(self) -> DoubleIntegratorPlanningProblem:
-        sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1])
+        margin = 0.01
+        sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1]) - margin
         start = np.array([0.02, 0.02])
         goal = np.array([0.98, self.world.y_length - 0.02])
         tbound = TrajectoryBound(
@@ -647,9 +650,29 @@ class ParametricMazeTaskBase(TaskBase):
         return DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
 
 
+class ParametricMazeTask1D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 2
+
+
+class ParametricMazeTask2D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 2
+
+
+class ParametricMazeTask3D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 3
+
+
+class ParametricMazeTask4D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 4
+
+
+class ParametricMazeTask5D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 5
+
+
 if __name__ == "__main__":
     # task = ParametricMazeTaskBase.from_task_param(np.array([0.8, 0.2, 0.8, 0.2]))
-    task = ParametricMazeTaskBase.from_task_param(np.array([0.5, 0.2, 0.4]))
+    task = ParametricMazeTask3D.sample()
     result = task.solve_default()
     assert result.traj is not None
     print("solved")
@@ -659,10 +682,10 @@ if __name__ == "__main__":
     # task2 = ParametricMazeTaskBase.from_task_param(param)
     # task2.vis
 
-    solver_config = DoubleIntegratorPlanningConfig(600, 30, only_closest=False)
+    n_point = 100 * task.dof
+    solver_config = DoubleIntegratorPlanningConfig(n_point, 30, only_closest=False)
     solver = DoubleIntegratorOptimizationSolver.init(solver_config)
-    task2 = ParametricMazeTaskBase.from_task_param(np.array([0.60, 0.25, 0.5]))
-    solver.setup(task2.export_problem())
+    solver.setup(task.export_problem())
     from pyinstrument import Profiler
 
     profiler = Profiler()
@@ -670,8 +693,8 @@ if __name__ == "__main__":
     result2 = solver.solve(result.traj)
     profiler.stop()
     if result2.traj is None:
-        task2.visualize(None)
+        task.visualize(None)
     else:
         print("solved!")
-        task2.visualize([result.traj, result2.traj], color="r")
+        task.visualize([result.traj, result2.traj], color="r")
     plt.show()
