@@ -44,10 +44,10 @@ class ParametricMaze:
     param: np.ndarray
     y_length: float
     wall_thickness = 0.20
-    holl_width = 0.08
+    holl_width = 0.12
 
     def __init__(self, param: np.ndarray):
-        y_length = (len(param) + 1) * 0.5
+        y_length = (len(param) + 1) * 0.7
         self.ptr = lib.create_parametric_maze_boxes(
             param, len(param), self.wall_thickness, self.holl_width, y_length
         )

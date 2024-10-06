@@ -637,8 +637,8 @@ class ParametricMazeTaskBase(TaskBase):
     def export_problem(self) -> DoubleIntegratorPlanningProblem:
         margin = 0.01
         sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1]) - margin
-        start = np.array([0.02, 0.02])
-        goal = np.array([0.98, self.world.y_length - 0.02])
+        start = np.array([0.05, 0.05])
+        goal = np.array([0.95, self.world.y_length - 0.05])
         tbound = TrajectoryBound(
             np.array([0.0, 0.0]),
             np.array([1.0, self.world.y_length]),
@@ -651,7 +651,7 @@ class ParametricMazeTaskBase(TaskBase):
 
 
 class ParametricMazeTask1D(ParametricMazeTaskBase):
-    dof: ClassVar[int] = 2
+    dof: ClassVar[int] = 1
 
 
 class ParametricMazeTask2D(ParametricMazeTaskBase):
