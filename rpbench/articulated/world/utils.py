@@ -310,11 +310,10 @@ class VoxelGrid(LzmaCompressor):
         voxel: np.ndarray,
         skelton: VoxelGridSkelton,
     ) -> "VoxelGrid":
-        indices = np.where(voxel.ravel())[0]
-        indices_flat = np.unravel_index(indices, skelton.resols)
+        indices = np.argwhere(voxel)
+        resols = skelton.resols
         indices_flat = (
-            indices_flat[0]
-            + indices_flat[1] * skelton.resols[0]
-            + indices_flat[2] * skelton.resols[0] * skelton.resols[1]
-        )
+            indices[:, 0] + indices[:, 1] * resols[0] + indices[:, 2] * resols[0] * resols[1]
+        ).astype(np.uint32)
+        indices_flat.sort()
         return cls(skelton, indices_flat)
