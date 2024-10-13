@@ -7,6 +7,8 @@ from functools import cached_property
 from typing import Callable, ClassVar, Generic, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
+from numba import njit
+from scipy.spatial import KDTree
 from skrobot.coordinates import CascadedCoords, Transform
 from skrobot.model.primitives import Box, Cylinder, Link, MeshLink
 from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction, trimesh2sdf
@@ -224,6 +226,62 @@ class VoxelGridSkelton:
         resols = struct.unpack("iii", unziped[12:24])
         tf_local_to_world = SerializableTransform.deserialize(unziped[24:])
         return cls(tf_local_to_world, extents, resols)
+
+
+@njit
+def compute_distance_field(binary_map):
+    max_val = 1024  # for now
+    N, M, L = binary_map.shape
+    dmap = np.empty((N, M, L), dtype=np.uint16)
+
+    for i in range(N):
+        for j in range(M):
+            for k in range(L):
+                if binary_map[i, j, k]:
+                    dmap[i, j, k] = 0
+                else:
+                    dmap[i, j, k] = max_val
+
+    for i in range(N):
+        for j in range(M):
+            for k in range(L):
+                if dmap[i, j, k] > 0:
+                    val_previous_k = max_val
+                    if k > 0:
+                        val_previous_k = dmap[i, j, k - 1] + 1
+
+                    val_previous_j = max_val
+                    if j > 0:
+                        val_previous_j = dmap[i, j - 1, k] + 1
+
+                    val_previous_i = max_val
+                    if i > 0:
+                        val_previous_i = dmap[i - 1, j, k] + 1
+
+                    val_previous = min(min(val_previous_j, val_previous_i), val_previous_k)
+                    if val_previous < dmap[i, j, k]:
+                        dmap[i, j, k] = val_previous
+
+    for i in range(N - 1, -1, -1):
+        for j in range(M - 1, -1, -1):
+            for k in range(L - 1, -1, -1):
+                if dmap[i, j, k] > 0:
+                    val_next_k = max_val
+                    if k < L - 1:
+                        val_next_k = dmap[i, j, k + 1] + 1
+
+                    val_next_j = max_val
+                    if j < M - 1:
+                        val_next_j = dmap[i, j + 1, k] + 1
+
+                    val_next_i = max_val
+                    if i < N - 1:
+                        val_next_i = dmap[i + 1, j, k] + 1
+
+                    val_next = min(min(val_next_j, val_next_i), val_next_k)
+                    if val_next < dmap[i, j, k]:
+                        dmap[i, j, k] = val_next
+    return dmap
 
 
 class ZlibCompressor:
