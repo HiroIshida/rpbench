@@ -70,10 +70,10 @@ class BytesArrayWrap(Sequence[bytes]):
             return self.seq[index_like]
         elif isinstance(index_like, slice):
             return BytesArrayPacked(self.seq[index_like])
-        elif isinstance(index_like, np.ndarray):
+        elif isinstance(index_like, (np.ndarray, list)):
             return BytesArrayWrap([self.seq[i] for i in index_like])
         else:
-            assert False, "unsupported type"
+            assert False, f"unsupported type {type(index_like)}, {index_like}"
 
     def __len__(self) -> int:
         return len(self.seq)
