@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, List, Union
 
 import numpy as np
+from plainmp.psdf import CloudSDF
 from plainmp.psdf import UnionSDF as pUnionSDF
+from plainmp.utils import set_robot_state, sksdf_to_cppsdf
 from scipy.spatial import KDTree
 from skrobot.model.primitives import Axis, PointCloudLink
 from skrobot.sdf import UnionSDF
@@ -130,9 +132,7 @@ if __name__ == "__main__":
     from plainmp.ik import solve_ik
     from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
     from plainmp.problem import Problem
-    from plainmp.psdf import CloudSDF
     from plainmp.robot_spec import FetchSpec
-    from plainmp.utils import set_robot_state, sksdf_to_cppsdf
     from skrobot.models.fetch import Fetch
 
     np.random.seed(3)

@@ -8,7 +8,6 @@ from typing import Callable, ClassVar, Generic, Literal, Optional, Tuple, TypeVa
 
 import numpy as np
 from numba import njit
-from scipy.spatial import KDTree
 from skrobot.coordinates import CascadedCoords, Transform
 from skrobot.model.primitives import Box, Cylinder, Link, MeshLink
 from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction, trimesh2sdf
