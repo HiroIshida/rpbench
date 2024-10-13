@@ -52,9 +52,9 @@ class JailInsertTask(TaskWithWorldCondBase[JailWorld, np.ndarray, None]):
     def solve_default(self) -> ResultProtocol:
         prob = self.export_problem()
         if _debug_mode_flag[0]:
-            conf = OMPLSolverConfig(1000_000, algorithm_range=None, simplify=True)
+            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True, timeout=3.0)
         else:
-            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True)
+            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True, timeout=30.0)
         solver = OMPLSolver(conf)
         return solver.solve(prob)
 
@@ -94,9 +94,10 @@ class JailInsertTask(TaskWithWorldCondBase[JailWorld, np.ndarray, None]):
 
 
 if __name__ == "__main__":
+    np.random.seed(0)
     task = JailInsertTask.sample()
     problem = task.export_problem()
-    conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True)
+    conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True, timeout=1)
     solver = OMPLSolver(conf)
     ret = solver.solve(problem)
     print(ret.time_elapsed)
