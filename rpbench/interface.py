@@ -9,9 +9,11 @@ from typing import (
     List,
     Optional,
     Protocol,
+    Sequence,
     Type,
     TypeVar,
     Union,
+    overload,
 )
 
 import numpy as np
@@ -49,6 +51,47 @@ class SDFProtocol(Protocol):
             1dim (n_point) array of signed distances of each points
         """
         ...
+
+
+class BytesArrayWrap(Sequence[bytes]):
+    def __init__(self, seq: List[bytes]) -> None:
+        self.seq = seq
+
+    @overload
+    def __getitem__(self, __index: int) -> bytes:
+        ...
+
+    @overload
+    def __getitem__(self, __index: slice) -> "BytesArrayPacked":
+        ...
+
+    def __getitem__(self, index_like):
+        if isinstance(index_like, int):
+            return self.seq[index_like]
+        elif isinstance(index_like, slice):
+            return BytesArrayPacked(self.seq[index_like])
+        elif isinstance(index_like, np.ndarray):
+            return BytesArrayWrap([self.seq[i] for i in index_like])
+        else:
+            assert False, "unsupported type"
+
+    def __len__(self) -> int:
+        return len(self.seq)
+
+    def tobytes(self) -> bytes:
+        return b"".join(self.seq)
+
+    def __array__(self):
+        assert False, "(sanity check) array conversion is not supported"
+
+
+def pack_param_seq(seq: Sequence):
+    if isinstance(seq[0], np.ndarray):
+        return np.array(seq)
+    elif isinstance(seq[0], bytes):
+        return BytesArrayWrap(seq)
+    else:
+        assert False, "unsupported type"
 
 
 class TaskExpressionProtocol(Protocol):
@@ -95,7 +138,7 @@ class TaskBase(ABC):
         return param
 
     @classmethod
-    def distribution_vector(cls: Type[TaskT]) -> np.ndarray:
+    def distribution_vector(cls: Type[TaskT]) -> Any:
         # express the distribution as 100 dim vector
         # by check this vector, we can check if the distribution definition has been changed
         # NOTE that this is "classmethod" because this vector is not for an instance from
@@ -108,7 +151,7 @@ class TaskBase(ABC):
                 task = cls.sample()
                 if task is not None:
                     tasks.append(task)
-        data = np.array([t.to_task_param() for t in tasks])
+        data = pack_seq([t.to_task_param() for t in tasks])
         return data
 
     @classmethod
