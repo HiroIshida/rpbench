@@ -62,14 +62,14 @@ class BytesArrayWrap(Sequence[bytes]):
         ...
 
     @overload
-    def __getitem__(self, __index: slice) -> "BytesArrayPacked":
+    def __getitem__(self, __index: slice) -> "BytesArrayWrap":
         ...
 
     def __getitem__(self, index_like):
         if isinstance(index_like, int):
             return self.seq[index_like]
         elif isinstance(index_like, slice):
-            return BytesArrayPacked(self.seq[index_like])
+            return BytesArrayWrap(self.seq[index_like])
         elif isinstance(index_like, (np.ndarray, list)):
             return BytesArrayWrap([self.seq[i] for i in index_like])
         else:
@@ -90,6 +90,25 @@ def pack_param_seq(seq: Sequence):
         return np.array(seq)
     elif isinstance(seq[0], bytes):
         return BytesArrayWrap(seq)
+    else:
+        assert False, "unsupported type"
+
+
+def concat_param_seq(seq1: Sequence, seq2: Sequence):
+    if isinstance(seq1, np.ndarray):
+        assert seq1.shape[1] == seq2.shape[1]
+        return np.vstack([seq1, seq2])
+    elif isinstance(seq1, BytesArrayWrap):
+        return BytesArrayWrap(seq1.seq + seq2.seq)
+    else:
+        assert False, "unsupported type"
+
+
+def shuffle_param_seq(seq: Sequence):
+    if isinstance(seq, np.ndarray):
+        return np.random.permutation(seq)
+    elif isinstance(seq, BytesArrayWrap):
+        return BytesArrayWrap(np.random.permutation(seq.seq))
     else:
         assert False, "unsupported type"
 
@@ -151,7 +170,7 @@ class TaskBase(ABC):
                 task = cls.sample()
                 if task is not None:
                     tasks.append(task)
-        data = pack_seq([t.to_task_param() for t in tasks])
+        data = pack_param_seq([t.to_task_param() for t in tasks])
         return data
 
     @classmethod

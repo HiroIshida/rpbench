@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Type
+from typing import Optional, Type, Union
 
 import numpy as np
 
@@ -21,13 +21,15 @@ class BytesTaskExpression:
     # this does not follows the protocol!
     # because get_vector returns bytes
     world_vec: Optional[bytes]
-    world_mat: Optional[np.ndarray]
+    world_mat: np.ndarray
     other_vec: np.ndarray  # must be double and 24 (3 * 8) bytes
 
     def get_matrix(self) -> Optional[np.ndarray]:
         return self.world_mat
 
-    def get_vector(self) -> bytes:
+    def get_vector(self) -> Union[bytes, np.ndarray]:
+        if self.world_vec is None:
+            return self.other_vec
         other_vec_bytes = self.other_vec.tobytes()
         return self.world_vec + other_vec_bytes
 
