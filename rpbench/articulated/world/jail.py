@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, ClassVar, List, Union
 
 import numpy as np
-from numba import njit
+from conway_tower import evolve_conway
 from plainmp.psdf import CloudSDF
 from plainmp.psdf import UnionSDF as pUnionSDF
 from plainmp.utils import sksdf_to_cppsdf
@@ -137,62 +137,10 @@ class JailWorld(JailWorldBase):
         return cls(region, panels, voxel_grid)
 
 
-@njit
-def update_conway_lifegame(mat: np.ndarray, mat_new: np.ndarray) -> None:
-    N, M = mat.shape
-    for i in range(N):
-        for j in range(M):
-            neighbours = [
-                (i - 1, j - 1),
-                (i - 1, j),
-                (i - 1, j + 1),
-                (i, j - 1),
-                (i, j + 1),
-                (i + 1, j - 1),
-                (i + 1, j),
-                (i + 1, j + 1),
-            ]
-            c = 0
-            for nei in neighbours:
-                x, y = nei
-                c += mat[x % N, y % M]
-            if mat[i, j]:
-                if c < 2 or c > 3:
-                    mat_new[i, j] = 0
-                else:
-                    mat_new[i, j] = 1
-            else:
-                if c == 3:
-                    mat_new[i, j] = 1
-                else:
-                    mat_new[i, j] = 0
-
-
-def create_conway(init_layer: np.ndarray, height: int):
-    mat_3d = np.zeros((init_layer.shape[0], init_layer.shape[1], height), dtype=bool)
-    t = 0
-    mat_3d[:, :, t] = init_layer
-    for t in range(1, height):
-        dx = np.random.randint(-1, 2)
-        dy = np.random.randint(-1, 2)
-        mat_shifted = np.roll(mat_3d[:, :, t - 1], shift=(dx, dy), axis=(0, 1))
-        mat_new = np.zeros_like(init_layer, dtype=bool)
-        update_conway_lifegame(mat_shifted, mat_new)
-        mat_3d[:, :, t] = mat_new
-    return mat_3d
-
-
-# run create_conway once to jit compile
-_init_layer = np.zeros((56, 56), dtype=bool)
-_init_layer[20:30, 20:30] = 1
-create_conway(_init_layer, 56)
-
-
 class ConwayJailWorld(JailWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> "JailWorld":
         region, panels = cls.create_region_and_panels()
-        create_conway(_init_layer, 56)
         x_margin = 10
         y_margin = 5
         n_bar_from_bottom = np.random.randint(1, 5)
@@ -204,7 +152,8 @@ class ConwayJailWorld(JailWorldBase):
             init_layer[x_center - 5 : x_center + 5, y_center - 5 : y_center + 5] = np.random.choice(
                 [0, 1], (10, 10), p=[0.5, 0.5]
             )
-            mat_3d = create_conway(init_layer, 56)
+            random_perturbs = np.random.randint(-1, 2, (56, 2))
+            mat_3d = evolve_conway(init_layer, 56, perturb=random_perturbs, z_as_time=True)
             if np.random.rand() < 0.5:
                 mat_3d = np.flip(mat_3d, axis=2)
             mat_3d_now = np.logical_or(mat_3d_now, mat_3d)
