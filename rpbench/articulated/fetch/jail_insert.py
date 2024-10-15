@@ -9,7 +9,7 @@ try:
     from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, Problem
     from plainmp.robot_spec import FetchSpec
 
-    from rpbench.articulated.world.jail import JailWorld
+    from rpbench.articulated.world.jail import ConwayJailWorld, JailWorld, JailWorldBase
 except ImportError:
     raise ImportError("Please install plainmp (private repo) to run this task.")
 
@@ -34,11 +34,12 @@ class BytesTaskExpression:
         return self.world_vec + other_vec_bytes
 
 
-class JailInsertTask(TaskWithWorldCondBase[JailWorld, np.ndarray, None]):
+class JailInsertTaskBase(TaskWithWorldCondBase[JailWorldBase, np.ndarray, None]):
     @classmethod
-    def from_task_param(cls, param: bytes) -> "JailInsertTask":
+    def from_task_param(cls, param: bytes) -> "JailInsertTaskBase":
         world_bytes, other_vec_bytes = param[:-24], param[-24:]
-        world = JailWorld.deserialize(world_bytes)
+        world_t = cls.get_world_type()
+        world = world_t.deserialize(world_bytes)
         other_vec = np.frombuffer(other_vec_bytes, dtype=np.float64)
         return cls(world, other_vec)
 
@@ -71,10 +72,6 @@ class JailInsertTask(TaskWithWorldCondBase[JailWorld, np.ndarray, None]):
         return Problem(fetch_spec.q_reset_pose(), lb, ub, pose_cst, ineq_cst, None, motion_step_box)
         raise NotImplementedError
 
-    @staticmethod
-    def get_world_type() -> Type[JailWorld]:
-        return JailWorld
-
     @classmethod
     def get_robot_model(cls) -> None:
         return None
@@ -93,6 +90,18 @@ class JailInsertTask(TaskWithWorldCondBase[JailWorld, np.ndarray, None]):
         if collision_free:
             return p
         return None
+
+
+class JailInsertTask(JailInsertTaskBase):
+    @staticmethod
+    def get_world_type() -> Type[JailWorld]:
+        return JailWorld
+
+
+class ConwayJailInsertTask(JailInsertTaskBase):
+    @staticmethod
+    def get_world_type() -> Type[JailWorld]:
+        return ConwayJailWorld
 
 
 if __name__ == "__main__":

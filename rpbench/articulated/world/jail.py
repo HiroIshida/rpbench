@@ -1,11 +1,13 @@
 import time
+from abc import abstractmethod
 from dataclasses import dataclass
 from typing import Callable, ClassVar, List, Union
 
 import numpy as np
+from numba import njit
 from plainmp.psdf import CloudSDF
 from plainmp.psdf import UnionSDF as pUnionSDF
-from plainmp.utils import set_robot_state, sksdf_to_cppsdf
+from plainmp.utils import sksdf_to_cppsdf
 from scipy.spatial import KDTree
 from skrobot.model.primitives import Axis, PointCloudLink
 from skrobot.sdf import UnionSDF
@@ -23,7 +25,7 @@ BROWN_COLOR = (204, 102, 0, 200)
 
 
 @dataclass
-class JailWorld(SamplableWorldBase):
+class JailWorldBase(SamplableWorldBase):
     region: BoxSkeleton
     panels: List[BoxSkeleton]
     voxels: VoxelGrid
@@ -53,40 +55,6 @@ class JailWorld(SamplableWorldBase):
         # slide jail
         region.translate([0.7, 0, 0.6])
         return region, panels
-
-    @classmethod
-    def sample(cls, standard: bool = False) -> "JailWorld":
-        region, panels = cls.create_region_and_panels()
-
-        # sample jail bars
-        sizes = np.array([cls.box_depth, cls.box_width, cls.box_height])
-        margin = 0.1
-        radius_min = 0.015
-        radius_max = 0.05
-        lb = -sizes * 0.5 + margin
-        ub = sizes * 0.5 - margin
-        n_bar = np.random.randint(1, 6)
-        infinite_length = 10.0
-        bars = []
-        for _ in range(n_bar):
-            pos = np.random.uniform(lb, ub)
-            radius = np.random.uniform(radius_min, radius_max)
-            bar = CylinderSkelton(radius, infinite_length)
-            bar.translate(pos)
-            roll = np.random.uniform(0, np.pi / 4)
-            bar.rotate(roll, axis=[1, 0, 0])
-            pitch = np.random.uniform(0, 2 * np.pi)
-            bar.rotate(pitch, axis=[0, 0, 1], wrt="world")
-            bars.append(bar)
-        for bar in bars:
-            region.assoc(bar, relative_coords="local")
-
-        bar_sdf = UnionSDF([bar.sdf for bar in bars])
-
-        # create voxel grid
-        voxel_skeleton = VoxelGridSkelton.from_box(region, (56, 56, 56))
-        voxel_grid = VoxelGrid.from_sdf(bar_sdf, voxel_skeleton)
-        return cls(region, panels, voxel_grid)
 
     def visualize(self, viewer: Union[PyrenderViewer, TrimeshSceneViewer]):
         for panel in self.panels:
@@ -122,10 +90,130 @@ class JailWorld(SamplableWorldBase):
         return self.voxels.serialize()
 
     @classmethod
-    def deserialize(cls, data: bytes) -> "JailWorld":
+    def deserialize(cls, data: bytes) -> "JailWorldBase":
         voxels = VoxelGrid.deserialize(data)
         region, panels = cls.create_region_and_panels()
         return cls(region, panels, voxels)
+
+    @classmethod
+    @abstractmethod
+    def sample(cls, standard: bool = False) -> "JailWorldBase":
+        pass
+
+
+class JailWorld(JailWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> "JailWorld":
+        region, panels = cls.create_region_and_panels()
+
+        # sample jail bars
+        sizes = np.array([cls.box_depth, cls.box_width, cls.box_height])
+        margin = 0.1
+        radius_min = 0.015
+        radius_max = 0.05
+        lb = -sizes * 0.5 + margin
+        ub = sizes * 0.5 - margin
+        n_bar = np.random.randint(1, 6)
+        infinite_length = 10.0
+        bars = []
+        for _ in range(n_bar):
+            pos = np.random.uniform(lb, ub)
+            radius = np.random.uniform(radius_min, radius_max)
+            bar = CylinderSkelton(radius, infinite_length)
+            bar.translate(pos)
+            roll = np.random.uniform(0, np.pi / 4)
+            bar.rotate(roll, axis=[1, 0, 0])
+            pitch = np.random.uniform(0, 2 * np.pi)
+            bar.rotate(pitch, axis=[0, 0, 1], wrt="world")
+            bars.append(bar)
+        for bar in bars:
+            region.assoc(bar, relative_coords="local")
+
+        bar_sdf = UnionSDF([bar.sdf for bar in bars])
+
+        # create voxel grid
+        voxel_skeleton = VoxelGridSkelton.from_box(region, (56, 56, 56))
+        voxel_grid = VoxelGrid.from_sdf(bar_sdf, voxel_skeleton)
+        return cls(region, panels, voxel_grid)
+
+
+@njit
+def update_conway_lifegame(mat: np.ndarray, mat_new: np.ndarray) -> None:
+    N, M = mat.shape
+    for i in range(N):
+        for j in range(M):
+            neighbours = [
+                (i - 1, j - 1),
+                (i - 1, j),
+                (i - 1, j + 1),
+                (i, j - 1),
+                (i, j + 1),
+                (i + 1, j - 1),
+                (i + 1, j),
+                (i + 1, j + 1),
+            ]
+            c = 0
+            for nei in neighbours:
+                x, y = nei
+                c += mat[x % N, y % M]
+            if mat[i, j]:
+                if c < 2 or c > 3:
+                    mat_new[i, j] = 0
+                else:
+                    mat_new[i, j] = 1
+            else:
+                if c == 3:
+                    mat_new[i, j] = 1
+                else:
+                    mat_new[i, j] = 0
+
+
+def create_conway(init_layer: np.ndarray, height: int):
+    mat_3d = np.zeros((init_layer.shape[0], init_layer.shape[1], height), dtype=bool)
+    t = 0
+    mat_3d[:, :, t] = init_layer
+    for t in range(1, height):
+        dx = np.random.randint(-1, 2)
+        dy = np.random.randint(-1, 2)
+        mat_shifted = np.roll(mat_3d[:, :, t - 1], shift=(dx, dy), axis=(0, 1))
+        mat_new = np.zeros_like(init_layer, dtype=bool)
+        update_conway_lifegame(mat_shifted, mat_new)
+        mat_3d[:, :, t] = mat_new
+    return mat_3d
+
+
+# run create_conway once to jit compile
+_init_layer = np.zeros((56, 56), dtype=bool)
+_init_layer[20:30, 20:30] = 1
+create_conway(_init_layer, 56)
+
+
+class ConwayJailWorld(JailWorldBase):
+    @classmethod
+    def sample(cls, standard: bool = False) -> "JailWorld":
+        region, panels = cls.create_region_and_panels()
+        create_conway(_init_layer, 56)
+        x_margin = 10
+        y_margin = 5
+        n_bar_from_bottom = np.random.randint(1, 5)
+        mat_3d_now = np.zeros((56, 56, 56), dtype=bool)
+        for i in range(n_bar_from_bottom):
+            x_center = np.random.randint(x_margin, 56 - x_margin)
+            y_center = np.random.randint(y_margin, 56 - y_margin)
+            init_layer = np.zeros((56, 56), dtype=bool)
+            init_layer[x_center - 5 : x_center + 5, y_center - 5 : y_center + 5] = np.random.choice(
+                [0, 1], (10, 10), p=[0.5, 0.5]
+            )
+            mat_3d = create_conway(init_layer, 56)
+            if np.random.rand() < 0.5:
+                mat_3d = np.flip(mat_3d, axis=2)
+            mat_3d_now = np.logical_or(mat_3d_now, mat_3d)
+
+        skelton = VoxelGridSkelton.from_box(region, (56, 56, 56))
+        indices = np.where(mat_3d_now)
+        indices_flat = indices[0] + indices[1] * 56 + indices[2] * 56 * 56
+        grid = VoxelGrid(skelton, indices_flat)
+        return cls(region, panels, grid)
 
 
 if __name__ == "__main__":
