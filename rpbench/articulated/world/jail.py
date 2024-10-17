@@ -9,7 +9,7 @@ from plainmp.psdf import CloudSDF
 from plainmp.psdf import UnionSDF as pUnionSDF
 from plainmp.utils import sksdf_to_cppsdf
 from scipy.spatial import KDTree
-from skrobot.model.primitives import Axis, PointCloudLink
+from skrobot.model.primitives import PointCloudLink
 from skrobot.sdf import UnionSDF
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
@@ -159,73 +159,33 @@ class ConwayJailWorld(JailWorldBase):
             mat_3d_now = np.logical_or(mat_3d_now, mat_3d)
 
         skelton = VoxelGridSkelton.from_box(region, (56, 56, 56))
-        indices = np.where(mat_3d_now)
-        indices_flat = indices[0] + indices[1] * 56 + indices[2] * 56 * 56
-        grid = VoxelGrid(skelton, indices_flat)
+        indices = np.argwhere(mat_3d_now)
+        grid = VoxelGrid(skelton, indices)
         return cls(region, panels, grid)
 
 
 if __name__ == "__main__":
-    from plainmp.ik import solve_ik
-    from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
-    from plainmp.problem import Problem
-    from plainmp.robot_spec import FetchSpec
-    from skrobot.models.fetch import Fetch
+    pass
 
     np.random.seed(3)
-    world = JailWorld.sample()
-    sdf = world.get_plainmp_sdf()
-    co = world.region.copy_worldcoords()
-    co.translate([0.25, 0.05, 0.0])
-    axis = Axis.from_coords(co)
+    world = ConwayJailWorld.sample()
+    world_again = JailWorld.deserialize(world.serialize())
+    assert world.serialize() == world_again.serialize()
 
-    fs = FetchSpec()
-    eq_cst = fs.create_gripper_pose_const(co.worldpos())
-    ineq_cst = fs.create_collision_const()
-    ineq_cst.set_sdf(sdf)
-    lb, ub = fs.angle_bounds()
+    # v = PyrenderViewer()
+    # world.visualize(v)
+    # v.show()
+    # import time; time.sleep(1000)
 
-    start = np.array([0.0, 1.31999949, 1.40000015, -0.20000077, 1.71999929, 0.0, 1.6600001, 0.0])
-    msbox = np.array([0.02, 0.02, 0.02, 0.05, 0.05, 0.05, 0.1, 0.1])
-    solver = OMPLSolver(OMPLSolverConfig(50000000, algorithm_range=None, simplify=True))
+    import tqdm
 
     ts = time.time()
-    while True:
-        ret_ik = solve_ik(eq_cst, ineq_cst, lb, ub, q_seed=None, max_trial=100)
-        if not ineq_cst.is_valid(ret_ik.q):
-            continue
-        goal = ret_ik.q
-        problem = Problem(start, lb, ub, goal, ineq_cst, None, msbox)
-        ret = solver.solve(problem)
-        if ret.traj is not None:
-            break
-    print(f"elapsed time: {time.time() - ts}")
+    for _ in tqdm.tqdm(range(1000)):
+        world.serialize()
+    print(f"per serialize: {(time.time() - ts) / 1000}")
 
-    co = world.region.copy_worldcoords()
-    co.translate([0.27, 0.04, 0.0])
-    eq_cst = fs.create_gripper_pose_const(co.worldpos())
-    problem = Problem(start, lb, ub, eq_cst, ineq_cst, None, msbox)
-
-    solver = OMPLSolver(
-        OMPLSolverConfig(
-            50000000, algorithm_range=None, simplify=True, ertconnect_eps=0.1, n_max_ik_trial=1
-        )
-    )
-    ret = solver.solve(problem, ret.traj)
-    print(ret)
-
-    fetch = Fetch()
-    set_robot_state(fetch, fs.control_joint_names, ret_ik.q)
-    viewer = PyrenderViewer()
-    world.visualize(viewer)
-    viewer.add(fetch)
-    viewer.add(axis)
-    viewer.show()
-
-    for q in ret.traj:
-        set_robot_state(fetch, fs.control_joint_names, q)
-        time.sleep(1)
-        viewer.redraw()
-    import time
-
-    time.sleep(1000)
+    ts = time.time()
+    serialized = world.serialize()
+    for _ in tqdm.tqdm(range(1000)):
+        JailWorld.deserialize(serialized)
+    print(f"per deserialize: {(time.time() - ts) / 1000}")

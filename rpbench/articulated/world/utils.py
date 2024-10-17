@@ -7,6 +7,7 @@ from functools import cached_property
 from typing import Callable, ClassVar, Generic, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
+import zstd
 from numba import njit
 from skrobot.coordinates import CascadedCoords, Transform
 from skrobot.model.primitives import Box, Cylinder, Link, MeshLink
@@ -191,20 +192,9 @@ class VoxelGridSkelton:
         points_wrt_local = tf_world_to_local.transform_vector(points_wrt_world)
         lb = np.array(self.extents) * -0.5
         indices = np.floor((points_wrt_local - lb) / self.intervals).astype(int)
-        indices_flat = (
-            indices[:, 0]
-            + indices[:, 1] * self.resols[0]
-            + indices[:, 2] * self.resols[0] * self.resols[1]
-        ).astype(int)
-        indices_flat.sort()
-        return indices_flat.astype(np.uint32)
+        return indices
 
-    def indices_to_points(self, indices_flat: np.ndarray) -> np.ndarray:
-        indices_z = indices_flat // (self.resols[0] * self.resols[1])
-        indices_y = (indices_flat % (self.resols[0] * self.resols[1])) // self.resols[0]
-        indices_x = indices_flat % self.resols[0]
-        indices = np.stack([indices_x, indices_y, indices_z], axis=-1)
-
+    def indices_to_points(self, indices: np.ndarray) -> np.ndarray:
         lb = np.array(self.extents) * -0.5
         points_wrt_local = np.array(indices) * self.intervals + lb
         points_wrt_world = self.tf_local_to_world.transform_vector(points_wrt_local)
@@ -283,16 +273,6 @@ def compute_distance_field(binary_map):
     return dmap
 
 
-class ZlibCompressor:
-    @staticmethod
-    def compress(data: bytes) -> bytes:
-        return zlib.compress(data, 1)
-
-    @staticmethod
-    def decompress(data: bytes) -> bytes:
-        return zlib.decompress(data)
-
-
 class LzmaCompressor:
     @staticmethod
     def compress(data: bytes) -> bytes:
@@ -303,8 +283,18 @@ class LzmaCompressor:
         return lzma.decompress(data)
 
 
+class ZstdCompressor:
+    @staticmethod
+    def compress(data: bytes) -> bytes:
+        return zstd.compress(data, 15)
+
+    @staticmethod
+    def decompress(data: bytes) -> bytes:
+        return zstd.decompress(data)
+
+
 @dataclass
-class VoxelGrid(LzmaCompressor):
+class VoxelGrid(ZstdCompressor):
     skelton: VoxelGridSkelton
     indices: np.ndarray
 
@@ -330,10 +320,10 @@ class VoxelGrid(LzmaCompressor):
 
     def serialize(self) -> bytes:
         skelton_bytes = self.skelton.serialize()
-        indices_bytes = self.indices.tobytes()
-        indices_comp_bytes = self.compress(indices_bytes)
+        voxelmap_bytes = self.to_3darray().tobytes()
+        voxelmap_comp_bytes = self.compress(voxelmap_bytes)
         skelton_bytes_size_bytes = struct.pack("I", len(skelton_bytes))
-        return skelton_bytes_size_bytes + skelton_bytes + indices_comp_bytes
+        return skelton_bytes_size_bytes + skelton_bytes + voxelmap_comp_bytes
 
     @classmethod
     def deserialize(cls, serialized: bytes) -> "VoxelGrid":
@@ -341,8 +331,9 @@ class VoxelGrid(LzmaCompressor):
         bytes_skelton = serialized[4 : 4 + skelton_bytes_size]
         skelton = VoxelGridSkelton.deserialize(bytes_skelton)
         bytes_other = serialized[4 + skelton_bytes_size :]
-        unziped = cls.decompress(bytes_other)
-        indices = np.frombuffer(unziped, dtype=np.uint32)
+        decompressed = cls.decompress(bytes_other)
+        voxelmap = np.frombuffer(decompressed, dtype=bool).reshape(skelton.resols)
+        indices = np.argwhere(voxelmap)
         return cls(skelton, indices)
 
     def to_points(self) -> np.ndarray:
@@ -351,14 +342,10 @@ class VoxelGrid(LzmaCompressor):
 
     def to_3darray(self) -> np.ndarray:
         resols = self.skelton.resols
-        indices_z = self.indices // (resols[0] * resols[1])
-        indices_y = (self.indices % (resols[0] * resols[1])) // resols[0]
-        indices_x = self.indices % resols[0]
-        indices = np.stack([indices_x, indices_y, indices_z], axis=-1)
         lins = [np.arange(resols[i]) for i in range(3)]
         X, Y, Z = np.meshgrid(*lins)
         voxel = np.zeros(resols, dtype=bool)
-        voxel[indices[:, 0], indices[:, 1], indices[:, 2]] = True
+        voxel[self.indices[:, 0], self.indices[:, 1], self.indices[:, 2]] = True
         return voxel
 
     @classmethod
@@ -368,9 +355,5 @@ class VoxelGrid(LzmaCompressor):
         skelton: VoxelGridSkelton,
     ) -> "VoxelGrid":
         indices = np.argwhere(voxel)
-        resols = skelton.resols
-        indices_flat = (
-            indices[:, 0] + indices[:, 1] * resols[0] + indices[:, 2] * resols[0] * resols[1]
-        ).astype(np.uint32)
-        indices_flat.sort()
-        return cls(skelton, indices_flat)
+        skelton.resols
+        return cls(skelton, indices)
