@@ -567,9 +567,18 @@ class ParametricMazeTaskBase(TaskBase):
         assert len(param) == cls.dof
         return cls(ParametricMaze(param))
 
-    def visualize(self, trajs, **kwargs):
-        fig, ax = plt.subplots()
-        self.world.visualize((fig, ax))
+    def visualize(self, trajs, plot_world: bool = True, fax=None, **kwargs):
+        if fax is None:
+            fig, ax = plt.subplots()
+        else:
+            fig, ax = fax
+
+        if plot_world:
+            self.world.visualize((fig, ax))
+            # ax.text(0.5, 1.05, 'maze map!', transform=ax.transAxes, ha='center', va='bottom', fontsize=12, fontweight='bold')
+            y_pos = self.world.y_length + 0.04
+            ax.text(0.5, y_pos, r"$n_p$=" + str(self.dof), ha="center", va="bottom", fontsize=16)
+
         if trajs is None:
             return
 
@@ -588,6 +597,11 @@ class ParametricMazeTaskBase(TaskBase):
                 X = np.array(X)
                 ax.plot(X[:, 0], X[:, 1], **kwargs)
                 ax.plot(X[-1, 0], X[-1, 1], "o-", color=kwargs["color"], markersize=2)
+
+        if plot_world:
+            # plot start and goal
+            ax.plot(0.05, 0.05, "mo", markersize=10, label="start")
+            ax.plot(0.95, self.world.y_length - 0.05, "m*", markersize=10, label="goal")
 
     @classmethod
     def sample(

@@ -78,17 +78,10 @@ class ParametricMaze:
 
     def visualize(self, fax):
         fig, ax = fax
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, self.y_length)
+        ax.set_xlim(-0.02, 1.02)
+        ax.set_ylim(-0.02, self.y_length + 0.02)
         wall_ys = np.linspace(0, self.y_length, self.n + 2)[1:-1]
         holl_xs = self.param
-
-        # xlin, ylin = np.linspace(0.0, 1.0, 100), np.linspace(0.0, 1.0, 100)
-        # X, Y = np.meshgrid(xlin, ylin)
-        # pts = np.stack([X.ravel(), Y.ravel()], axis=1)
-        # dist = self.signed_distance_batch(pts[:, 0], pts[:, 1])
-        # dist = dist.reshape(100, 100)
-        # ax.imshow(dist < 0.0, extent=(0, 1, 0, 1), origin="lower", cmap="gray", alpha=0.5)
 
         for i in range(self.n):
             wall_y = wall_ys[i]
@@ -100,12 +93,12 @@ class ParametricMaze:
             holl_x_max = min(holl_x_max, 1)
             if holl_x_min > 0:
                 left_wall = patches.Rectangle(
-                    (0, wall_y_min), holl_x_min, self.wall_thickness, color="black"
+                    (0, wall_y_min), holl_x_min, self.wall_thickness, color="dimgray"
                 )
                 ax.add_patch(left_wall)
             if holl_x_max < 1:
                 right_wall = patches.Rectangle(
-                    (holl_x_max, wall_y_min), 1 - holl_x_max, self.wall_thickness, color="black"
+                    (holl_x_max, wall_y_min), 1 - holl_x_max, self.wall_thickness, color="dimgray"
                 )
                 ax.add_patch(right_wall)
         boundary = patches.Rectangle(
@@ -114,10 +107,12 @@ class ParametricMaze:
 
         ax.add_patch(boundary)
         ax.set_aspect("equal")
-        plt.title("Parametric Maze Visualization")
-        plt.xlabel("X-axis")
-        plt.ylabel("Y-axis")
-        plt.grid(True)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["left"].set_visible(False)
 
 
 if __name__ == "__main__":
