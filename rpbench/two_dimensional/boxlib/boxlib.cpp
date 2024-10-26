@@ -6,6 +6,7 @@
 
 extern "C" {
     void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickness, double hole_size, double y_length);
+    void* create_parametric_maze_boxes_special(double param, double wall_thickness, double hole_size, double y_length);
     void* make_boxes(double* xmin, double* xmax, double* ymin, double* ymax, int n);
     void delete_boxes(void* boxes);
     double signed_distance(double x, double y, void* boxes);
@@ -59,6 +60,33 @@ void signed_distance_batch(double* x, double* y, double* dist, int n, void* boxe
 
 void delete_boxes(void* boxes) {
   delete static_cast<Boxes*>(boxes);
+}
+
+void* create_parametric_maze_boxes_special(double param, double wall_thickness, double hole_size, double y_length) {
+  std::vector<double> xmins(2);
+  std::vector<double> xmaxs(2);
+  std::vector<double> ymins(2);
+  std::vector<double> ymaxs(2);
+
+  // place a single wall-with-hole at the center of the maze
+  double half_wall_thickness = wall_thickness * 0.5;
+  double half_hole_size = hole_size * 0.5;
+  auto wall_y = y_length * 0.5;
+  auto holl_x = param;
+  // left
+  xmins[0] = 0.0;
+  xmaxs[0] = holl_x - half_hole_size;
+  ymins[0] = wall_y - half_wall_thickness;
+  ymaxs[0] = wall_y + half_wall_thickness;
+
+  // right
+  xmins[1] = holl_x + half_hole_size;
+  xmaxs[1] = 1.0;
+  ymins[1] = wall_y - half_wall_thickness;
+  ymaxs[1] = wall_y + half_wall_thickness;
+
+  void* boxes = make_boxes(xmins.data(), xmaxs.data(), ymins.data(), ymaxs.data(), 2);
+  return boxes;
 }
 
 void* create_parametric_maze_boxes(double* param, int n_dof, double wall_thickness, double hole_size, double y_length) {

@@ -26,6 +26,14 @@ lib.create_parametric_maze_boxes.argtypes = [
 ]
 lib.create_parametric_maze_boxes.restype = ctypes.c_void_p
 
+lib.create_parametric_maze_boxes_special.argtypes = [
+    ctypes.c_double,
+    ctypes.c_double,
+    ctypes.c_double,
+    ctypes.c_double,
+]
+lib.create_parametric_maze_boxes_special.restype = ctypes.c_void_p
+
 lib.signed_distance_batch.argtypes = [
     ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
     ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
@@ -38,29 +46,13 @@ lib.delete_boxes.argtypes = [ctypes.c_void_p]
 lib.delete_boxes.restype = None
 
 
-class ParametricMaze:
+class ParametricMazeBase:
     ptr: ctypes.c_void_p
     n: int
     param: np.ndarray
     y_length: float
     wall_thickness = 0.20
     holl_width = 0.12
-
-    def __init__(self, param: np.ndarray):
-        y_length = (len(param) + 1) * 0.7
-        self.ptr = lib.create_parametric_maze_boxes(
-            param, len(param), self.wall_thickness, self.holl_width, y_length
-        )
-        self.n = len(param)
-        self.param = param
-        self.y_length = y_length
-
-    @classmethod
-    def sample(cls, n: int):
-        x_min = cls.holl_width * 0.5
-        x_max = 1.0 - cls.holl_width * 0.5
-        param = np.random.uniform(x_min, x_max, n)
-        return cls(param)
 
     def __del__(self):
         lib.delete_boxes(self.ptr)
@@ -115,12 +107,52 @@ class ParametricMaze:
         ax.spines["left"].set_visible(False)
 
 
+class ParametricMaze(ParametricMazeBase):
+    def __init__(self, param: np.ndarray):
+        y_length = (len(param) + 1) * 0.7
+        self.ptr = lib.create_parametric_maze_boxes(
+            param, len(param), self.wall_thickness, self.holl_width, y_length
+        )
+        self.n = len(param)
+        self.param = param
+        self.y_length = y_length
+
+    @classmethod
+    def sample(cls, n: int):
+        x_min = cls.holl_width * 0.5
+        x_max = 1.0 - cls.holl_width * 0.5
+        param = np.random.uniform(x_min, x_max, n)
+        return cls(param)
+
+
+class ParametricMazeSpecial(ParametricMazeBase):
+    def __init__(self, param: float):
+        y_length = (4 + 1) * 0.7
+        self.ptr = lib.create_parametric_maze_boxes_special(
+            param, self.wall_thickness, self.holl_width, y_length
+        )
+        self.n = 1
+        self.param = np.array([param])
+        self.y_length = y_length
+
+    @classmethod
+    def sample(cls):
+        x_min = cls.holl_width * 0.5
+        x_max = 1.0 - cls.holl_width * 0.5
+        param = np.random.uniform(x_min, x_max)
+        return cls(param)
+
+
 if __name__ == "__main__":
-    maze = ParametricMaze(np.array([0.2, 0.5]))
-    xlin = np.linspace(0.0, 1.0, 100)
-    ylin = np.linspace(0.0, maze.y_length, 100)
-    X, Y = np.meshgrid(xlin, ylin)
-    pts = np.stack([X.ravel(), Y.ravel()], axis=1)
-    dist = maze.signed_distance_batch(pts[:, 0], pts[:, 1])
-    plt.imshow(dist.reshape(100, 100) < 0.0)
+    # maze = ParametricMazeSpecial(0.2)
+    maze = ParametricMaze(np.array([0.3, 0.5, 0.7]))
+    fig, ax = plt.subplots()
+    maze.visualize((fig, ax))
     plt.show()
+    # xlin = np.linspace(0.0, 1.0, 100)
+    # ylin = np.linspace(0.0, maze.y_length, 100)
+    # X, Y = np.meshgrid(xlin, ylin)
+    # pts = np.stack([X.ravel(), Y.ravel()], axis=1)
+    # dist = maze.signed_distance_batch(pts[:, 0], pts[:, 1])
+    # plt.imshow(dist.reshape(100, 100) < 0.0)
+    # plt.show()

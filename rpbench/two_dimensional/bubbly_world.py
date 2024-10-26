@@ -19,7 +19,7 @@ from rpbench.interface import (
     TaskExpression,
     TaskWithWorldCondBase,
 )
-from rpbench.two_dimensional.boxlib import ParametricMaze
+from rpbench.two_dimensional.boxlib import ParametricMaze, ParametricMazeSpecial
 from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryBound,
     TrajectoryCostFunction,
@@ -555,6 +555,7 @@ class Taskvisualizer:
 class ParametricMazeTaskBase(TaskBase):
     world: ParametricMaze
     dof: ClassVar[int]
+    is_special: ClassVar[bool] = False
 
     @dataclass
     class _FMTResult:
@@ -565,7 +566,11 @@ class ParametricMazeTaskBase(TaskBase):
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTaskBase":
         assert len(param) == cls.dof
-        return cls(ParametricMaze(param))
+        if cls.is_special:
+            assert len(param) == 1
+            return cls(ParametricMazeSpecial(param[0]))
+        else:
+            return cls(ParametricMaze(param))
 
     def visualize(self, trajs, plot_world: bool = True, fax=None, **kwargs):
         if fax is None:
@@ -577,7 +582,10 @@ class ParametricMazeTaskBase(TaskBase):
             self.world.visualize((fig, ax))
             # ax.text(0.5, 1.05, 'maze map!', transform=ax.transAxes, ha='center', va='bottom', fontsize=12, fontweight='bold')
             y_pos = self.world.y_length + 0.04
-            ax.text(0.5, y_pos, r"$n_p$=" + str(self.dof), ha="center", va="bottom", fontsize=16)
+            if not self.is_special:
+                ax.text(
+                    0.5, y_pos, r"$n_p$=" + str(self.dof), ha="center", va="bottom", fontsize=16
+                )
 
         if trajs is None:
             return
@@ -614,7 +622,10 @@ class ParametricMazeTaskBase(TaskBase):
             t_elapsed = time.time() - t_start
             if t_elapsed > timeout:
                 raise TimeoutError("predicated_sample: timeout!")
-            task = cls(ParametricMaze.sample(cls.dof))
+            if cls.is_special:
+                task = cls(ParametricMazeSpecial.sample())
+            else:
+                task = cls(ParametricMaze.sample(cls.dof))
             if predicate is None or predicate(task):
                 return task
 
@@ -684,17 +695,21 @@ class ParametricMazeTask5D(ParametricMazeTaskBase):
     dof: ClassVar[int] = 5
 
 
+class ParametricMazeSpecialTask(ParametricMazeTaskBase):
+    is_special: ClassVar[bool] = True
+    dof: ClassVar[
+        int
+    ] = 4  # HACK: although this task is 1D, world length has same as the case of n_p = 4, which will be used to determine the waypoint number
+
+
 if __name__ == "__main__":
-    # task = ParametricMazeTaskBase.from_task_param(np.array([0.8, 0.2, 0.8, 0.2]))
-    task = ParametricMazeTask3D.sample()
+    special = True
+    if special:
+        task = ParametricMazeSpecialTask.sample()
+    else:
+        task = ParametricMazeTask3D.sample()
     result = task.solve_default()
     assert result.traj is not None
-    print("solved")
-    # expr = task.export_task_expression(False)
-    # param = expr.get_vector()
-    # param += 0.0
-    # task2 = ParametricMazeTaskBase.from_task_param(param)
-    # task2.vis
 
     n_point = 100 * task.dof
     solver_config = DoubleIntegratorPlanningConfig(n_point, 30, only_closest=False)
