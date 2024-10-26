@@ -19,7 +19,11 @@ from rpbench.interface import (
     TaskExpression,
     TaskWithWorldCondBase,
 )
-from rpbench.two_dimensional.boxlib import ParametricMaze, ParametricMazeSpecial
+from rpbench.two_dimensional.boxlib import (
+    ParametricCircles,
+    ParametricMaze,
+    ParametricMazeSpecial,
+)
 from rpbench.two_dimensional.double_integrator_trajopt import (
     TrajectoryBound,
     TrajectoryCostFunction,
@@ -556,6 +560,7 @@ class ParametricMazeTaskBase(TaskBase):
     world: ParametricMaze
     dof: ClassVar[int]
     is_special: ClassVar[bool] = False
+    is_circle: ClassVar[bool] = False
 
     @dataclass
     class _FMTResult:
@@ -570,7 +575,10 @@ class ParametricMazeTaskBase(TaskBase):
             assert len(param) == 1
             return cls(ParametricMazeSpecial(param[0]))
         else:
-            return cls(ParametricMaze(param))
+            if cls.is_circle:
+                return cls(ParametricCircles(param))
+            else:
+                return cls(ParametricMaze(param))
 
     def visualize(self, trajs, plot_world: bool = True, fax=None, **kwargs):
         if fax is None:
@@ -625,7 +633,10 @@ class ParametricMazeTaskBase(TaskBase):
             if cls.is_special:
                 task = cls(ParametricMazeSpecial.sample())
             else:
-                task = cls(ParametricMaze.sample(cls.dof))
+                if cls.is_circle:
+                    task = cls(ParametricCircles.sample(cls.dof))
+                else:
+                    task = cls(ParametricMaze.sample(cls.dof))
             if predicate is None or predicate(task):
                 return task
 
@@ -695,6 +706,26 @@ class ParametricMazeTask5D(ParametricMazeTaskBase):
     dof: ClassVar[int] = 5
 
 
+class ParametricCirclesTask1D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 1
+    is_circle: ClassVar[bool] = True
+
+
+class ParametricCirclesTask2D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 2
+    is_circle: ClassVar[bool] = True
+
+
+class ParametricCirclesTask3D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 3
+    is_circle: ClassVar[bool] = True
+
+
+class ParametricCirclesTask4D(ParametricMazeTaskBase):
+    dof: ClassVar[int] = 4
+    is_circle: ClassVar[bool] = True
+
+
 class ParametricMazeSpecialTask(ParametricMazeTaskBase):
     is_special: ClassVar[bool] = True
     dof: ClassVar[
@@ -703,11 +734,15 @@ class ParametricMazeSpecialTask(ParametricMazeTaskBase):
 
 
 if __name__ == "__main__":
-    special = True
+    special = False
+    is_circle = True
     if special:
         task = ParametricMazeSpecialTask.sample()
     else:
-        task = ParametricMazeTask3D.sample()
+        if is_circle:
+            task = ParametricCirlcesTask4D.sample()
+        else:
+            task = ParametricMazeTask3D.sample()
     result = task.solve_default()
     assert result.traj is not None
 

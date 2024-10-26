@@ -143,12 +143,60 @@ class ParametricMazeSpecial(ParametricMazeBase):
         return cls(param)
 
 
+class ParametricCircles:
+    params: np.ndarray
+    circle_radius = 0.2
+
+    def __init__(self, params: np.ndarray):
+        self.params = params
+        self.y_length = (4 + 1) * 0.7
+        self.ys = np.linspace(0, self.y_length, len(params) + 2)[1:-1]
+
+    @classmethod
+    def sample(cls, n: int):
+        x_min = cls.circle_radius
+        x_max = 1.0 - cls.circle_radius
+        params = np.random.uniform(x_min, x_max, n)
+        return cls(params)
+
+    def signed_distance(self, x, y):
+        return self.signed_distance_batch(np.array([x]), np.array([y]))[0]
+
+    def signed_distance_batch(self, x, y):
+        sq_vals = np.full(len(x), np.inf)
+        for i, param in enumerate(self.params):
+            tmp = (x - param) ** 2 + (y - self.ys[i]) ** 2
+            sq_vals = np.minimum(sq_vals, tmp)
+        return np.sqrt(sq_vals) - self.circle_radius
+
+    def visualize(self, fax):
+        fig, ax = fax
+        ax.set_xlim(-0.02, 1.02)
+        ax.set_ylim(-0.02, self.y_length + 0.02)
+        for i, y in enumerate(self.ys):
+            circle = patches.Circle((self.params[i], y), self.circle_radius, color="dimgray")
+            ax.add_patch(circle)
+        boundary = patches.Rectangle(
+            (0, 0), 1, self.y_length, fill=False, edgecolor="black", linewidth=2
+        )
+
+        ax.add_patch(boundary)
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+
+
 if __name__ == "__main__":
-    # maze = ParametricMazeSpecial(0.2)
-    maze = ParametricMaze(np.array([0.3, 0.5, 0.7]))
+    maze = ParametricCircles([0.4, 0.3, 0.8])
     fig, ax = plt.subplots()
     maze.visualize((fig, ax))
     plt.show()
+
+    # maze = ParametricMaze(np.array([0.3, 0.5, 0.7]))
     # xlin = np.linspace(0.0, 1.0, 100)
     # ylin = np.linspace(0.0, maze.y_length, 100)
     # X, Y = np.meshgrid(xlin, ylin)

@@ -230,5 +230,3 @@ if __name__ == "__main__":
     solver.setup(p)
     r = solver.solve(r.traj)
     task2.world.visualize(r.traj)
-
-
