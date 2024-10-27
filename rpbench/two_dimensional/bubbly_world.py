@@ -559,6 +559,7 @@ class Taskvisualizer:
 class ParametricMazeTaskBase(TaskBase):
     world: ParametricMaze
     dof: ClassVar[int]
+    ext_goal_param: Optional[float]  # used only for circle task
     is_special: ClassVar[bool] = False
     is_circle: ClassVar[bool] = False
 
@@ -576,7 +577,7 @@ class ParametricMazeTaskBase(TaskBase):
             return cls(ParametricMazeSpecial(param[0]))
         else:
             if cls.is_circle:
-                return cls(ParametricCircles(param))
+                return cls(ParametricCircles(param[:-1]), param[-1])
             else:
                 return cls(ParametricMaze(param))
 
@@ -595,29 +596,34 @@ class ParametricMazeTaskBase(TaskBase):
                     0.5, y_pos, r"$n_p$=" + str(self.dof), ha="center", va="bottom", fontsize=16
                 )
 
-        if trajs is None:
-            return
-
-        # if isinstance(trajs, diopt.Trajectory):
-        #     trajs = [trajs]
-        for traj in trajs:
-            if isinstance(traj, diopt.Trajectory):
-                ax.plot(traj.X[:, 0], traj.X[:, 1], "ro-", markersize=2)
-                ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
-            else:
-                t_duration = traj.get_duration()
-                t_resolution = 0.01
-                for t in np.arange(0, t_duration, t_resolution):
-                    traj.interpolate(t)
-                X = [traj.interpolate(t) for t in np.arange(0, t_duration, t_resolution)]
-                X = np.array(X)
-                ax.plot(X[:, 0], X[:, 1], **kwargs)
-                ax.plot(X[-1, 0], X[-1, 1], "o-", color=kwargs["color"], markersize=2)
+        if trajs is not None:
+            for traj in trajs:
+                if isinstance(traj, diopt.Trajectory):
+                    ax.plot(traj.X[:, 0], traj.X[:, 1], "ro-", markersize=2)
+                    ax.plot(traj.X[-1, 0], traj.X[-1, 1], "o", color=kwargs["color"], markersize=2)
+                else:
+                    t_duration = traj.get_duration()
+                    t_resolution = 0.01
+                    for t in np.arange(0, t_duration, t_resolution):
+                        traj.interpolate(t)
+                    X = [traj.interpolate(t) for t in np.arange(0, t_duration, t_resolution)]
+                    X = np.array(X)
+                    ax.plot(X[:, 0], X[:, 1], **kwargs)
+                    ax.plot(X[-1, 0], X[-1, 1], "o-", color=kwargs["color"], markersize=2)
 
         if plot_world:
             # plot start and goal
             ax.plot(0.05, 0.05, "mo", markersize=10, label="start")
-            ax.plot(0.95, self.world.y_length - 0.05, "m*", markersize=10, label="goal")
+            if self.ext_goal_param is None:
+                ax.plot(0.95, self.world.y_length - 0.05, "m*", markersize=10, label="goal")
+            else:
+                ax.plot(
+                    self.ext_goal_param,
+                    self.world.y_length - 0.05,
+                    "m*",
+                    markersize=10,
+                    label="goal",
+                )
 
     @classmethod
     def sample(
@@ -634,14 +640,19 @@ class ParametricMazeTaskBase(TaskBase):
                 task = cls(ParametricMazeSpecial.sample())
             else:
                 if cls.is_circle:
-                    task = cls(ParametricCircles.sample(cls.dof))
+                    x_goal = np.random.uniform(0.05, 0.95)
+                    task = cls(ParametricCircles.sample(cls.dof), x_goal)
                 else:
                     task = cls(ParametricMaze.sample(cls.dof))
             if predicate is None or predicate(task):
                 return task
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
-        return TaskExpression(self.world.param, None, np.empty(0))
+        if self.ext_goal_param:
+            other_vec = np.array([self.ext_goal_param])
+        else:
+            other_vec = np.empty(0)
+        return TaskExpression(self.world.param, None, other_vec)
 
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
@@ -674,7 +685,10 @@ class ParametricMazeTaskBase(TaskBase):
         margin = 0.01
         sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1]) - margin
         start = np.array([0.05, 0.05])
-        goal = np.array([0.95, self.world.y_length - 0.05])
+        if self.ext_goal_param is None:
+            goal = np.array([0.95, self.world.y_length - 0.05])
+        else:
+            goal = np.array([self.ext_goal_param, self.world.y_length - 0.05])
         tbound = TrajectoryBound(
             np.array([0.0, 0.0]),
             np.array([1.0, self.world.y_length]),
@@ -737,17 +751,18 @@ if __name__ == "__main__":
     special = False
     is_circle = True
     if special:
-        task = ParametricMazeSpecialTask.sample()
+        assert False
     else:
         if is_circle:
-            task = ParametricCirlcesTask4D.sample()
+            task = ParametricCirclesTask1D.sample()
+            task = ParametricCirclesTask1D.from_task_param(task.to_task_param())
         else:
             task = ParametricMazeTask3D.sample()
     result = task.solve_default()
     assert result.traj is not None
 
-    n_point = 100 * task.dof
-    solver_config = DoubleIntegratorPlanningConfig(n_point, 30, only_closest=False)
+    n_point = 100 * 4
+    solver_config = DoubleIntegratorPlanningConfig(n_point, 30, only_closest=True)
     solver = DoubleIntegratorOptimizationSolver.init(solver_config)
     solver.setup(task.export_problem())
     from pyinstrument import Profiler
@@ -757,7 +772,7 @@ if __name__ == "__main__":
     result2 = solver.solve(result.traj)
     profiler.stop()
     if result2.traj is None:
-        task.visualize(None)
+        task.visualize([result.traj], color="r")
     else:
         print("solved!")
         task.visualize([result.traj, result2.traj], color="r")
