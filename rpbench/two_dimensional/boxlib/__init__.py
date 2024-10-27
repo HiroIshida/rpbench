@@ -1,6 +1,7 @@
 import ctypes
 from os import path
 from pathlib import Path
+from typing import ClassVar
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
@@ -17,6 +18,16 @@ if not lib_path.exists():
     assert ret.returncode == 0
 
 lib = ctypes.CDLL(str(lib_path))
+
+lib.make_boxes.argtypes = [
+    ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+    ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+    ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+    ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
+    ctypes.c_int,
+]
+lib.make_boxes.restype = ctypes.c_void_p
+
 lib.create_parametric_maze_boxes.argtypes = [
     ndpointer(dtype=np.float64, flags="C_CONTIGUOUS"),
     ctypes.c_int,
@@ -144,38 +155,71 @@ class ParametricMazeSpecial(ParametricMazeBase):
 
 
 class ParametricCircles:
+    ptr: ctypes.c_void_p
     param: np.ndarray
-    circle_radius = 0.25
+    obstacle_w: ClassVar[float] = 0.5
+    obstacle_h: ClassVar[float] = 0.3
+
+    def __del__(self):
+        lib.delete_boxes(self.ptr)
 
     def __init__(self, params: np.ndarray):
         self.param = params
         self.y_length = (4 + 1) * 0.7
         self.ys = np.linspace(0, self.y_length, len(params) + 2)[1:-1]
+        # create_voxes
+        xmins = []
+        xmaxs = []
+        ymins = []
+        ymaxs = []
+        for x, y in zip(params, self.ys):
+            xmins.append(x - self.obstacle_w / 2)
+            xmaxs.append(x + self.obstacle_w / 2)
+            ymins.append(y - self.obstacle_h / 2)
+            ymaxs.append(y + self.obstacle_h / 2)
+        xmins = np.array(xmins)
+        xmaxs = np.array(xmaxs)
+        ymins = np.array(ymins)
+        ymaxs = np.array(ymaxs)
+        self.ptr = lib.make_boxes(xmins, xmaxs, ymins, ymaxs, len(params))
 
     @classmethod
     def sample(cls, n: int):
-        x_min = cls.circle_radius
-        x_max = 1.0 - cls.circle_radius
+        x_min = cls.obstacle_w / 2
+        x_max = 1.0 - cls.obstacle_w / 2
         params = np.random.uniform(x_min, x_max, n)
         return cls(params)
 
     def signed_distance(self, x, y):
-        return self.signed_distance_batch(np.array([x]), np.array([y]))[0]
+        return lib.signed_distance(ctypes.c_double(x), ctypes.c_double(y), self.ptr)
 
     def signed_distance_batch(self, x, y):
-        sq_vals = np.full(len(x), np.inf)
-        for i, param in enumerate(self.param):
-            tmp = (x - param) ** 2 + (y - self.ys[i]) ** 2
-            sq_vals = np.minimum(sq_vals, tmp)
-        return np.sqrt(sq_vals) - self.circle_radius
+        x = np.ascontiguousarray(x, dtype=np.float64)
+        y = np.ascontiguousarray(y, dtype=np.float64)
+        n = len(x)
+        dist = np.empty(n, dtype=np.float64)
+        lib.signed_distance_batch(x, y, dist, ctypes.c_int(n), self.ptr)
+        return dist
 
     def visualize(self, fax):
         fig, ax = fax
         ax.set_xlim(-0.02, 1.02)
         ax.set_ylim(-0.02, self.y_length + 0.02)
         for i, y in enumerate(self.ys):
-            circle = patches.Circle((self.param[i], y), self.circle_radius, color="dimgray")
-            ax.add_patch(circle)
+            x = self.param[i]
+            x_min = x - self.obstacle_w / 2
+            x + self.obstacle_w / 2
+            y_min = y - self.obstacle_h / 2
+            y + self.obstacle_h / 2
+            ax.add_patch(
+                patches.Rectangle(
+                    (x_min, y_min),
+                    self.obstacle_w,
+                    self.obstacle_h,
+                    fill=True,
+                    color="dimgray",
+                )
+            )
         boundary = patches.Rectangle(
             (0, 0), 1, self.y_length, fill=False, edgecolor="black", linewidth=2
         )

@@ -754,8 +754,8 @@ if __name__ == "__main__":
         assert False
     else:
         if is_circle:
-            task = ParametricCirclesTask1D.sample()
-            task = ParametricCirclesTask1D.from_task_param(task.to_task_param())
+            task = ParametricCirclesTask4D.sample()
+            task = ParametricCirclesTask4D.from_task_param(task.to_task_param())
         else:
             task = ParametricMazeTask3D.sample()
     result = task.solve_default()
