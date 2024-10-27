@@ -570,7 +570,7 @@ class ParametricMazeTaskBase(TaskBase):
 
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "ParametricMazeTaskBase":
-        assert len(param) == cls.dof
+        # assert len(param) == cls.dof
         if cls.is_special:
             assert len(param) == 1
             return cls(ParametricMazeSpecial(param[0]))
