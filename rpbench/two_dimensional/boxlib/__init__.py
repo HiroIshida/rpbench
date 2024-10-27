@@ -120,9 +120,9 @@ class ParametricMazeBase:
 
 class ParametricMaze(ParametricMazeBase):
     def __init__(self, param: np.ndarray):
-        y_length = (len(param) + 1) * 0.7
+        y_length = (4 + 1) * 0.7
         self.ptr = lib.create_parametric_maze_boxes(
-            param, len(param), self.wall_thickness, self.holl_width, y_length
+            np.array(param), len(param), self.wall_thickness, self.holl_width, y_length
         )
         self.n = len(param)
         self.param = param

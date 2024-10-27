@@ -637,13 +637,13 @@ class ParametricMazeTaskBase(TaskBase):
             if t_elapsed > timeout:
                 raise TimeoutError("predicated_sample: timeout!")
             if cls.is_special:
-                task = cls(ParametricMazeSpecial.sample())
+                task = cls(ParametricMazeSpecial.sample(), None)
             else:
                 if cls.is_circle:
                     x_goal = np.random.uniform(0.05, 0.95)
                     task = cls(ParametricCircles.sample(cls.dof), x_goal)
                 else:
-                    task = cls(ParametricMaze.sample(cls.dof))
+                    task = cls(ParametricMaze.sample(cls.dof), None)
             if predicate is None or predicate(task):
                 return task
 
