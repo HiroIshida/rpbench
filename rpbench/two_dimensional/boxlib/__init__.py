@@ -144,11 +144,11 @@ class ParametricMazeSpecial(ParametricMazeBase):
 
 
 class ParametricCircles:
-    params: np.ndarray
+    param: np.ndarray
     circle_radius = 0.2
 
     def __init__(self, params: np.ndarray):
-        self.params = params
+        self.param = params
         self.y_length = (4 + 1) * 0.7
         self.ys = np.linspace(0, self.y_length, len(params) + 2)[1:-1]
 
@@ -164,7 +164,7 @@ class ParametricCircles:
 
     def signed_distance_batch(self, x, y):
         sq_vals = np.full(len(x), np.inf)
-        for i, param in enumerate(self.params):
+        for i, param in enumerate(self.param):
             tmp = (x - param) ** 2 + (y - self.ys[i]) ** 2
             sq_vals = np.minimum(sq_vals, tmp)
         return np.sqrt(sq_vals) - self.circle_radius
@@ -174,7 +174,7 @@ class ParametricCircles:
         ax.set_xlim(-0.02, 1.02)
         ax.set_ylim(-0.02, self.y_length + 0.02)
         for i, y in enumerate(self.ys):
-            circle = patches.Circle((self.params[i], y), self.circle_radius, color="dimgray")
+            circle = patches.Circle((self.param[i], y), self.circle_radius, color="dimgray")
             ax.add_patch(circle)
         boundary = patches.Rectangle(
             (0, 0), 1, self.y_length, fill=False, edgecolor="black", linewidth=2
