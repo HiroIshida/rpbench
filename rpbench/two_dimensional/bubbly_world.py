@@ -559,7 +559,6 @@ class Taskvisualizer:
 class ParametricMazeTaskBase(TaskBase):
     world: ParametricMaze
     dof: ClassVar[int]
-    ext_goal_param: Optional[float]  # used only for circle task
     is_special: ClassVar[bool] = False
     is_circle: ClassVar[bool] = False
 
@@ -577,7 +576,7 @@ class ParametricMazeTaskBase(TaskBase):
             return cls(ParametricMazeSpecial(param[0]))
         else:
             if cls.is_circle:
-                return cls(ParametricCircles(param[:-1]), param[-1])
+                return cls(ParametricCircles(param))
             else:
                 return cls(ParametricMaze(param))
 
@@ -614,16 +613,7 @@ class ParametricMazeTaskBase(TaskBase):
         if plot_world:
             # plot start and goal
             ax.plot(0.05, 0.05, "mo", markersize=10, label="start")
-            if self.ext_goal_param is None:
-                ax.plot(0.95, self.world.y_length - 0.05, "m*", markersize=10, label="goal")
-            else:
-                ax.plot(
-                    self.ext_goal_param,
-                    self.world.y_length - 0.05,
-                    "m*",
-                    markersize=10,
-                    label="goal",
-                )
+            ax.plot(0.95, self.world.y_length - 0.05, "m*", markersize=10, label="goal")
 
     @classmethod
     def sample(
@@ -637,21 +627,17 @@ class ParametricMazeTaskBase(TaskBase):
             if t_elapsed > timeout:
                 raise TimeoutError("predicated_sample: timeout!")
             if cls.is_special:
-                task = cls(ParametricMazeSpecial.sample(), None)
+                task = cls(ParametricMazeSpecial.sample())
             else:
                 if cls.is_circle:
-                    x_goal = np.random.uniform(0.05, 0.95)
-                    task = cls(ParametricCircles.sample(cls.dof), x_goal)
+                    task = cls(ParametricCircles.sample(cls.dof))
                 else:
-                    task = cls(ParametricMaze.sample(cls.dof), None)
+                    task = cls(ParametricMaze.sample(cls.dof))
             if predicate is None or predicate(task):
                 return task
 
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
-        if self.ext_goal_param:
-            other_vec = np.array([self.ext_goal_param])
-        else:
-            other_vec = np.empty(0)
+        other_vec = np.empty(0)
         return TaskExpression(self.world.param, None, other_vec)
 
     def solve_default(self) -> ResultProtocol:
@@ -685,10 +671,7 @@ class ParametricMazeTaskBase(TaskBase):
         margin = 0.01
         sdf: SDFProtocol = lambda x: self.world.signed_distance_batch(x[:, 0], x[:, 1]) - margin
         start = np.array([0.05, 0.05])
-        if self.ext_goal_param is None:
-            goal = np.array([0.95, self.world.y_length - 0.05])
-        else:
-            goal = np.array([self.ext_goal_param, self.world.y_length - 0.05])
+        goal = np.array([0.95, self.world.y_length - 0.05])
         tbound = TrajectoryBound(
             np.array([0.0, 0.0]),
             np.array([1.0, self.world.y_length]),
