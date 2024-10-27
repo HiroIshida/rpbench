@@ -145,7 +145,7 @@ class ParametricMazeSpecial(ParametricMazeBase):
 
 class ParametricCircles:
     param: np.ndarray
-    circle_radius = 0.2
+    circle_radius = 0.25
 
     def __init__(self, params: np.ndarray):
         self.param = params
