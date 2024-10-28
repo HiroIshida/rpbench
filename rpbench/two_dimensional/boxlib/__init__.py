@@ -157,11 +157,8 @@ class ParametricMazeSpecial(ParametricMazeBase):
 class ParametricCircles:
     ptr: ctypes.c_void_p
     param: np.ndarray
-    obstacle_w: ClassVar[float] = 0.5
+    obstacle_w: ClassVar[float] = 0.4
     obstacle_h: ClassVar[float] = 0.3
-
-    def __del__(self):
-        lib.delete_boxes(self.ptr)
 
     def __init__(self, params: np.ndarray):
         self.param = params
