@@ -655,7 +655,7 @@ class ParametricMazeTaskBase(TaskBase):
             sdfs = problem.sdf(np.expand_dims(x, axis=0)) - margin
             return sdfs[0] > 0.0
 
-        N = 3000 + 500 * self.dof
+        N = 5000
         print(f"start solving with N={N}")
         ts = time.time()
         fmt = FastMarchingTree(s_start, s_goal, is_obstacle_free, bbox, problem.dt, 1.0, N)
@@ -675,8 +675,8 @@ class ParametricMazeTaskBase(TaskBase):
         tbound = TrajectoryBound(
             np.array([0.0, 0.0]),
             np.array([1.0, self.world.y_length]),
-            np.array([-0.2, -0.2]),
-            np.array([0.2, 0.2]),
+            np.array([-0.5, -0.5]),
+            np.array([0.5, 0.5]),
             np.array([-0.05, -0.05]),
             np.array([0.05, 0.05]),
         )
@@ -740,11 +740,11 @@ if __name__ == "__main__":
             task = ParametricCirclesTask4D.sample()
             task = ParametricCirclesTask4D.from_task_param(task.to_task_param())
         else:
-            task = ParametricMazeTask3D.sample()
+            task = ParametricMazeTask2D.sample()
     result = task.solve_default()
     assert result.traj is not None
 
-    n_point = 100 * 4
+    n_point = 100 * 6
     solver_config = DoubleIntegratorPlanningConfig(n_point, 30, only_closest=True)
     solver = DoubleIntegratorOptimizationSolver.init(solver_config)
     solver.setup(task.export_problem())
