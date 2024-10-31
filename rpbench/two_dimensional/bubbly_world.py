@@ -680,7 +680,7 @@ class ParametricMazeTaskBase(TaskBase):
             np.array([-0.05, -0.05]),
             np.array([0.05, 0.05]),
         )
-        return DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.2)
+        return DoubleIntegratorPlanningProblem(start, goal, sdf, tbound, 0.5)
 
 
 class ParametricMazeTask1D(ParametricMazeTaskBase):
