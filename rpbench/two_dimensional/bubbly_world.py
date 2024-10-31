@@ -140,7 +140,7 @@ class DoubleIntegratorOptimizationSolver(
             n_max_eval=self.config.n_max_call,
             step_size_init=self.config.step_size_init,
             step_size_step=self.config.step_size_step,
-            verbose=True,
+            verbose=False,
         )
         ret = self.osqp_solver.solve(traj_guess.to_array(), osqp_conf)
         if ret.success:
