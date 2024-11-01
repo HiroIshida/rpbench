@@ -182,8 +182,8 @@ class ParametricCircles:
 
     @classmethod
     def sample(cls, n: int):
-        x_min = 0.0
-        x_max = 1.0
+        x_min = cls.obstacle_w / 2
+        x_max = 1.0 - cls.obstacle_w / 2
         params = np.random.uniform(x_min, x_max, n)
         return cls(params)
 
