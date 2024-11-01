@@ -157,7 +157,7 @@ class ParametricMazeSpecial(ParametricMazeBase):
 class ParametricCircles:
     ptr: ctypes.c_void_p
     param: np.ndarray
-    obstacle_w: ClassVar[float] = 0.4
+    obstacle_w: ClassVar[float] = 0.9
     obstacle_h: ClassVar[float] = 0.3
 
     def __init__(self, params: np.ndarray):
@@ -182,9 +182,20 @@ class ParametricCircles:
 
     @classmethod
     def sample(cls, n: int):
-        x_min = cls.obstacle_w / 2
-        x_max = 1.0 - cls.obstacle_w / 2
-        params = np.random.uniform(x_min, x_max, n)
+        x_mins = []
+        x_maxs = []
+        for i in range(n):
+            if i % 2 == 0:
+                x_min = - cls.obstacle_w / 2
+                x_max = cls.obstacle_w / 2
+            else:
+                x_min = 1 - cls.obstacle_w / 2
+                x_max = 1 + cls.obstacle_w / 2
+            x_mins.append(x_min)
+            x_maxs.append(x_max)
+        x_mins = np.array(x_mins)
+        x_maxs = np.array(x_maxs)
+        params = np.random.rand(n) * (x_maxs - x_mins) + x_mins
         return cls(params)
 
     def signed_distance(self, x, y):
@@ -232,7 +243,7 @@ class ParametricCircles:
 
 
 if __name__ == "__main__":
-    maze = ParametricCircles([0.4, 0.3, 0.8])
+    maze = ParametricCircles.sample(4)
     fig, ax = plt.subplots()
     maze.visualize((fig, ax))
     plt.show()
