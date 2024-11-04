@@ -109,8 +109,8 @@ class JailWorld(JailWorldBase):
         # sample jail bars
         sizes = np.array([cls.box_depth, cls.box_width, cls.box_height])
         margin = 0.1
-        radius_min = 0.015
-        radius_max = 0.05
+        radius_min = 0.03
+        radius_max = 0.07
         lb = -sizes * 0.5 + margin
         ub = sizes * 0.5 - margin
         n_bar = np.random.randint(1, 6)
@@ -121,10 +121,6 @@ class JailWorld(JailWorldBase):
             radius = np.random.uniform(radius_min, radius_max)
             bar = CylinderSkelton(radius, infinite_length)
             bar.translate(pos)
-            roll = np.random.uniform(0, np.pi / 4)
-            bar.rotate(roll, axis=[1, 0, 0])
-            pitch = np.random.uniform(0, 2 * np.pi)
-            bar.rotate(pitch, axis=[0, 0, 1], wrt="world")
             bars.append(bar)
         for bar in bars:
             region.assoc(bar, relative_coords="local")
@@ -165,27 +161,13 @@ class ConwayJailWorld(JailWorldBase):
 
 
 if __name__ == "__main__":
-    pass
-
-    np.random.seed(3)
-    world = ConwayJailWorld.sample()
+    # np.random.seed(3)
+    world = JailWorld.sample()
     world_again = JailWorld.deserialize(world.serialize())
     assert world.serialize() == world_again.serialize()
+    viewer = PyrenderViewer()
+    world.visualize(viewer)
+    viewer.show()
+    import time
 
-    # v = PyrenderViewer()
-    # world.visualize(v)
-    # v.show()
-    # import time; time.sleep(1000)
-
-    import tqdm
-
-    ts = time.time()
-    for _ in tqdm.tqdm(range(1000)):
-        world.serialize()
-    print(f"per serialize: {(time.time() - ts) / 1000}")
-
-    ts = time.time()
-    serialized = world.serialize()
-    for _ in tqdm.tqdm(range(1000)):
-        JailWorld.deserialize(serialized)
-    print(f"per deserialize: {(time.time() - ts) / 1000}")
+    time.sleep(1000)

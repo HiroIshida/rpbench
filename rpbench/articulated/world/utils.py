@@ -315,7 +315,7 @@ class VoxelGrid(ZstdCompressor):
         points = skelton.get_eval_points()
         sdf_values = sdf(points)
         width = np.max(skelton.intervals)
-        surface_indices = np.logical_and(sdf_values < 0, sdf_values > -width)
+        surface_indices = np.logical_and(sdf_values < 0, sdf_values > -2 * width)
         return cls.from_points(points[surface_indices], skelton)
 
     def serialize(self) -> bytes:
