@@ -316,7 +316,7 @@ class BubblyWorldBase(SamplableWorldBase):
         return Grid2d(np.zeros(2), np.ones(2), (56, 56))
 
     def get_grid_map(self) -> np.ndarray:
-        grid = self.get_grid()
+        grid = self.grid()
 
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
         X, Y = np.meshgrid(xlin, ylin)
