@@ -320,7 +320,7 @@ class BubblyWorldBase(SamplableWorldBase):
 
         xlin, ylin = [np.linspace(grid.lb[i], grid.ub[i], grid.sizes[i]) for i in range(2)]
         X, Y = np.meshgrid(xlin, ylin)
-        pts = np.array(list(zip(X.flatten(), Y.flatten())))
+        pts = np.vstack((X.ravel(), Y.ravel())).T
 
         sdf = self.get_exact_sdf()
         vals = sdf.__call__(pts)
