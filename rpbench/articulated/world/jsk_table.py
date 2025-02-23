@@ -121,6 +121,11 @@ class JskMessyTableWorldBase(SamplableWorldBase):
         pass
 
     @classmethod
+    @abstractmethod
+    def robot_specific_table_position_check(cls, table: JskTable) -> bool:
+        pass
+
+    @classmethod
     def sample(cls, standard: bool = False) -> "JskMessyTableWorldBase":
         table = JskTable()
 
@@ -132,15 +137,6 @@ class JskMessyTableWorldBase(SamplableWorldBase):
         if standard:
             assert False
         else:
-
-            def table_collide_with_fetch():
-                # NOTE: this jsk_table world is not originally designed to be used only with fetch
-                # But for the sake of simplicity, we will check the collision with fetch
-                # appoximate fetch's base by a sphere with radius 0.3 at z=0.25
-                sdf = UnionSDF([p.sdf for p in table.table_primitives])
-                dist = sdf(np.array([[0.0, 0.0, 0.25]]))[0]
-                return dist < 0.3
-
             while True:
                 xmin, xmax, ymin, ymax = cls.get_table_position_minmax()
                 x_position = np.random.uniform(xmin, xmax)
@@ -150,7 +146,7 @@ class JskMessyTableWorldBase(SamplableWorldBase):
                 table.newcoords(co)
                 angle = cls.get_rotation_angle()
                 table.rotate(angle, "z")
-                if not table_collide_with_fetch():
+                if not cls.robot_specific_table_position_check(table):
                     break
 
             # implement obstacle distribution
@@ -246,7 +242,18 @@ class JskMessyTableWorldBase(SamplableWorldBase):
         return cls(table, obstacle_list, obstacle_env_region)
 
 
-class JskMessyTableWorld(JskMessyTableWorldBase):
+class FetchJskMessyTableWorld(JskMessyTableWorldBase):
+    @classmethod
+    def robot_specific_table_position_check(cls, table: JskTable) -> bool:
+        # NOTE: this jsk_table world is not originally designed to be used only with fetch
+        # But for the sake of simplicity, we will check the collision with fetch
+        # appoximate fetch's base by a sphere with radius 0.3 at z=0.25
+        sdf = UnionSDF([p.sdf for p in table.table_primitives])
+        dist = sdf(np.array([[0.0, 0.0, 0.25]]))[0]
+        return dist < 0.3
+
+
+class JskMessyTableWorld(FetchJskMessyTableWorld):
     @classmethod
     def get_rotation_angle(cls) -> float:
         return 0.0
@@ -256,7 +263,7 @@ class JskMessyTableWorld(JskMessyTableWorldBase):
         return 0.6, 0.8, JskTable.TABLE_WIDTH * -0.5, JskTable.TABLE_WIDTH * 0.5
 
 
-class JskMessyTableWorld2(JskMessyTableWorldBase):
+class JskMessyTableWorld2(FetchJskMessyTableWorld):
     @classmethod
     def get_rotation_angle(cls) -> float:
         return np.pi / 2

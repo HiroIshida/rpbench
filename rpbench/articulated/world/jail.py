@@ -168,6 +168,4 @@ if __name__ == "__main__":
     viewer = PyrenderViewer()
     world.visualize(viewer)
     viewer.show()
-    import time
-
     time.sleep(1000)
