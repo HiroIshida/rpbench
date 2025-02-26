@@ -135,7 +135,12 @@ def is_colliding(shape1: Primitive2d, shape2: Primitive2d) -> bool:
         return bool(dist < shape1.radius + shape2.radius)
 
     elif isinstance(shape1, Box2d) and isinstance(shape2, Box2d):
+        # NOTE: This is just a heuristic. It is not a perfect collision detection.
         if np.any(shape1.sd(shape2.verts) < 0.0) or np.any(shape2.sd(shape1.verts) < 0.0):
+            return True
+        if shape2.sd(shape1.coords.pos[None, :])[0] < 0.0:
+            return True
+        if shape1.sd(shape2.coords.pos[None, :])[0] < 0.0:
             return True
         return False
     elif isinstance(shape1, Box2d) and isinstance(shape2, Circle):
@@ -144,30 +149,6 @@ def is_colliding(shape1: Primitive2d, shape2: Primitive2d) -> bool:
         return shape2.sd(np.expand_dims(shape1.center, axis=0))[0] < shape1.radius
     else:
         raise NotImplementedError
-
-
-def sample_shape(
-    table_extent: np.ndarray, box_extent: np.ndarray, obstacles: List[Box2d], n_budget: int = 30
-) -> Optional[Box2d]:
-    table = Box2d(table_extent, PlanerCoords.standard())
-
-    for _ in range(n_budget):
-        box_pos_cand = -0.5 * table_extent + table_extent * np.random.rand(2)
-        angle_cand = -0.5 * np.pi + np.random.rand() * np.pi
-        box_cand = Box2d(box_extent, PlanerCoords(box_pos_cand, angle_cand))
-
-        def is_valid(box_cand):
-            is_inside = np.all(table.sd(box_cand.verts) < 0.0)
-            if is_inside:
-                for obs in obstacles:
-                    if box_cand.is_colliding(obs):
-                        return False
-                return True
-            return False
-
-        if is_valid(box_cand):
-            return box_cand
-    return None
 
 
 def sample_box(
@@ -184,7 +165,7 @@ def sample_box(
             is_inside = np.all(table.sd(box_cand.verts) < 0.0)
             if is_inside:
                 for obs in obstacles:
-                    if box_cand.is_colliding(obs):
+                    if is_colliding(box_cand, obs):
                         return False
                 return True
             return False

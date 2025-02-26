@@ -28,13 +28,13 @@ class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
     sdf: SignedDistanceFunction
 
     def to_visualizable(self, color: Optional[Tuple[int, int, int, int]] = None) -> PrimitiveT:
-        primitive = self._to_skrobot_primitive()
+        primitive = self.to_skrobot_primitive()
         if color is not None:
             primitive.set_color(color)
         return primitive
 
     @abstractmethod
-    def _to_skrobot_primitive(self) -> PrimitiveT:
+    def to_skrobot_primitive(self) -> PrimitiveT:
         ...
 
     @abstractmethod
@@ -53,7 +53,7 @@ class MeshSkelton(CascadedCoords, PrimitiveSkelton[MeshLink]):
         self.assoc(sdf, relative_coords="local")
         self.sdf = sdf
 
-    def _to_skrobot_primitive(self) -> MeshLink:
+    def to_skrobot_primitive(self) -> MeshLink:
         mesh_link = MeshLink(self.mesh)
         mesh_link.newcoords(self.copy_worldcoords())
         return mesh_link
@@ -101,7 +101,7 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
     def extents(self) -> np.ndarray:
         return np.array(self._extents)
 
-    def _to_skrobot_primitive(self) -> Box:
+    def to_skrobot_primitive(self) -> Box:
         box = Box(self.extents)
         box.newcoords(self.copy_worldcoords())
         return box
@@ -134,7 +134,7 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
         self.assoc(sdf, relative_coords="local")
         self.sdf = sdf
 
-    def _to_skrobot_primitive(self) -> Cylinder:
+    def to_skrobot_primitive(self) -> Cylinder:
         cylidner = Cylinder(self.radius, self.height)
         cylidner.newcoords(self.copy_worldcoords())
         return cylidner
