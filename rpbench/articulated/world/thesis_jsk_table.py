@@ -16,6 +16,10 @@ from rpbench.planer_box_utils import Box2d, PlanerCoords, is_colliding, sample_b
 from rpbench.utils import SceneWrapper
 
 
+def fit_radian(theta):
+    return (theta + np.pi) % (2 * np.pi) - np.pi
+
+
 def define_av_init() -> np.ndarray:
     model = PR2()
     model.reset_manip_pose()
@@ -256,7 +260,7 @@ class JskMessyTableWorld(SamplableWorldBase):
             sds = table_box2d_wrt_table.sd(np.array([pr2_point_plus_x, pr2_point_plus_y]))
             grad_sd = (sds[0] - sd, sds[1] - sd)
             yaw_center = np.arctan2(grad_sd[1], grad_sd[0]) + np.pi  # TODO: randomize
-            yaw = yaw_center + np.random.uniform(-np.pi / 6, np.pi / 6)
+            yaw = fit_radian(yaw_center + np.random.uniform(-np.pi / 6, np.pi / 6))
             quaternion = np.array([0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2)])
             q = np.hstack([pr2_point, 0, quaternion])
             cst.evaluate(q)[0]
