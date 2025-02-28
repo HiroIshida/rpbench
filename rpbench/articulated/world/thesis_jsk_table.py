@@ -1,10 +1,9 @@
 from dataclasses import dataclass
-from typing import ClassVar, List, Union
+from typing import ClassVar, List, Union, Tuple
 
 import numpy as np
 from plainmp.psdf import UnionSDF
-from plainmp.robot_spec import PR2BaseOnlySpec
-from plainmp.utils import primitive_to_plainmp_sdf
+from plainmp.robot_spec import PR2BaseOnlySpec, PR2RarmSpec, PR2LarmSpec
 from skrobot.coordinates import CascadedCoords
 from skrobot.coordinates.math import rpy_angle
 from skrobot.models.pr2 import PR2
@@ -20,19 +19,36 @@ def fit_radian(theta):
     return (theta + np.pi) % (2 * np.pi) - np.pi
 
 
-def define_av_init() -> np.ndarray:
+def define_av_init() -> Tuple[np.ndarray, np.ndarray]:
+    # called only once
     model = PR2()
     model.reset_manip_pose()
-    model.r_shoulder_lift_joint.joint_angle(+0.4)
-    model.r_upper_arm_roll_joint.joint_angle(-2.6)
-    model.l_shoulder_lift_joint.joint_angle(+0.4)
-    model.l_upper_arm_roll_joint.joint_angle(2.6)
-    return model.angle_vector()
+    model.r_shoulder_pan_joint.joint_angle(-1.94)
+    model.r_shoulder_lift_joint.joint_angle(1.23)
+    model.r_upper_arm_roll_joint.joint_angle(-2.0)
+    model.r_elbow_flex_joint.joint_angle(-1.02)
+    model.r_forearm_roll_joint.joint_angle(-1.03)
+    model.r_wrist_flex_joint.joint_angle(-1.18)
+    model.r_wrist_roll_joint.joint_angle(-0.78)
+
+    model.l_shoulder_pan_joint.joint_angle(+1.94)
+    model.l_shoulder_lift_joint.joint_angle(1.23)
+    model.l_upper_arm_roll_joint.joint_angle(+2.0)
+    model.l_elbow_flex_joint.joint_angle(-1.02)
+    model.l_forearm_roll_joint.joint_angle(+1.03)
+    model.l_wrist_flex_joint.joint_angle(-1.08)
+    model.l_wrist_roll_joint.joint_angle(0.78)
+
+    larm_spec = PR2LarmSpec()
+    larm_init_angles = [getattr(model, jn).joint_angle() for jn in larm_spec.control_joint_names]
+    rarm_spec = PR2RarmSpec()
+    rarm_init_angles = [getattr(model, jn).joint_angle() for jn in rarm_spec.control_joint_names]
+    return model.angle_vector(), larm_init_angles, rarm_init_angles
 
 
 DARKRED_COLOR = (139, 0, 0, 200)
 BROWN_COLOR = (204, 102, 0, 200)
-AV_INIT = define_av_init()
+AV_INIT, LARM_INIT_ANGLES, RARM_INIT_ANGLES = define_av_init()
 
 
 class JskChair(CascadedCoords):
@@ -61,10 +77,7 @@ class JskChair(CascadedCoords):
             viewer.add(prim.to_visualizable(DARKRED_COLOR))
 
     def create_sdf(self) -> UnionSDF:
-        psdfs = [
-            primitive_to_plainmp_sdf(prim.to_skrobot_primitive()) for prim in self.chair_primitives
-        ]
-        return UnionSDF(psdfs)
+        return UnionSDF([p.to_plainmp_sdf() for p in self.chair_primitives])
 
 
 class JskTable(CascadedCoords):
@@ -161,10 +174,7 @@ class JskTable(CascadedCoords):
             viewer.add(prim.to_visualizable((200, 200, 200, 255)))
 
     def create_sdf(self) -> UnionSDF:
-        psdfs = [
-            primitive_to_plainmp_sdf(prim.to_skrobot_primitive()) for prim in self.table_primitives
-        ]
-        return UnionSDF(psdfs)
+        return UnionSDF([p.to_plainmp_sdf() for p in self.table_primitives])
 
 
 @dataclass
@@ -250,7 +260,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         while True:
             pr2_point = target_region.sample_points(1)[0][:2]
             sd = table_box2d_wrt_table.sd(pr2_point.reshape(1, 2))[0]
-            if sd > 0.6:
+            if sd > 0.55:
                 continue  # too far from the table
             if sd < 0.0:
                 continue  # apparently colliding with the table
@@ -261,11 +271,8 @@ class JskMessyTableWorld(SamplableWorldBase):
             grad_sd = (sds[0] - sd, sds[1] - sd)
             yaw_center = np.arctan2(grad_sd[1], grad_sd[0]) + np.pi  # TODO: randomize
             yaw = fit_radian(yaw_center + np.random.uniform(-np.pi / 6, np.pi / 6))
-            quaternion = np.array([0.0, 0.0, np.sin(yaw / 2), np.cos(yaw / 2)])
-            q = np.hstack([pr2_point, 0, quaternion])
-            cst.evaluate(q)[0]
-            if cst.is_valid(q):
-                pr2_coords = np.hstack([pr2_point, yaw])
+            pr2_coords = np.hstack([pr2_point, yaw])
+            if cst.is_valid(pr2_coords):
                 break
         # << sample robot inside the target map region
 

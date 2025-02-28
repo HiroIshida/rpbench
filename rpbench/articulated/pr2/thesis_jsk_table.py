@@ -1,9 +1,11 @@
-from typing import ClassVar, List, Optional, Type
+import time
+from typing import ClassVar, List, Optional, Type, Union
 
 import numpy as np
+from abc import abstractmethod
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, OMPLSolverResult, Problem
 from plainmp.psdf import UnionSDF
-from plainmp.robot_spec import FetchSpec
+from plainmp.robot_spec import PR2RarmSpec, PR2LarmSpec
 from plainmp.utils import primitive_to_plainmp_sdf
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
@@ -15,8 +17,12 @@ from rpbench.articulated.world.thesis_jsk_table import (
     JskMessyTableWorld,
     JskTable,
     fit_radian,
+    AV_INIT,
+    RARM_INIT_ANGLES,
+    LARM_INIT_ANGLES,
 )
 from rpbench.interface import TaskExpression, TaskWithWorldCondBase
+from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 
 class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):
@@ -25,6 +31,13 @@ class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, 
     REACHING_YAW_MIN: ClassVar[float] = -0.25 * np.pi
     REACHING_YAW_MAX: ClassVar[float] = 0.25 * np.pi
     REACHABILITY_RADIUS: ClassVar[float] = 0.9
+
+    # @classmethod
+    # @abstractmethod
+    # def is_rarm(cls) -> bool:
+    #     ...
+    def is_rarm(self) -> bool:
+        return False
 
     @classmethod
     def get_world_type(cls) -> Type[JskMessyTableWorld]:
@@ -49,21 +62,29 @@ class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, 
         return cls(table, co)
 
     def export_problem(self) -> Problem:
-        fetch_spec = FetchSpec()
+        if self.is_rarm():
+            spec = PR2RarmSpec()
+            q_init = RARM_INIT_ANGLES
+        else:
+            spec = PR2LarmSpec()
+            q_init = LARM_INIT_ANGLES
+        pr2 = spec.get_robot_model(deepcopy=False)
+        pr2.angle_vector(AV_INIT)
+        x_pos, y_pos, yaw = self.world.pr2_coords
+        pr2.newcoords(Coordinates([x_pos, y_pos, 0], [yaw, 0, 0]))
+        spec.reflect_skrobot_model_to_kin(pr2)
+
         xyz = self.description.worldpos()
         yaw = rpy_angle(self.description.worldrot())[0][0]
         np_pose = np.array([xyz[0], xyz[1], xyz[2], 0, 0, yaw])
-
-        pose_cst = fetch_spec.create_gripper_pose_const(np_pose)
-
-        create_bvh = False  # plainmp bvh is buggy
-        sdf = UnionSDF([sksdf_to_cppsdf(o.sdf) for o in self.world.get_all_obstacles()], create_bvh)
-        ineq_cst = fetch_spec.create_collision_const()
+        pose_cst = spec.create_gripper_pose_const(np_pose)
+        sdf = UnionSDF([p.to_plainmp_sdf() for p in self.world.get_all_obstacles()])
+        ineq_cst = spec.create_collision_const()
         ineq_cst.set_sdf(sdf)
 
-        lb, ub = fetch_spec.angle_bounds()
-        motion_step_box = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.2, 0.2]
-        return Problem(fetch_spec.q_reset_pose(), lb, ub, pose_cst, ineq_cst, None, motion_step_box)
+        lb, ub = spec.angle_bounds()
+        motion_step_box = np.array([0.02] * 7)
+        return Problem(q_init, lb, ub, pose_cst, ineq_cst, None, motion_step_box)
 
     @classmethod
     def from_task_param(
@@ -124,32 +145,43 @@ class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, 
 
     @classmethod
     def sample_description(cls, world: JskMessyTableWorld) -> Optional[Coordinates]:
+        n_max_trial = 30
+        count = 0
         while True:
-            x = np.random.uniform(low=JskTable.TABLE_DEPTH * 0.5, high=JskTable.TABLE_DEPTH * 0.5)
+            if count > n_max_trial:
+                return None
+            count += 1
+            x = np.random.uniform(low=-JskTable.TABLE_DEPTH * 0.5, high=JskTable.TABLE_DEPTH * 0.5)
             y = np.random.uniform(low=-JskTable.TABLE_WIDTH * 0.5, high=JskTable.TABLE_WIDTH * 0.5)
-            z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX)
+            z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX) + JskTable.TABLE_HEIGHT
             pos = np.array([x, y, z])
             pr2_pos = world.pr2_coords[:2]
-            if np.linalg.norm(pos[:2] - pr2_pos) < cls.REACHABILITY_RADIUS:
+            dist = np.linalg.norm(pos[:2] - pr2_pos)
+            print(dist)
+            if dist > cls.REACHABILITY_RADIUS:
                 continue
             pr2_yaw_angle = world.pr2_coords[2]
             yaw_plus = np.random.uniform(low=cls.REACHING_YAW_MIN, high=cls.REACHING_YAW_MAX)
             yaw = fit_radian(pr2_yaw_angle + yaw_plus)
+            yaw = pr2_yaw_angle
             co = Coordinates(pos, [yaw, 0, 0])
             break
 
         # Collision check with objects on the table
         sdf = UnionSDF(
-            [primitive_to_plainmp_sdf(o.to_skrobot_primitive()) for o in world.get_all_obstacles()]
+            [primitive_to_plainmp_sdf(o.to_skrobot_primitive()) for o in world.tabletop_obstacle_list]
         )
         dist = sdf.evaluate(co.worldpos())
-        if dist < 0.05:
+        print(dist)
+        if dist > 0.15:  # too far
+            return None
+        if dist < 0.03:
             return None
 
         co_slided = co.copy_worldcoords()
         co_slided.translate([-0.1, 0.0, 0.0])
         dist = sdf.evaluate(co_slided.worldpos())
-        if dist < 0.05:
+        if dist < 0.03:
             return None
 
         return co
@@ -168,4 +200,28 @@ class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, 
 
 
 if __name__ == "__main__":
+    # np.random.seed(14)
     task = ThesisJskTableTask.sample()
+    problem = task.export_problem()
+
+    solver = OMPLSolver(OMPLSolverConfig(shortcut=True, bspline=True))
+    ts = time.time()
+    ret = solver.solve(problem)
+    print(ret.terminate_state)
+    print(ret.n_call)
+    print(ret.time_elapsed)
+
+    x, y, yaw = task.world.pr2_coords
+    from skrobot.models.pr2 import PR2
+    pr2 = PR2(use_tight_joint_limit=False)
+    pr2.angle_vector(AV_INIT)
+    pr2.newcoords(Coordinates([x, y, 0], [yaw, 0, 0]))
+    v = task.create_viewer()
+    v.add(pr2)
+    v.show()
+    rarm_spec = PR2LarmSpec()
+    for q in ret.traj.resample(40):
+        rarm_spec.set_skrobot_model_state(pr2, q)
+        v.redraw()
+        time.sleep(0.1)
+    time.sleep(10)
