@@ -11,7 +11,9 @@ import zstd
 from numba import njit
 from skrobot.coordinates import CascadedCoords, Transform
 from skrobot.model.primitives import Box, Cylinder, Link, MeshLink
-from skrobot.sdf import BoxSDF, CylinderSDF, SignedDistanceFunction, trimesh2sdf
+import skrobot.sdf
+from skrobot.sdf import SignedDistanceFunction, trimesh2sdf
+from plainmp.psdf import PrimitiveSDFBase, BoxSDF, CylinderSDF, Pose
 from trimesh import Trimesh
 
 PrimitiveT = TypeVar("PrimitiveT", bound=Link)
@@ -39,6 +41,10 @@ class PrimitiveSkelton(ABC, Generic[PrimitiveT]):
 
     @abstractmethod
     def detach_clone(self: SelfT) -> SelfT:
+        ...
+
+    @abstractmethod
+    def to_plainmp_sdf(self) -> PrimitiveSDFBase:
         ...
 
 
@@ -84,6 +90,9 @@ class MeshSkelton(CascadedCoords, PrimitiveSkelton[MeshLink]):
     def itp_fill_value(self, value: float):
         self.sdf.itp.fill_value = value
 
+    def to_plainmp_sdf(self) -> PrimitiveSDFBase:
+        raise NotImplementedError
+
 
 class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
     # works as Box but does not have trimesh geometries
@@ -93,7 +102,7 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
         CascadedCoords.__init__(self, pos=pos)
         self._extents = extents
 
-        sdf = BoxSDF(extents)
+        sdf = skrobot.sdf.BoxSDF(extents)  # use skrobot for backword compatibility
         self.assoc(sdf, relative_coords="local")
         self.sdf = sdf
 
@@ -121,6 +130,10 @@ class BoxSkeleton(CascadedCoords, PrimitiveSkelton[Box]):
         b.newcoords(self.copy_worldcoords())
         return b
 
+    def to_plainmp_sdf(self) -> PrimitiveSDFBase:
+        pose = Pose(self.worldpos(), self.worldrot())
+        return BoxSDF(self.extents, pose)
+
 
 class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
     radius: float
@@ -143,6 +156,10 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
         c = CylinderSkelton(self.radius, self.height)
         c.newcoords(self.copy_worldcoords())
         return c
+
+    def to_plainmp_sdf(self) -> PrimitiveSDFBase:
+        pose = psdf.Pose(self.worldpos(), self.worldrot())
+        return CylinderSDF(self.height, self.radius, pose)
 
 
 class SerializableTransform(Transform):
