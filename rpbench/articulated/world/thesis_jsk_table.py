@@ -51,6 +51,7 @@ def define_av_init() -> Tuple[np.ndarray, np.ndarray]:
 
 DARKRED_COLOR = (139, 0, 0, 200)
 BROWN_COLOR = (204, 102, 0, 200)
+DARKGREEN_COLOR = (0, 100, 0, 200)
 AV_INIT, LARM_INIT_ANGLES, RARM_INIT_ANGLES = define_av_init()
 
 
@@ -182,8 +183,8 @@ class JskTable(CascadedCoords):
 
 @dataclass
 class JskMessyTableTask(TaskBase):
-    tabletop_obstacle_list: List[BoxSkeleton]
-    chair_list: List[JskChair]
+    obstacles_param: np.ndarray  # (6 * n_obstacle,)
+    chairs_param: np.ndarray  # (3 * n_chair,)
     pr2_coords: np.ndarray
     reaching_pose: np.ndarray
     N_MAX_OBSTACLE: ClassVar[int] = 20
@@ -200,7 +201,7 @@ class JskMessyTableTask(TaskBase):
     #     """
     #     Args:
     #         pr2_coords: [x, y, yaw]
-    #         bbox_param_list: [[x, y, yaw, w, d, h], ...]
+    #         bbox_param_list: [[x, y, yaw, d, w, h], ...]
     #     """
     #     param = np.zeros(3 + 6 * cls.N_MAX_OBSTACLE)
     #     param[:3] = pr2_coords
@@ -208,19 +209,63 @@ class JskMessyTableTask(TaskBase):
     #         param[3 + 6 * i : 2 + 6 * (i + 1)] = bbox
     #     return cls.from_parameter(param)
 
+    @classmethod
+    def from_semantic_params(
+        cls,
+        bbox_param_mat: np.ndarray,  # (N, 6) [x, y, yaw, d, w, h]
+        chair_coords_mat: np.ndarray,  # (N, 3)[x, y, yaw]
+        pr2_coords: np.ndarray,  # [x, y, yaw]
+        reaching_pose: np.ndarray,
+    ) -> "JskMessyTableTask":
+
+        tabletop_obstacle_list = []
+        for bbox in bbox_param_mat:
+            co = PlanerCoords(bbox[:2], bbox[2])
+            box = BoxSkeleton(bbox[3:], co)
+            tabletop_obstacle_list.append(box)
+
+        chair_list = []
+        for chair_coords in chair_coords_mat:
+            chair = JskChair()
+            chair.translate(np.hstack([chair_coords[:2], 0.0]))
+            chair.rotate(chair_coords[2], "z")
+            chair_list.append(chair)
+
+        return cls(tabletop_obstacle_list, chair_list, pr2_coords, reaching_pose)
+
     # abstract override
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "JskMessyTableTask":
-        ...
-
-    # abstract override
-    @classmethod
-    def to_task_param(self) -> np.ndarray:
-        ...
+        head = 0
+        bbox_param_dim = 6 * cls.N_MAX_OBSTACLE
+        bbox_param_list = param[head : head + bbox_param_dim].reshape(-1, 6)
+        head += bbox_param_dim
+        chair_param_dim = 3 * cls.N_MAX_CHAIR
+        chair_coords_list = param[head : head + chair_param_dim].reshape(-1, 3)
+        head += chair_param_dim
+        pr2_coords = param[head : head + 3]
+        head += 3
+        reaching_pose = param[head : head + 4]
+        return cls.from_semantic_params(
+            bbox_param_list, chair_coords_list, pr2_coords, reaching_pose
+        )
 
     # abstract override
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
-        ...
+        pass
+        # if use_matrix:
+        #     assert False
+        # else:
+        #     param = np.zeros(6 * self.N_MAX_OBSTACLE + 3 * self.N_MAX_CHAIR + 3 + 4)
+        #     head = 0
+        #     for obs in self.tabletop_obstacle_list:
+        #         pos = obs.worldpos()
+        #         rot = obs.worldrot()
+        #         ypr = rpy_angle(rot)[0]
+        #         obstacle_pose = np.array([pos[0], pos[1], ypr[0]])
+        #         obstacle_param = np.hstack([obstacle_pose, obs.extents])
+        #         param[head : head + 6] = obstacle_param
+        #         head += 6
 
     # abstract override
     def solve_default(self) -> ResultProtocol:
@@ -251,7 +296,34 @@ class JskMessyTableTask(TaskBase):
             chair_list = cls._sample_chairs(
                 table, target_region, table_box2d_wrt_region, pr2_coords
             )
-            return cls(obstacles, chair_list, pr2_coords, reaching_pose)
+
+            # serialize obstacles
+            obstacle_param_list = []
+            for obstacle in obstacles:
+                pos = obstacle.worldpos()
+                rot = obstacle.worldrot()
+                ypr = rpy_angle(rot)[0]
+                obstacle_param = np.hstack([pos[0], pos[1], ypr[0], obstacle.extents])
+                obstacle_param_list.append(obstacle_param)
+            if len(obstacle_param_list) > 0:
+                obstacles_param = np.hstack(obstacle_param_list)
+            else:
+                obstacles_param = np.empty(0)
+
+            # serialize chairs
+            chair_param_list = []
+            for chair in chair_list:
+                pos = chair.worldpos()
+                rot = chair.worldrot()
+                ypr = rpy_angle(rot)[0]
+                chair_param = np.array([pos[0], pos[1], ypr[0]])
+                chair_param_list.append(chair_param)
+            if len(chair_param_list) > 0:
+                chairs_param = np.hstack(chair_param_list)
+            else:
+                chairs_param = np.empty(0)
+
+            return cls(obstacles_param, chairs_param, pr2_coords, reaching_pose)
 
     @staticmethod
     def _sample_obstacles_on_table(table: JskTable) -> Tuple[List[BoxSkeleton], BoxSkeleton]:
@@ -436,9 +508,6 @@ class JskMessyTableTask(TaskBase):
                 chair_list.append(chair)
         return chair_list
 
-    def get_all_obstacles(self) -> List[BoxSkeleton]:
-        return self.tabletop_obstacle_list + self.table.table_primitives
-
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         table = JskTable()
         table.visualize(viewer)
@@ -448,58 +517,19 @@ class JskMessyTableTask(TaskBase):
         ax = Axis.from_coords(co)
         viewer.add(ax)
 
-        for chair in self.chair_list:
+        for obs_param in self.obstacles_param.reshape(-1, 6):
+            x, y, yaw, d, w, h = obs_param
+            box = BoxSkeleton(np.array([d, w, h]))
+            box.translate([x, y, table.TABLE_HEIGHT + 0.5 * h])
+            box.rotate(yaw, "z")
+            viewer.add(box.to_visualizable(DARKGREEN_COLOR))
+
+        for chair_param in self.chairs_param.reshape(-1, 3):
+            x, y, yaw = chair_param
+            chair = JskChair()
+            chair.translate(np.hstack([x, y, 0.0]))
+            chair.rotate(yaw, "z")
             chair.visualize(viewer)
-
-        for obs in self.tabletop_obstacle_list:
-            viewer.add(obs.to_visualizable((0, 255, 0, 255)))
-
-    def to_parameter(self) -> np.ndarray:
-        head = 0
-        obstacle_param = np.zeros(6 * self.N_MAX_OBSTACLE)
-        for obs in self.tabletop_obstacle_list:
-            pos = obs.worldpos()
-            rot = obs.worldrot()
-            ypr = rpy_angle(rot)[0]
-            obstacle_pose = np.array([pos[0], pos[1], ypr[0]])
-            obstacle_param[head : head + 6] = np.hstack([obstacle_pose, obs.extents])
-            head += 6
-        return np.hstack([self.pr2_coords, obstacle_param])
-
-    @classmethod
-    def from_parameter(cls, param: np.ndarray) -> "JskMessyTableTask":
-        table = JskTable()
-
-        region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
-        obstacle_env_region = BoxSkeleton(region_size)
-        table.assoc(obstacle_env_region, relative_coords="local")
-        obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
-
-        pr2_planar_coords = param[:3]
-
-        region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
-        obstacle_env_region = BoxSkeleton(region_size)
-        table.assoc(obstacle_env_region, relative_coords="local")
-        obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
-
-        obstacle_param = param[3:]
-        n_obstacle = len(obstacle_param) // 6
-        obstacle_list = []
-        head = 0
-        for _ in range(n_obstacle):
-            sub_param = obstacle_param[head : head + 6]
-            if np.all(sub_param == 0.0):
-                break
-            pose_param, extent = sub_param[:3], sub_param[3:]
-            box = BoxSkeleton(extent)
-            trans = table.worldpos()[2] + 0.5 * extent[2]
-            box.translate(np.hstack([pose_param[:2], trans]))
-            box.rotate(pose_param[2], "z")
-            obstacle_env_region.assoc(box, relative_coords="world")
-            obstacle_list.append(box)
-            head += 6
-
-        return cls(table, pr2_planar_coords, [], obstacle_list, obstacle_env_region)
 
 
 if __name__ == "__main__":
