@@ -1,7 +1,9 @@
+import time
 from dataclasses import dataclass
-from typing import ClassVar, List, Optional, Tuple, Union
+from typing import Any, ClassVar, List, Optional, Tuple, Union
 
 import numpy as np
+from plainmp.problem import Problem
 from plainmp.psdf import UnionSDF
 from plainmp.robot_spec import Coordinates, PR2BaseOnlySpec, PR2LarmSpec, PR2RarmSpec
 from skrobot.coordinates import CascadedCoords
@@ -11,7 +13,7 @@ from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
 from rpbench.articulated.world.utils import BoxSkeleton
-from rpbench.interface import SamplableWorldBase
+from rpbench.interface import ResultProtocol, TaskBase, TaskExpression
 from rpbench.planer_box_utils import Box2d, PlanerCoords, is_colliding, sample_box
 from rpbench.utils import SceneWrapper
 
@@ -179,7 +181,7 @@ class JskTable(CascadedCoords):
 
 
 @dataclass
-class JskMessyTableWorld(SamplableWorldBase):
+class JskMessyTableTask(TaskBase):
     table: JskTable
     reaching_pose: np.ndarray
     pr2_coords: np.ndarray
@@ -187,51 +189,62 @@ class JskMessyTableWorld(SamplableWorldBase):
     tabletop_obstacle_list: List[BoxSkeleton]
     obstacle_env_region: BoxSkeleton
     N_MAX_OBSTACLE: ClassVar[int] = 20
+    N_MAX_CHAIR: ClassVar[int] = 5
     OBSTACLE_W_MIN: ClassVar[float] = 0.05
     OBSTACLE_W_MAX: ClassVar[float] = 0.25
     OBSTACLE_H_MIN: ClassVar[float] = 0.05
     OBSTACLE_H_MAX: ClassVar[float] = 0.35
 
-    @classmethod
-    def from_semantic_params(
-        cls, pr2_coords: np.ndarray, bbox_param_list: List[np.ndarray]
-    ) -> "JskMessyTableWorld":
-        """
-        Args:
-            pr2_coords: [x, y, yaw]
-            bbox_param_list: [[x, y, yaw, w, d, h], ...]
-        """
-        param = np.zeros(3 + 6 * cls.N_MAX_OBSTACLE)
-        param[:3] = pr2_coords
-        for i, bbox in enumerate(bbox_param_list):
-            param[3 + 6 * i : 2 + 6 * (i + 1)] = bbox
-        return cls.from_parameter(param)
+    # @classmethod
+    # def from_semantic_params(
+    #     cls, pr2_coords: np.ndarray, bbox_param_list: List[np.ndarray]
+    #     ) -> "JskMessyTableTask":
+    #     """
+    #     Args:
+    #         pr2_coords: [x, y, yaw]
+    #         bbox_param_list: [[x, y, yaw, w, d, h], ...]
+    #     """
+    #     param = np.zeros(3 + 6 * cls.N_MAX_OBSTACLE)
+    #     param[:3] = pr2_coords
+    #     for i, bbox in enumerate(bbox_param_list):
+    #         param[3 + 6 * i : 2 + 6 * (i + 1)] = bbox
+    #     return cls.from_parameter(param)
 
-    def is_out_of_distribution(self) -> bool:
+    # abstract override
+    @classmethod
+    def from_task_param(cls, param: np.ndarray) -> "JskMessyTableTask":
+        ...
+
+    # abstract override
+    @classmethod
+    def to_task_param(self) -> np.ndarray:
+        ...
+
+    # abstract override
+    def export_task_expression(self, use_matrix: bool) -> TaskExpression:
+        ...
+
+    # abstract override
+    def solve_default(self) -> ResultProtocol:
         raise NotImplementedError
-        # if len(self.tabletop_obstacle_list) > self.N_MAX_OBSTACLE:
-        #     return True
-        # co = self.table.copy_worldcoords()
-        # pos = co.worldpos()
-        # x_min, x_max, y_min, y_max = self.get_table_position_minmax()
-        # if not (x_min <= pos[0] <= x_max):
-        #     return True
-        # if not (y_min <= pos[1] <= y_max):
-        #     return True
-        # for obs in self.tabletop_obstacle_list:
-        #     h = obs.extents[2]
-        #     if not (self.OBSTACLE_H_MIN <= h <= self.OBSTACLE_H_MAX):
-        #         return True
-        #     # TODO: check positions ...
-        #     # all obstacles are on the table and should not extend outside the table
-        #     # but checking this is bit tidious
-        # return False
 
+    # abstract override
+    def export_problem(self) -> Problem:
+        raise NotImplementedError
+
+    # abstract override
     @classmethod
-    def sample(cls, standard: bool = False) -> Optional["JskMessyTableWorld"]:
+    def sample(cls, predicate: Optional[Any] = None) -> Optional["JskMessyTableTask"]:
+        assert predicate is None, "predicate is not supported"
+        timeout = 10
+        t_start = time.time()
+
         table = JskTable()
         obstacles, obstacle_env_region = cls._sample_obstacles_on_table(table)
         while True:
+            elapsed = time.time() - t_start
+            if elapsed > timeout:
+                return None
             reaching_pose = cls._sample_reaching_pose(obstacles)
             target_region, table_box2d_wrt_region = cls._prepare_target_region(table)
             pr2_coords = cls._sample_robot(table, target_region, reaching_pose)
@@ -244,21 +257,21 @@ class JskMessyTableWorld(SamplableWorldBase):
 
     @staticmethod
     def _sample_obstacles_on_table(table: JskTable) -> Tuple[List[BoxSkeleton], BoxSkeleton]:
-        region_size = [table.size[0], table.size[1], JskMessyTableWorld.OBSTACLE_H_MAX + 0.05]
+        region_size = [table.size[0], table.size[1], JskMessyTableTask.OBSTACLE_H_MAX + 0.05]
         obstacle_env_region = BoxSkeleton(region_size)
         table.assoc(obstacle_env_region, relative_coords="local")
         obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
 
-        n_min, n_max = 5, JskMessyTableWorld.N_MAX_OBSTACLE
+        n_min, n_max = 5, JskMessyTableTask.N_MAX_OBSTACLE
         n_obstacle = np.random.randint(n_min, n_max)
         region2d = Box2d(np.array(table.size[:2]), PlanerCoords.standard())
         obj2d_list = []
         for _ in range(n_obstacle):
             w = np.random.uniform(
-                JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX
+                JskMessyTableTask.OBSTACLE_W_MIN, JskMessyTableTask.OBSTACLE_W_MAX
             )
             d = np.random.uniform(
-                JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX
+                JskMessyTableTask.OBSTACLE_W_MIN, JskMessyTableTask.OBSTACLE_W_MAX
             )
             yaw = np.random.uniform(0.0, np.pi)
             center = region2d.sample_point()
@@ -270,7 +283,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         obj_list = []
         for obj2d in obj2d_list:
             h = np.random.uniform(
-                JskMessyTableWorld.OBSTACLE_H_MIN, JskMessyTableWorld.OBSTACLE_H_MAX
+                JskMessyTableTask.OBSTACLE_H_MIN, JskMessyTableTask.OBSTACLE_H_MAX
             )
             extent = np.hstack([obj2d.extent, h])
             obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
@@ -386,7 +399,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         pr2_coords: np.ndarray,
     ) -> List[JskChair]:
 
-        n_chair = np.random.randint(0, 5)
+        n_chair = np.random.randint(0, JskMessyTableTask.N_MAX_CHAIR)
         pr2_obstacle_box = Box2d(
             np.array([0.7, 0.7]),
             PlanerCoords(table_box2d_wrt_region.coords.pos + pr2_coords[:2], pr2_coords[2]),
@@ -455,7 +468,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         return np.hstack([self.pr2_coords, obstacle_param])
 
     @classmethod
-    def from_parameter(cls, param: np.ndarray) -> "JskMessyTableWorld":
+    def from_parameter(cls, param: np.ndarray) -> "JskMessyTableTask":
         table = JskTable()
 
         region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
@@ -493,14 +506,17 @@ class JskMessyTableWorld(SamplableWorldBase):
 if __name__ == "__main__":
     pr2 = PR2()
     pr2.reset_manip_pose()
-    world = JskMessyTableWorld.sample(standard=False)
+    world = JskMessyTableTask.sample()
+    import tqdm
 
-    # world = JskMessyTableWorld.from_parameter(world.to_parameter())
+    [JskMessyTableTask.sample() for _ in tqdm.tqdm(range(100))]
+
+    # world = JskMessyTableTask.from_parameter(world.to_parameter())
     pr2.translate(np.hstack([world.pr2_coords[:2], 0.0]))
     pr2.rotate(world.pr2_coords[2], "z")
     pr2.angle_vector(AV_INIT)
 
-    # world = JskMessyTableWorld.from_parameter(world.to_parameter())
+    # world = JskMessyTableTask.from_parameter(world.to_parameter())
     v = PyrenderViewer()
     world.visualize(v)
     v.add(pr2)
