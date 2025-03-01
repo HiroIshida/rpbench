@@ -1,11 +1,10 @@
 import time
-from typing import ClassVar, List, Optional, Type, Union
+from typing import ClassVar, List, Optional, Type
 
 import numpy as np
-from abc import abstractmethod
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, OMPLSolverResult, Problem
 from plainmp.psdf import UnionSDF
-from plainmp.robot_spec import PR2RarmSpec, PR2LarmSpec
+from plainmp.robot_spec import PR2LarmSpec, PR2RarmSpec
 from plainmp.utils import primitive_to_plainmp_sdf
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
@@ -14,15 +13,14 @@ from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.thesis_jsk_table import (
+    AV_INIT,
+    LARM_INIT_ANGLES,
+    RARM_INIT_ANGLES,
     JskMessyTableWorld,
     JskTable,
     fit_radian,
-    AV_INIT,
-    RARM_INIT_ANGLES,
-    LARM_INIT_ANGLES,
 )
 from rpbench.interface import TaskExpression, TaskWithWorldCondBase
-from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
 
 
 class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, None]):
@@ -153,7 +151,10 @@ class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, 
             count += 1
             x = np.random.uniform(low=-JskTable.TABLE_DEPTH * 0.5, high=JskTable.TABLE_DEPTH * 0.5)
             y = np.random.uniform(low=-JskTable.TABLE_WIDTH * 0.5, high=JskTable.TABLE_WIDTH * 0.5)
-            z = np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX) + JskTable.TABLE_HEIGHT
+            z = (
+                np.random.uniform(low=cls.REACHING_HEIGHT_MIN, high=cls.REACHING_HEIGHT_MAX)
+                + JskTable.TABLE_HEIGHT
+            )
             pos = np.array([x, y, z])
             pr2_pos = world.pr2_coords[:2]
             dist = np.linalg.norm(pos[:2] - pr2_pos)
@@ -169,7 +170,10 @@ class ThesisJskTableTask(TaskWithWorldCondBase[JskMessyTableWorld, Coordinates, 
 
         # Collision check with objects on the table
         sdf = UnionSDF(
-            [primitive_to_plainmp_sdf(o.to_skrobot_primitive()) for o in world.tabletop_obstacle_list]
+            [
+                primitive_to_plainmp_sdf(o.to_skrobot_primitive())
+                for o in world.tabletop_obstacle_list
+            ]
         )
         dist = sdf.evaluate(co.worldpos())
         print(dist)
@@ -213,6 +217,7 @@ if __name__ == "__main__":
 
     x, y, yaw = task.world.pr2_coords
     from skrobot.models.pr2 import PR2
+
     pr2 = PR2(use_tight_joint_limit=False)
     pr2.angle_vector(AV_INIT)
     pr2.newcoords(Coordinates([x, y, 0], [yaw, 0, 0]))
