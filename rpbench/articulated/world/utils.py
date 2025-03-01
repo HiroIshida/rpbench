@@ -7,13 +7,13 @@ from functools import cached_property
 from typing import Callable, ClassVar, Generic, Literal, Optional, Tuple, TypeVar, Union
 
 import numpy as np
+import skrobot.sdf
 import zstd
 from numba import njit
+from plainmp.psdf import BoxSDF, CylinderSDF, Pose, PrimitiveSDFBase
 from skrobot.coordinates import CascadedCoords, Transform
 from skrobot.model.primitives import Box, Cylinder, Link, MeshLink
-import skrobot.sdf
 from skrobot.sdf import SignedDistanceFunction, trimesh2sdf
-from plainmp.psdf import PrimitiveSDFBase, BoxSDF, CylinderSDF, Pose
 from trimesh import Trimesh
 
 PrimitiveT = TypeVar("PrimitiveT", bound=Link)
@@ -158,7 +158,7 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
         return c
 
     def to_plainmp_sdf(self) -> PrimitiveSDFBase:
-        pose = psdf.Pose(self.worldpos(), self.worldrot())
+        pose = Pose(self.worldpos(), self.worldrot())
         return CylinderSDF(self.height, self.radius, pose)
 
 

@@ -1,11 +1,13 @@
 from dataclasses import dataclass
-from typing import ClassVar, List, Union, Tuple
+from typing import ClassVar, List, Optional, Tuple, Union
 
 import numpy as np
+import tqdm
 from plainmp.psdf import UnionSDF
-from plainmp.robot_spec import PR2BaseOnlySpec, PR2RarmSpec, PR2LarmSpec
+from plainmp.robot_spec import Coordinates, PR2BaseOnlySpec, PR2LarmSpec, PR2RarmSpec
 from skrobot.coordinates import CascadedCoords
 from skrobot.coordinates.math import rpy_angle
+from skrobot.model.primitives import Axis
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
@@ -180,6 +182,7 @@ class JskTable(CascadedCoords):
 @dataclass
 class JskMessyTableWorld(SamplableWorldBase):
     table: JskTable
+    reaching_pose: np.ndarray
     pr2_coords: np.ndarray
     chair_list: List[JskChair]
     tabletop_obstacle_list: List[BoxSkeleton]
@@ -193,7 +196,7 @@ class JskMessyTableWorld(SamplableWorldBase):
     @classmethod
     def from_semantic_params(
         cls, pr2_coords: np.ndarray, bbox_param_list: List[np.ndarray]
-    ) -> "JskMessyTableWorldBase":
+    ) -> "JskMessyTableWorld":
         """
         Args:
             pr2_coords: [x, y, yaw]
@@ -226,23 +229,19 @@ class JskMessyTableWorld(SamplableWorldBase):
         # return False
 
     @classmethod
-    def sample(cls, standard: bool = False) -> "JskMessyTableWorldBase":
+    def sample(cls, standard: bool = False) -> Optional["JskMessyTableWorld"]:
         table = JskTable()
-
-        # Step 1: Sample obstacles on the table.
         obstacles, obstacle_env_region = cls._sample_obstacles_on_table(table)
-
-        # Step 2: Prepare the target region.
-        target_region, table_box2d_wrt_region = cls._prepare_target_region(table)
-
-        # Step 3: Sample a valid robot pose.
-        pr2_coords = cls._sample_robot(table, target_region)
-
-        # Step 4: Sample chairs inside the target map region.
-        chair_list = cls._sample_chairs(table, target_region, table_box2d_wrt_region, pr2_coords)
-
-        return cls(table, pr2_coords, chair_list, obstacles, obstacle_env_region)
-
+        while True:
+            reaching_pose = cls._sample_reaching_pose(obstacles)
+            target_region, table_box2d_wrt_region = cls._prepare_target_region(table)
+            pr2_coords = cls._sample_robot(table, target_region, reaching_pose)
+            if pr2_coords is None:
+                continue
+            chair_list = cls._sample_chairs(
+                table, target_region, table_box2d_wrt_region, pr2_coords
+            )
+            return cls(table, reaching_pose, pr2_coords, chair_list, obstacles, obstacle_env_region)
 
     @staticmethod
     def _sample_obstacles_on_table(table: JskTable) -> Tuple[List[BoxSkeleton], BoxSkeleton]:
@@ -256,8 +255,12 @@ class JskMessyTableWorld(SamplableWorldBase):
         region2d = Box2d(np.array(table.size[:2]), PlanerCoords.standard())
         obj2d_list = []
         for _ in range(n_obstacle):
-            w = np.random.uniform(JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX)
-            d = np.random.uniform(JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX)
+            w = np.random.uniform(
+                JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX
+            )
+            d = np.random.uniform(
+                JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX
+            )
             yaw = np.random.uniform(0.0, np.pi)
             center = region2d.sample_point()
             obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))
@@ -267,7 +270,9 @@ class JskMessyTableWorld(SamplableWorldBase):
 
         obj_list = []
         for obj2d in obj2d_list:
-            h = np.random.uniform(JskMessyTableWorld.OBSTACLE_H_MIN, JskMessyTableWorld.OBSTACLE_H_MAX)
+            h = np.random.uniform(
+                JskMessyTableWorld.OBSTACLE_H_MIN, JskMessyTableWorld.OBSTACLE_H_MAX
+            )
             extent = np.hstack([obj2d.extent, h])
             obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
             obj.rotate(obj2d.coords.angle, "z")
@@ -276,6 +281,41 @@ class JskMessyTableWorld(SamplableWorldBase):
             obstacle_env_region.assoc(obj, relative_coords="local")
         return obj_list, obstacle_env_region
 
+    @staticmethod
+    def _sample_reaching_pose(obstacles: List[BoxSkeleton]) -> np.ndarray:
+        co2d = PlanerCoords(
+            np.array([JskTable.TABLE_DEPTH * 0.5, -JskTable.TABLE_WIDTH * 0.5]), 0.0
+        )
+        large_box2d = Box2d(
+            np.array([JskTable.TABLE_DEPTH * 2, JskTable.TABLE_WIDTH * 2]), co2d
+        )  # hypothetical large box
+
+        obstacle_sdf = UnionSDF([o.to_plainmp_sdf() for o in obstacles])
+
+        while True:
+            x = np.random.uniform(-JskTable.TABLE_DEPTH * 0.5, JskTable.TABLE_DEPTH * 0.5)
+            y = np.random.uniform(-JskTable.TABLE_WIDTH * 0.5, JskTable.TABLE_WIDTH * 0.5)
+            z = np.random.uniform(0.05, 0.2) + JskTable.TABLE_HEIGHT
+            eps = 1e-3
+            pts = np.array([[x, y], [x + eps, y], [x, y + eps]])
+            sd, sd_pdx, sd_pdy = large_box2d.sd(pts)
+            if sd < -0.5:
+                continue  # too far and less likely to be reachable
+            if sd > 0.3:
+                continue
+
+            grad = np.array([sd_pdx - sd, sd_pdy - sd])
+            yaw = fit_radian(np.arctan2(grad[1], grad[0]) + np.pi)
+            cand = np.array([x, y, z, yaw])
+
+            # check if the candidate is colliding with obstacles
+            pos = cand[:3]
+            if obstacle_sdf.evaluate(pos) < 0.01:
+                continue
+            pos_slided = pos - np.array([np.cos(yaw), np.sin(yaw), 0.0]) * 0.1
+            if obstacle_sdf.evaluate(pos_slided) < 0.01:
+                continue
+            return cand
 
     @staticmethod
     def _prepare_target_region(table: JskTable) -> Tuple[BoxSkeleton, Box2d]:
@@ -296,23 +336,33 @@ class JskMessyTableWorld(SamplableWorldBase):
         return target_region, table_box2d_wrt_region
 
     @staticmethod
-    def _sample_robot(table: JskTable, target_region: BoxSkeleton) -> np.ndarray:
+    def _sample_robot(
+        table: JskTable, target_region: BoxSkeleton, reaching_pose: np.ndarray
+    ) -> Optional[np.ndarray]:
         pr2_base_spec = PR2BaseOnlySpec()
         table_sdf = table.create_sdf()
         table_box2d = Box2d(
-            np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]),
-            PlanerCoords.standard()
+            np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]), PlanerCoords.standard()
         )
         pr2_base_spec.get_kin()
-        skmodel = pr2_base_spec.get_robot_model()
+        skmodel = pr2_base_spec.get_robot_model(deepcopy=False)
         skmodel.angle_vector(AV_INIT)
         pr2_base_spec.reflect_skrobot_model_to_kin(skmodel)
         cst = pr2_base_spec.create_collision_const()
         cst.set_sdf(table_sdf)
 
+        n_max_trial = 100
         eps = 1e-2
+        count = 0
         while True:
+            count += 1
+            if count > n_max_trial:
+                return None
             pr2_point = target_region.sample_points(1)[0][:2]
+            dist = np.linalg.norm(pr2_point - reaching_pose[:2])
+            if dist > 0.8:
+                continue
+
             sd = table_box2d.sd(pr2_point.reshape(1, 2))[0]
             if sd > 0.55 or sd < 0.0:
                 continue
@@ -329,11 +379,16 @@ class JskMessyTableWorld(SamplableWorldBase):
                 return pr2_coords
 
     @staticmethod
-    def _sample_chairs(table: JskTable, target_region: BoxSkeleton, table_box2d_wrt_region: Box2d, pr2_coords: np.ndarray) -> List[JskChair]:
+    def _sample_chairs(
+        table: JskTable,
+        target_region: BoxSkeleton,
+        table_box2d_wrt_region: Box2d,
+        pr2_coords: np.ndarray,
+    ) -> List[JskChair]:
         # Create a fresh collision constraint based on the table.
         pr2_base_spec = PR2BaseOnlySpec()
         pr2_base_spec.get_kin()
-        skmodel = pr2_base_spec.get_robot_model()
+        skmodel = pr2_base_spec.get_robot_model(deepcopy=False)
         skmodel.angle_vector(AV_INIT)
         pr2_base_spec.reflect_skrobot_model_to_kin(skmodel)
         table_sdf = table.create_sdf()
@@ -370,6 +425,11 @@ class JskMessyTableWorld(SamplableWorldBase):
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         self.table.visualize(viewer)
 
+        reaching_position, reaching_yaw = self.reaching_pose[:3], self.reaching_pose[3]
+        co = Coordinates(reaching_position, rot=[reaching_yaw, 0, 0])
+        ax = Axis.from_coords(co)
+        viewer.add(ax)
+
         for chair in self.chair_list:
             chair.visualize(viewer)
 
@@ -389,7 +449,7 @@ class JskMessyTableWorld(SamplableWorldBase):
         return np.hstack([self.pr2_coords, obstacle_param])
 
     @classmethod
-    def from_parameter(cls, param: np.ndarray) -> "JskMessyTableWorldBase":
+    def from_parameter(cls, param: np.ndarray) -> "JskMessyTableWorld":
         table = JskTable()
 
         region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
@@ -428,7 +488,14 @@ if __name__ == "__main__":
     pr2 = PR2()
     pr2.reset_manip_pose()
     world = JskMessyTableWorld.sample(standard=False)
-    world = JskMessyTableWorld.from_parameter(world.to_parameter())
+    from pyinstrument import Profiler
+
+    profiler = Profiler()
+    profiler.start()
+    [JskMessyTableWorld.sample(standard=False) for _ in tqdm.tqdm(range(100))]
+    profiler.stop()
+    print(profiler.output_text(unicode=True, color=True))
+    # world = JskMessyTableWorld.from_parameter(world.to_parameter())
     pr2.translate(np.hstack([world.pr2_coords[:2], 0.0]))
     pr2.rotate(world.pr2_coords[2], "z")
     pr2.angle_vector(AV_INIT)
