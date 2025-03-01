@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, List, Optional, Tuple, Union
 
 import numpy as np
+from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, Problem
 from plainmp.problem import Problem
-from plainmp.psdf import UnionSDF
+from plainmp.psdf import BoxSDF, Pose, UnionSDF
 from plainmp.robot_spec import Coordinates, PR2BaseOnlySpec, PR2LarmSpec, PR2RarmSpec
 from skrobot.coordinates import CascadedCoords
 from skrobot.coordinates.math import rpy_angle
@@ -82,6 +83,13 @@ class JskChair(CascadedCoords):
 
     def create_sdf(self) -> UnionSDF:
         return UnionSDF([p.to_plainmp_sdf() for p in self.chair_primitives])
+
+
+_chair_origin_sdf: UnionSDF = JskChair().create_sdf()
+
+
+def get_chair_origin_sdf() -> UnionSDF:
+    return _chair_origin_sdf.clone()
 
 
 class JskTable(CascadedCoords):
@@ -180,6 +188,19 @@ class JskTable(CascadedCoords):
     def create_sdf(self) -> UnionSDF:
         return UnionSDF([p.to_plainmp_sdf() for p in self.table_primitives])
 
+    def translate(self, *args, **kwargs):
+        raise NotImplementedError("This method is deleted")
+
+    def rotate(self, *args, **kwargs):
+        raise NotImplementedError("This method is deleted")
+
+
+_jsk_table_sdf = JskTable().create_sdf()  # always the same. So, pre-compute it.
+
+
+def get_jsk_table_sdf() -> UnionSDF:
+    return _jsk_table_sdf.clone()
+
 
 @dataclass
 class JskMessyTableTask(TaskBase):
@@ -248,9 +269,46 @@ class JskMessyTableTask(TaskBase):
     def solve_default(self) -> ResultProtocol:
         raise NotImplementedError
 
+    def get_total_sdf(self) -> UnionSDF:
+        total_sdf = get_jsk_table_sdf()
+        if len(self.chairs_param) > 0:
+            for chair_param in self.chairs_param.reshape(-1, 3):
+                x, y, yaw = chair_param
+                chair_sdf = get_chair_origin_sdf()
+                chair_sdf.translate([x, y, 0.0])
+                chair_sdf.rotate_z(yaw)
+                total_sdf.merge(chair_sdf)
+
+        if len(self.obstacles_param) > 0:
+            for obs_param in self.obstacles_param.reshape(-1, 6):
+                x, y, yaw, d, w, h = obs_param
+                box_sdf = BoxSDF([d, w, h], Pose())
+                box_sdf.translate([x, y, JskTable.TABLE_HEIGHT + 0.5 * h])
+                box_sdf.rotate_z(yaw)
+                total_sdf.add(box_sdf)
+        return total_sdf
+
     # abstract override
     def export_problem(self) -> Problem:
-        raise NotImplementedError
+        spec = PR2RarmSpec(use_fixed_uuid=True)
+        pr2 = spec.get_robot_model(deepcopy=False)
+        pr2.angle_vector(AV_INIT)
+        x_pos, y_pos, yaw = self.pr2_coords
+        pr2.newcoords(Coordinates([x_pos, y_pos, 0], [yaw, 0, 0]))
+        spec.reflect_skrobot_model_to_kin(pr2)
+
+        x, y, z, yaw = self.reaching_pose
+        eq_cst = spec.create_gripper_pose_const(np.array([x, y, z, 0, 0, yaw]))
+
+        ineq_cst = spec.create_collision_const()
+        sdf = self.get_total_sdf()
+        ineq_cst.set_sdf(sdf)
+
+        lb, ub = spec.angle_bounds()
+
+        motion_step_box = np.array([0.03] * 7)
+        q_init = RARM_INIT_ANGLES
+        return Problem(q_init, lb, ub, eq_cst, ineq_cst, None, motion_step_box)
 
     # abstract override
     @classmethod
@@ -508,16 +566,18 @@ class JskMessyTableTask(TaskBase):
 
 
 if __name__ == "__main__":
-    pr2 = PR2()
-    pr2.reset_manip_pose()
-    import tqdm
+    np.random.seed(0)
+    table = JskTable()
 
-    for _ in tqdm.tqdm(range(1000)):
-        task = JskMessyTableTask.sample()
-        param = task.to_task_param()
-        task = JskMessyTableTask.from_task_param(param)
-        reparam = task.to_task_param()
-        assert np.allclose(param, reparam, equal_nan=True)
+    pr2 = PR2(use_tight_joint_limit=False)
+    pr2.reset_manip_pose()
+
+    task = JskMessyTableTask.sample()
+
+    problem = task.export_problem()
+    solver = OMPLSolver(OMPLSolverConfig(shortcut=True, bspline=True))
+    ret = solver.solve(problem)
+    rarm_spec = PR2RarmSpec()
 
     pr2.translate(np.hstack([task.pr2_coords[:2], 0.0]))
     pr2.rotate(task.pr2_coords[2], "z")
@@ -527,5 +587,8 @@ if __name__ == "__main__":
     task.visualize(v)
     v.add(pr2)
     v.show()
-    # v.add(fetch)
+    for q in ret.traj.resample(40):
+        rarm_spec.set_skrobot_model_state(pr2, q)
+        v.redraw()
+        time.sleep(0.01)
     time.sleep(1000)
