@@ -229,26 +229,79 @@ class JskMessyTableWorld(SamplableWorldBase):
     def sample(cls, standard: bool = False) -> "JskMessyTableWorldBase":
         table = JskTable()
 
+        # Step 1: Sample obstacles on the table.
+        obstacles, obstacle_env_region = cls._sample_obstacles_on_table(table)
+
+        # Step 2: Prepare the target region.
+        target_region, table_box2d_wrt_region = cls._prepare_target_region(table)
+
+        # Step 3: Sample a valid robot pose.
+        pr2_coords = cls._sample_robot(table, target_region)
+
+        # Step 4: Sample chairs inside the target map region.
+        chair_list = cls._sample_chairs(table, target_region, table_box2d_wrt_region, pr2_coords)
+
+        return cls(table, pr2_coords, chair_list, obstacles, obstacle_env_region)
+
+
+    @staticmethod
+    def _sample_obstacles_on_table(table: JskTable) -> Tuple[List[BoxSkeleton], BoxSkeleton]:
+        region_size = [table.size[0], table.size[1], JskMessyTableWorld.OBSTACLE_H_MAX + 0.05]
+        obstacle_env_region = BoxSkeleton(region_size)
+        table.assoc(obstacle_env_region, relative_coords="local")
+        obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
+
+        n_min, n_max = 5, JskMessyTableWorld.N_MAX_OBSTACLE
+        n_obstacle = np.random.randint(n_min, n_max)
+        region2d = Box2d(np.array(table.size[:2]), PlanerCoords.standard())
+        obj2d_list = []
+        for _ in range(n_obstacle):
+            w = np.random.uniform(JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX)
+            d = np.random.uniform(JskMessyTableWorld.OBSTACLE_W_MIN, JskMessyTableWorld.OBSTACLE_W_MAX)
+            yaw = np.random.uniform(0.0, np.pi)
+            center = region2d.sample_point()
+            obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))
+            if not region2d.contains(obj2d) or any(is_colliding(obj2d, o) for o in obj2d_list):
+                continue
+            obj2d_list.append(obj2d)
+
+        obj_list = []
+        for obj2d in obj2d_list:
+            h = np.random.uniform(JskMessyTableWorld.OBSTACLE_H_MIN, JskMessyTableWorld.OBSTACLE_H_MAX)
+            extent = np.hstack([obj2d.extent, h])
+            obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
+            obj.rotate(obj2d.coords.angle, "z")
+            obj.translate([0.0, 0.0, 0.5 * h - region_size[2] * 0.5])
+            obj_list.append(obj)
+            obstacle_env_region.assoc(obj, relative_coords="local")
+        return obj_list, obstacle_env_region
+
+
+    @staticmethod
+    def _prepare_target_region(table: JskTable) -> Tuple[BoxSkeleton, Box2d]:
         target_region = BoxSkeleton(
             [
                 table.TABLE_DEPTH + table.DIST_FROM_DOORSIDE_WALL + table.DIST_FROM_FRIDGESIDE_WALL,
                 table.TABLE_WIDTH + 1.2,
                 0.1,
             ],
-            pos=[-0.46, +0.56, 0],  # hand-tuned to fit well
+            pos=[-0.46, 0.56, 0],  # hand-tuned to fit well
         )
         table.assoc(target_region)
         table_pos_from_region = -target_region.worldpos()[:2]
         table_box2d_wrt_region = Box2d(
             np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]),
             PlanerCoords(table_pos_from_region, 0.0),
-        )  # table box2d wrt world (the table's center)
+        )
+        return target_region, table_box2d_wrt_region
 
-        # >> sample robot inside the target map region
+    @staticmethod
+    def _sample_robot(table: JskTable, target_region: BoxSkeleton) -> np.ndarray:
         pr2_base_spec = PR2BaseOnlySpec()
         table_sdf = table.create_sdf()
-        table_box2d_wrt_table = Box2d(
-            np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]), PlanerCoords.standard()
+        table_box2d = Box2d(
+            np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]),
+            PlanerCoords.standard()
         )
         pr2_base_spec.get_kin()
         skmodel = pr2_base_spec.get_robot_model()
@@ -256,91 +309,60 @@ class JskMessyTableWorld(SamplableWorldBase):
         pr2_base_spec.reflect_skrobot_model_to_kin(skmodel)
         cst = pr2_base_spec.create_collision_const()
         cst.set_sdf(table_sdf)
+
         eps = 1e-2
         while True:
             pr2_point = target_region.sample_points(1)[0][:2]
-            sd = table_box2d_wrt_table.sd(pr2_point.reshape(1, 2))[0]
-            if sd > 0.55:
-                continue  # too far from the table
-            if sd < 0.0:
-                continue  # apparently colliding with the table
+            sd = table_box2d.sd(pr2_point.reshape(1, 2))[0]
+            if sd > 0.55 or sd < 0.0:
+                continue
 
+            # Estimate gradient to determine heading.
             pr2_point_plus_x = pr2_point + np.array([eps, 0.0])
             pr2_point_plus_y = pr2_point + np.array([0.0, eps])
-            sds = table_box2d_wrt_table.sd(np.array([pr2_point_plus_x, pr2_point_plus_y]))
+            sds = table_box2d.sd(np.array([pr2_point_plus_x, pr2_point_plus_y]))
             grad_sd = (sds[0] - sd, sds[1] - sd)
-            yaw_center = np.arctan2(grad_sd[1], grad_sd[0]) + np.pi  # TODO: randomize
+            yaw_center = np.arctan2(grad_sd[1], grad_sd[0]) + np.pi
             yaw = fit_radian(yaw_center + np.random.uniform(-np.pi / 6, np.pi / 6))
             pr2_coords = np.hstack([pr2_point, yaw])
             if cst.is_valid(pr2_coords):
-                break
-        # << sample robot inside the target map region
+                return pr2_coords
 
-        # >> sample chairs inside the target map region
-        sample_chair = False  # temporary
+    @staticmethod
+    def _sample_chairs(table: JskTable, target_region: BoxSkeleton, table_box2d_wrt_region: Box2d, pr2_coords: np.ndarray) -> List[JskChair]:
+        # Create a fresh collision constraint based on the table.
+        pr2_base_spec = PR2BaseOnlySpec()
+        pr2_base_spec.get_kin()
+        skmodel = pr2_base_spec.get_robot_model()
+        skmodel.angle_vector(AV_INIT)
+        pr2_base_spec.reflect_skrobot_model_to_kin(skmodel)
+        table_sdf = table.create_sdf()
+        cst = pr2_base_spec.create_collision_const()
+        cst.set_sdf(table_sdf)
+
+        n_chair = np.random.randint(0, 5)
+        chair_box2d_list = []
+        for _ in range(n_chair):
+            obstacles = [table_box2d_wrt_region] + chair_box2d_list
+            chair_box2d = sample_box(
+                target_region.extents[:2], np.array([0.5, 0.5]), obstacles, n_budget=50
+            )
+            if chair_box2d is not None:
+                chair_box2d_list.append(chair_box2d)
+
         chair_list = []
-        if sample_chair:
-            n_chair = np.random.randint(0, 5)
-            chair_box2d_list = []
-            for _ in range(n_chair):
-                obstacles = [table_box2d_wrt_region] + chair_box2d_list
-                chair_box2d = sample_box(
-                    target_region.extents[:2], np.array([0.5, 0.5]), obstacles, n_budget=50
-                )
-                if chair_box2d is not None:
-                    chair_box2d_list.append(chair_box2d)
-            for chair_box2d in chair_box2d_list:
-                chair = JskChair()
-                chair.translate([chair_box2d.coords.pos[0], chair_box2d.coords.pos[1], 0.0])
-                chair.rotate(chair_box2d.coords.angle, "z")
-                target_region.assoc(chair, relative_coords="local")
-                chair_sdf = chair.create_sdf()
-                cst.set_sdf(chair_sdf)
-                if cst.is_valid(q):
-                    chair_list.append(chair)
-        # << sample chairs inside the target map region
-
-        # sample obstacle on the table
-        region_size = [table.size[0], table.size[1], cls.OBSTACLE_H_MAX + 0.05]
-        obstacle_env_region = BoxSkeleton(region_size)
-        table.assoc(obstacle_env_region, relative_coords="local")
-        obstacle_env_region.translate([0.0, 0.0, region_size[2] * 0.5])
-
-        if standard:
-            assert False
-        else:
-            # implement obstacle distribution
-            n_min_obstacle = 5
-            n_max_obstacle = cls.N_MAX_OBSTACLE
-            n_obstacle = np.random.randint(n_min_obstacle, n_max_obstacle)
-
-            # consider sampling boxes inside a planer box (table)
-            region2d = Box2d(np.array(table.size[:2]), PlanerCoords.standard())
-            obj2d_list = []  # type: ignore
-            for _ in range(n_obstacle):
-                w = np.random.uniform(cls.OBSTACLE_W_MIN, cls.OBSTACLE_W_MAX)
-                d = np.random.uniform(cls.OBSTACLE_W_MIN, cls.OBSTACLE_W_MAX)
-                yaw = np.random.uniform(0.0, np.pi)
-                center = region2d.sample_point()
-                obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))  # type: ignore
-                if not region2d.contains(obj2d):  # if stick out of the table
-                    continue
-                is_any_colliding = any([is_colliding(obj2d, o) for o in obj2d_list])
-                if is_any_colliding:
-                    continue
-                obj2d_list.append(obj2d)
-
-            obj_list = []
-            for obj2d in obj2d_list:
-                h = np.random.uniform(cls.OBSTACLE_H_MIN, cls.OBSTACLE_H_MAX)
-                extent = np.hstack([obj2d.extent, h])
-                obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
-                obj.rotate(obj2d.coords.angle, "z")
-                obj.translate([0.0, 0.0, 0.5 * h - region_size[2] * 0.5])
-                obj_list.append(obj)
-                obstacle_env_region.assoc(obj, relative_coords="local")
-
-            return cls(table, pr2_coords, chair_list, obj_list, obstacle_env_region)
+        for chair_box2d in chair_box2d_list:
+            chair = JskChair()
+            chair.translate([chair_box2d.coords.pos[0], chair_box2d.coords.pos[1], 0.0])
+            chair.rotate(chair_box2d.coords.angle, "z")
+            target_region.assoc(chair, relative_coords="local")
+            chair_sdf = chair.create_sdf()
+            # Combine the table's sdf with the chair's sdf.
+            combined_sdf = UnionSDF([table_sdf, chair_sdf])
+            cst.set_sdf(combined_sdf)
+            if cst.is_valid(pr2_coords):
+                chair_list.append(chair)
+        return chair_list
 
     def get_all_obstacles(self) -> List[BoxSkeleton]:
         return self.tabletop_obstacle_list + self.table.table_primitives
