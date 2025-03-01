@@ -182,12 +182,10 @@ class JskTable(CascadedCoords):
 
 @dataclass
 class JskMessyTableTask(TaskBase):
-    table: JskTable
-    reaching_pose: np.ndarray
-    pr2_coords: np.ndarray
-    chair_list: List[JskChair]
     tabletop_obstacle_list: List[BoxSkeleton]
-    obstacle_env_region: BoxSkeleton
+    chair_list: List[JskChair]
+    pr2_coords: np.ndarray
+    reaching_pose: np.ndarray
     N_MAX_OBSTACLE: ClassVar[int] = 20
     N_MAX_CHAIR: ClassVar[int] = 5
     OBSTACLE_W_MIN: ClassVar[float] = 0.05
@@ -253,7 +251,7 @@ class JskMessyTableTask(TaskBase):
             chair_list = cls._sample_chairs(
                 table, target_region, table_box2d_wrt_region, pr2_coords
             )
-            return cls(table, reaching_pose, pr2_coords, chair_list, obstacles, obstacle_env_region)
+            return cls(obstacles, chair_list, pr2_coords, reaching_pose)
 
     @staticmethod
     def _sample_obstacles_on_table(table: JskTable) -> Tuple[List[BoxSkeleton], BoxSkeleton]:
@@ -442,7 +440,8 @@ class JskMessyTableTask(TaskBase):
         return self.tabletop_obstacle_list + self.table.table_primitives
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        self.table.visualize(viewer)
+        table = JskTable()
+        table.visualize(viewer)
 
         reaching_position, reaching_yaw = self.reaching_pose[:3], self.reaching_pose[3]
         co = Coordinates(reaching_position, rot=[reaching_yaw, 0, 0])
@@ -507,16 +506,11 @@ if __name__ == "__main__":
     pr2 = PR2()
     pr2.reset_manip_pose()
     world = JskMessyTableTask.sample()
-    import tqdm
 
-    [JskMessyTableTask.sample() for _ in tqdm.tqdm(range(100))]
-
-    # world = JskMessyTableTask.from_parameter(world.to_parameter())
     pr2.translate(np.hstack([world.pr2_coords[:2], 0.0]))
     pr2.rotate(world.pr2_coords[2], "z")
     pr2.angle_vector(AV_INIT)
 
-    # world = JskMessyTableTask.from_parameter(world.to_parameter())
     v = PyrenderViewer()
     world.visualize(v)
     v.add(pr2)
