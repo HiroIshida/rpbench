@@ -306,7 +306,7 @@ class JskMessyTableTask(TaskBase):
             elbow_name = "r_elbow_flex_link"
         else:
             elbow_name = "l_elbow_flex_link"
-        min_elbow_height = JskTable.TABLE_HEIGHT + 0.1
+        min_elbow_height = JskTable.TABLE_HEIGHT + 0.05
         max_elbow_height = JskTable.TABLE_HEIGHT + 0.35
         elbow_cst = spec.create_position_bound_const(
             elbow_name, 2, min_elbow_height, max_elbow_height
@@ -321,6 +321,9 @@ class JskMessyTableTask(TaskBase):
         q_init = RARM_INIT_ANGLES
         problem = Problem(q_init, lb, ub, eq_cst, coll_cst, None, motion_step_box)
         problem.goal_ineq_const = elbow_cst
+        # narrow down the goal bounds for the later manipulatability
+        problem.goal_lb = lb + 0.3
+        problem.goal_ub = ub - 0.3
         return problem
 
     # abstract override
