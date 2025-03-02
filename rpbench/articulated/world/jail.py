@@ -7,7 +7,7 @@ import numpy as np
 from conway_tower import evolve_conway
 from plainmp.psdf import CloudSDF
 from plainmp.psdf import UnionSDF as pUnionSDF
-from plainmp.utils import sksdf_to_cppsdf
+from plainmp.utils import primitive_to_plainmp_sdf
 from scipy.spatial import KDTree
 from skrobot.model.primitives import PointCloudLink
 from skrobot.sdf import UnionSDF
@@ -67,9 +67,9 @@ class JailWorldBase(SamplableWorldBase):
         cloud_sdf = CloudSDF(self.voxels.to_points(), 0.0)
         sdf_list = [cloud_sdf]
         for panel in self.panels:
-            sdf = sksdf_to_cppsdf(panel.sdf)
+            sdf = primitive_to_plainmp_sdf(panel.to_skrobot_primitive())
             sdf_list.append(sdf)
-        union_sdf = pUnionSDF(sdf_list, False)
+        union_sdf = pUnionSDF(sdf_list)
         return union_sdf
 
     def get_sdf(self, optional_sdfs=None) -> Callable[[np.ndarray], np.ndarray]:

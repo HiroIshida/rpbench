@@ -143,7 +143,7 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
         CascadedCoords.__init__(self, pos=pos)
         self.radius = radius
         self.height = height
-        sdf = CylinderSDF(height, radius)
+        sdf = skrobot.sdf.CylinderSDF(height, radius)
         self.assoc(sdf, relative_coords="local")
         self.sdf = sdf
 

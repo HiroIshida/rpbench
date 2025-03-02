@@ -105,10 +105,10 @@ class ConwayJailInsertTask(JailInsertTaskBase):
 
 
 if __name__ == "__main__":
-    np.random.seed(0)
+    # np.random.seed(0)
     task = JailInsertTask.sample()
     problem = task.export_problem()
-    conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True, timeout=1)
+    conf = OMPLSolverConfig(1000_0000, algorithm_range=None, bspline=True, shortcut=True, timeout=1)
     solver = OMPLSolver(conf)
     ret = solver.solve(problem)
     print(ret.time_elapsed)
