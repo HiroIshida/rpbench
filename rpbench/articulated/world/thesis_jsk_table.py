@@ -13,6 +13,7 @@ from skrobot.model.primitives import Axis
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
+from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.utils import BoxSkeleton
 from rpbench.interface import ResultProtocol, TaskBase, TaskExpression
 from rpbench.planer_box_utils import Box2d, PlanerCoords, is_colliding, sample_box
@@ -254,7 +255,29 @@ class JskMessyTableTask(TaskBase):
     # abstract override
     def export_task_expression(self, use_matrix: bool) -> TaskExpression:
         if use_matrix:
-            assert False
+            world_vec = None
+            obstacle_env_region = BoxSkeleton(
+                [
+                    JskTable.TABLE_DEPTH,
+                    JskTable.TABLE_WIDTH,
+                    JskMessyTableTask.OBSTACLE_H_MAX + 0.05,
+                ]
+            )
+            obstacle_env_region.translate(
+                [0.0, 0.0, JskTable.TABLE_HEIGHT + obstacle_env_region.extents[2] * 0.5]
+            )
+
+            # spawn obstacle
+            obstacles = []
+            for obs_param in self.obstacles_param.reshape(-1, 6):
+                x, y, yaw, d, w, h = obs_param
+                box = BoxSkeleton([d, w, h], pos=[x, y, JskTable.TABLE_HEIGHT + 0.5 * h])
+                box.rotate(yaw, "z")
+                obstacles.append(box)
+
+            world_mat = create_heightmap_z_slice(obstacle_env_region, obstacles, 112)
+            other_vec = np.hstack([self.pr2_coords, self.reaching_pose])
+            return TaskExpression(world_vec, world_mat, other_vec)
         else:
             # param filled with nan
             world_vec = np.full(6 * self.N_MAX_OBSTACLE + 3 * self.N_MAX_CHAIR, np.nan)
@@ -585,7 +608,7 @@ class JskMessyTableTask(TaskBase):
 
 
 if __name__ == "__main__":
-    # np.random.seed(0)
+    # np.random.seed(17)
     table = JskTable()
 
     pr2 = PR2(use_tight_joint_limit=False)
