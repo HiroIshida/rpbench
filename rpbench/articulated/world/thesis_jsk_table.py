@@ -300,15 +300,28 @@ class JskMessyTableTask(TaskBase):
         x, y, z, yaw = self.reaching_pose
         eq_cst = spec.create_gripper_pose_const(np.array([x, y, z, 0, 0, yaw]))
 
-        ineq_cst = spec.create_collision_const()
-        sdf = self.get_total_sdf()
-        ineq_cst.set_sdf(sdf)
+        # also we impose a constraint that the robot's elbow never be higher than
+        # certain height, to assure that the robot gripper is visible from the camera
+        if isinstance(spec, PR2RarmSpec):
+            elbow_name = "r_elbow_flex_link"
+        else:
+            elbow_name = "l_elbow_flex_link"
+        min_elbow_height = JskTable.TABLE_HEIGHT + 0.1
+        max_elbow_height = JskTable.TABLE_HEIGHT + 0.35
+        elbow_cst = spec.create_position_bound_const(
+            elbow_name, 2, min_elbow_height, max_elbow_height
+        )
+
+        coll_cst = spec.create_collision_const()
+        coll_cst.set_sdf(self.get_total_sdf())
 
         lb, ub = spec.angle_bounds()
 
         motion_step_box = np.array([0.03] * 7)
         q_init = RARM_INIT_ANGLES
-        return Problem(q_init, lb, ub, eq_cst, ineq_cst, None, motion_step_box)
+        problem = Problem(q_init, lb, ub, eq_cst, coll_cst, None, motion_step_box)
+        problem.goal_ineq_const = elbow_cst
+        return problem
 
     # abstract override
     @classmethod
@@ -566,7 +579,7 @@ class JskMessyTableTask(TaskBase):
 
 
 if __name__ == "__main__":
-    np.random.seed(0)
+    # np.random.seed(0)
     table = JskTable()
 
     pr2 = PR2(use_tight_joint_limit=False)
