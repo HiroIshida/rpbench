@@ -208,7 +208,7 @@ class JskMessyTableTask(TaskBase):
     chairs_param: np.ndarray  # (3 * n_chair,)
     pr2_coords: np.ndarray
     reaching_pose: np.ndarray
-    N_MAX_OBSTACLE: ClassVar[int] = 20
+    N_MAX_OBSTACLE: ClassVar[int] = 10
     N_MAX_CHAIR: ClassVar[int] = 5
     OBSTACLE_W_MIN: ClassVar[float] = 0.05
     OBSTACLE_W_MAX: ClassVar[float] = 0.25
@@ -290,7 +290,21 @@ class JskMessyTableTask(TaskBase):
 
     # abstract override
     def export_problem(self) -> Problem:
-        spec = PR2RarmSpec(use_fixed_uuid=True)
+        yaw_robot = self.pr2_coords[2]
+        y_axis = np.array([-np.sin(yaw_robot), np.cos(yaw_robot)])
+        vec_robot_to_reach = self.reaching_pose[:2] - self.pr2_coords[:2]
+        right_side = np.dot(y_axis, vec_robot_to_reach) < 0
+        if right_side:
+            spec = PR2RarmSpec(use_fixed_uuid=True)
+            elbow_name = "r_elbow_flex_link"
+            q_init = RARM_INIT_ANGLES
+        else:
+            spec = PR2LarmSpec(use_fixed_uuid=True)
+            elbow_name = "l_elbow_flex_link"
+            q_init = LARM_INIT_ANGLES
+
+        self._spec_cache = spec  # for debugging
+
         pr2 = spec.get_robot_model(deepcopy=False)
         pr2.angle_vector(AV_INIT)
         x_pos, y_pos, yaw = self.pr2_coords
@@ -302,10 +316,6 @@ class JskMessyTableTask(TaskBase):
 
         # also we impose a constraint that the robot's elbow never be higher than
         # certain height, to assure that the robot gripper is visible from the camera
-        if isinstance(spec, PR2RarmSpec):
-            elbow_name = "r_elbow_flex_link"
-        else:
-            elbow_name = "l_elbow_flex_link"
         min_elbow_height = JskTable.TABLE_HEIGHT + 0.05
         max_elbow_height = JskTable.TABLE_HEIGHT + 0.35
         elbow_cst = spec.create_position_bound_const(
@@ -318,7 +328,6 @@ class JskMessyTableTask(TaskBase):
         lb, ub = spec.angle_bounds()
 
         motion_step_box = np.array([0.03] * 7)
-        q_init = RARM_INIT_ANGLES
         problem = Problem(q_init, lb, ub, eq_cst, coll_cst, None, motion_step_box)
         problem.goal_ineq_const = elbow_cst
         # narrow down the goal bounds for the later manipulatability
@@ -502,12 +511,6 @@ class JskMessyTableTask(TaskBase):
             yaw_reaching = reaching_pose[3]
             yaw = fit_radian(yaw_reaching + np.random.uniform(-np.pi / 4, np.pi / 4))
 
-            y_axis = np.array([-np.sin(yaw), np.cos(yaw)])
-            vec_robot_to_reach = reaching_pose[:2] - pr2_point
-            right_side = np.dot(y_axis, vec_robot_to_reach) < 0
-            if not right_side:
-                continue
-
             pr2_coords = np.hstack([pr2_point, yaw])
             if cst.is_valid(pr2_coords):
                 return pr2_coords
@@ -593,7 +596,7 @@ if __name__ == "__main__":
     problem = task.export_problem()
     solver = OMPLSolver(OMPLSolverConfig(shortcut=True, bspline=True))
     ret = solver.solve(problem)
-    rarm_spec = PR2RarmSpec()
+    spec = task._spec_cache
 
     pr2.translate(np.hstack([task.pr2_coords[:2], 0.0]))
     pr2.rotate(task.pr2_coords[2], "z")
@@ -603,8 +606,8 @@ if __name__ == "__main__":
     task.visualize(v)
     v.add(pr2)
     v.show()
-    for q in ret.traj.resample(40):
-        rarm_spec.set_skrobot_model_state(pr2, q)
+    for q in ret.traj.resample(80):
+        spec.set_skrobot_model_state(pr2, q)
         v.redraw()
         time.sleep(0.01)
     time.sleep(1000)
