@@ -2,16 +2,11 @@ from dataclasses import dataclass
 from typing import Optional, Type, Union
 
 import numpy as np
+from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, Problem
+from plainmp.robot_spec import FetchSpec
 
+from rpbench.articulated.world.jail import ConwayJailWorld, JailWorld, JailWorldBase
 from rpbench.interface import ResultProtocol, TaskWithWorldCondBase
-
-try:
-    from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig, Problem
-    from plainmp.robot_spec import FetchSpec
-
-    from rpbench.articulated.world.jail import ConwayJailWorld, JailWorld, JailWorldBase
-except ImportError:
-    raise ImportError("Please install plainmp (private repo) to run this task.")
 
 _debug_mode_flag = [False]
 
