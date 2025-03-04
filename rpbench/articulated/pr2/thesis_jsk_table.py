@@ -292,7 +292,9 @@ class JskMessyTableTaskBase(TaskBase):
     # abstract override
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
-        conf = OMPLSolverConfig(shortcut=True, bspline=True, n_max_call=1000000, timeout=3.0, n_max_ik_trial=1000)
+        conf = OMPLSolverConfig(
+            shortcut=True, bspline=True, n_max_call=1000000, timeout=3.0, n_max_ik_trial=1000
+        )
         solver = OMPLSolver(conf)
         ret = solver.solve(problem)
         return ret
@@ -365,9 +367,9 @@ class JskMessyTableTaskBase(TaskBase):
 
     # abstract override
     @classmethod
-    def sample(cls, predicate: Optional[Any] = None) -> Optional["JskMessyTableTask"]:
-        assert predicate is None, "predicate is not supported"
-        timeout = 10
+    def sample(
+        cls, predicate: Optional[Any] = None, timeout: int = 180
+    ) -> Optional["JskMessyTableTask"]:
         t_start = time.time()
 
         table = JskTable()
@@ -414,8 +416,11 @@ class JskMessyTableTaskBase(TaskBase):
                 chairs_param = np.hstack(chair_param_list)
             else:
                 chairs_param = np.empty(0)
-
-            return cls(obstacles_param, chairs_param, pr2_coords, reaching_pose)
+            task = cls(obstacles_param, chairs_param, pr2_coords, reaching_pose)
+            if predicate is None:
+                return task
+            if predicate(task):
+                return task
 
     @staticmethod
     def _sample_obstacles_on_table(table: JskTable) -> Tuple[List[BoxSkeleton], BoxSkeleton]:
