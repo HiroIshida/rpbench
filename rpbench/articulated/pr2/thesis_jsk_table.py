@@ -291,7 +291,11 @@ class JskMessyTableTaskBase(TaskBase):
 
     # abstract override
     def solve_default(self) -> ResultProtocol:
-        raise NotImplementedError
+        problem = self.export_problem()
+        conf = OMPLSolverConfig(shortcut=True, bspline=True, n_max_call=1000000, timeout=3.0, n_max_ik_trial=1000)
+        solver = OMPLSolver(conf)
+        ret = solver.solve(problem)
+        return ret
 
     def get_total_sdf(self) -> UnionSDF:
         total_sdf = get_jsk_table_sdf()
