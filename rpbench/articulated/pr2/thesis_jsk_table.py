@@ -382,7 +382,7 @@ class JskMessyTableTaskBase(TaskBase):
             if pr2_coords is None:
                 continue
 
-            if cls.consider_chair:
+            if cls.consider_chair():
                 chair_list = cls._sample_chairs(
                     table, target_region, table_box2d_wrt_region, pr2_coords
                 )
