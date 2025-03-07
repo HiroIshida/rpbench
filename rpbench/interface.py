@@ -124,7 +124,9 @@ class TaskExpressionProtocol(Protocol):
 @dataclass(frozen=True)
 class TaskExpression:
     world_vec: Optional[np.ndarray]
-    world_mat: Optional[np.ndarray]
+    world_mat: Optional[
+        np.ndarray
+    ]  # None | (n, m) | (c, n, m)  # (n, m) instead of (1, n, m) due to backward compatibility
     other_vec: np.ndarray
 
     def get_matrix(self) -> Optional[np.ndarray]:

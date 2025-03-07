@@ -268,16 +268,27 @@ class JskMessyTableTaskBase(TaskBase):
                 [0.0, 0.0, JskTable.TABLE_HEIGHT + obstacle_env_region.extents[2] * 0.5]
             )
 
-            # spawn obstacle
             obstacles = []
             for obs_param in self.obstacles_param.reshape(-1, 6):
                 x, y, yaw, d, w, h = obs_param
                 box = BoxSkeleton([d, w, h], pos=[x, y, JskTable.TABLE_HEIGHT + 0.5 * h])
                 box.rotate(yaw, "z")
                 obstacles.append(box)
-
-            world_mat = create_heightmap_z_slice(obstacle_env_region, obstacles, 112)
+            table_mat = create_heightmap_z_slice(obstacle_env_region, obstacles, 112)
             other_vec = np.hstack([self.pr2_coords, self.reaching_pose])
+            if self.consider_chair():
+                region, _ = self._prepare_target_region()
+                primitives = []
+                for chair_param in self.chairs_param.reshape(-1, 3):
+                    x, y, yaw = chair_param
+                    chair = JskChair()
+                    chair.translate([x, y, 0.0])
+                    chair.rotate(yaw, "z")
+                    primitives.extend(chair.chair_primitives)
+                chair_mat = create_heightmap_z_slice(region, primitives, 112)
+                world_mat = np.stack([table_mat, chair_mat], axis=0)
+            else:
+                world_mat = table_mat
             return TaskExpression(world_vec, world_mat, other_vec)
         else:
             # param filled with nan
@@ -379,7 +390,7 @@ class JskMessyTableTaskBase(TaskBase):
             if elapsed > timeout:
                 return None
             reaching_pose = cls._sample_reaching_pose(obstacles)
-            target_region, table_box2d_wrt_region = cls._prepare_target_region(table)
+            target_region, table_box2d_wrt_region = cls._prepare_target_region()
             pr2_coords = cls._sample_robot(table, target_region, reaching_pose)
             if pr2_coords is None:
                 continue
@@ -497,19 +508,20 @@ class JskMessyTableTaskBase(TaskBase):
             return cand
 
     @staticmethod
-    def _prepare_target_region(table: JskTable) -> Tuple[BoxSkeleton, Box2d]:
+    def _prepare_target_region() -> Tuple[BoxSkeleton, Box2d]:
         target_region = BoxSkeleton(
             [
-                table.TABLE_DEPTH + table.DIST_FROM_DOORSIDE_WALL + table.DIST_FROM_FRIDGESIDE_WALL,
-                table.TABLE_WIDTH + 1.2,
-                0.1,
+                JskTable.TABLE_DEPTH
+                + JskTable.DIST_FROM_DOORSIDE_WALL
+                + JskTable.DIST_FROM_FRIDGESIDE_WALL,
+                JskTable.TABLE_WIDTH + 1.2,
+                1.0,
             ],
-            pos=[-0.46, 0.56, 0],  # hand-tuned to fit well
+            pos=[-0.46, 0.56, 0.5],  # hand-tuned to fit well
         )
-        table.assoc(target_region)
         table_pos_from_region = -target_region.worldpos()[:2]
         table_box2d_wrt_region = Box2d(
-            np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]),
+            np.array([JskTable.TABLE_DEPTH, JskTable.TABLE_WIDTH]),
             PlanerCoords(table_pos_from_region, 0.0),
         )
         return target_region, table_box2d_wrt_region
@@ -639,13 +651,14 @@ class JskMessyTableTask(JskMessyTableTaskBase):
 
 
 if __name__ == "__main__":
-    # np.random.seed(17)
+    np.random.seed(17)
     table = JskTable()
 
     pr2 = PR2(use_tight_joint_limit=False)
     pr2.reset_manip_pose()
 
-    task = JskMessyTableTask.sample()
+    task = JskMessyTableTaskWithChair.sample()
+    task = JskMessyTableTaskWithChair.from_task_param(task.to_task_param())
 
     problem = task.export_problem()
     solver = OMPLSolver(OMPLSolverConfig(shortcut=True, bspline=True))
@@ -668,7 +681,7 @@ if __name__ == "__main__":
     exp = task.export_task_expression(True)
     import matplotlib.pyplot as plt
 
-    plt.imshow(exp.world_mat)
+    plt.imshow(exp.world_mat[1, :, :])
     plt.show()
 
     time.sleep(1000)
