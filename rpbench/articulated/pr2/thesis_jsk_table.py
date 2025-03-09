@@ -329,12 +329,16 @@ class JskMessyTableTaskBase(TaskBase):
                 total_sdf.add(box_sdf)
         return total_sdf
 
-    # abstract override
-    def export_problem(self) -> Problem:
+    def is_using_rarm(self) -> bool:
         yaw_robot = self.pr2_coords[2]
         y_axis = np.array([-np.sin(yaw_robot), np.cos(yaw_robot)])
         vec_robot_to_reach = self.reaching_pose[:2] - self.pr2_coords[:2]
         right_side = np.dot(y_axis, vec_robot_to_reach) < 0
+        return right_side
+
+    # abstract override
+    def export_problem(self) -> Problem:
+        right_side = self.is_using_rarm()
         if right_side:
             spec = PR2RarmSpec(use_fixed_uuid=True)
             elbow_name = "r_elbow_flex_link"
