@@ -530,7 +530,7 @@ class JskMessyTableTaskBase(TaskBase):
     def _sample_robot(
         table: JskTable, target_region: BoxSkeleton, reaching_pose: np.ndarray
     ) -> Optional[np.ndarray]:
-        pr2_base_spec = PR2BaseOnlySpec()
+        pr2_base_spec = PR2BaseOnlySpec(use_fixed_uuid=True)
         table_sdf = table.create_sdf()
         table_box2d = Box2d(
             np.array([table.TABLE_DEPTH, table.TABLE_WIDTH]), PlanerCoords.standard()
@@ -586,7 +586,7 @@ class JskMessyTableTaskBase(TaskBase):
             if chair_box2d is not None:
                 chair_box2d_list.append(chair_box2d)
 
-        pr2_base_spec = PR2BaseOnlySpec()
+        pr2_base_spec = PR2BaseOnlySpec(use_fixed_uuid=True)
         pr2_base_spec.get_kin()
         skmodel = pr2_base_spec.get_robot_model(deepcopy=False)
         skmodel.angle_vector(AV_INIT)
