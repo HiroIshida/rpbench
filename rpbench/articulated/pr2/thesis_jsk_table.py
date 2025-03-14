@@ -10,7 +10,7 @@ from plainmp.psdf import BoxSDF, Pose, UnionSDF
 from plainmp.robot_spec import Coordinates, PR2BaseOnlySpec, PR2LarmSpec, PR2RarmSpec
 from skrobot.coordinates import CascadedCoords
 from skrobot.coordinates.math import rpy_angle
-from skrobot.model.primitives import Axis
+from skrobot.model.primitives import Axis, Box
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
@@ -79,9 +79,11 @@ class JskChair(CascadedCoords):
             self.assoc(prim)
         self.chair_primitives = primitive_list
 
-    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        for prim in self.chair_primitives:
-            viewer.add(prim.to_visualizable(DARKRED_COLOR))
+    def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> List[Box]:
+        handles = [p.to_visualizable(DARKRED_COLOR) for p in self.chair_primitives]
+        for h in handles:
+            viewer.add(h)
+        return handles
 
     def create_sdf(self) -> UnionSDF:
         return UnionSDF([p.to_plainmp_sdf() for p in self.chair_primitives])
