@@ -50,9 +50,9 @@ class JailInsertTaskBase(TaskWithWorldCondBase[JailWorldBase, np.ndarray, None])
     def solve_default(self) -> ResultProtocol:
         prob = self.export_problem()
         if _debug_mode_flag[0]:
-            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True, timeout=3.0)
+            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, shortcut=True, bspline=True, timeout=3.0)
         else:
-            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, simplify=True, timeout=30.0)
+            conf = OMPLSolverConfig(1000_0000, algorithm_range=None, shortcut=True, bspline=True, timeout=30.0)
         solver = OMPLSolver(conf)
         return solver.solve(prob)
 
