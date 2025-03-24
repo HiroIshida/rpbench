@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-from plainmp.psdf import UnionSDF, CylinderSDF, Pose
+from plainmp.psdf import CylinderSDF, Pose, UnionSDF
 from skrobot.coordinates import CascadedCoords, Coordinates
 from skrobot.model.primitives import PointCloudLink
 from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
@@ -199,9 +199,23 @@ class FridgeModel(CascadedCoords):
                 table[obstacle] = visualizable  # type: ignore
         self._visualizable_table = table
 
+    def translate(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def rotate(self, *args, **kwargs):
+        raise NotImplementedError
+
 
 _fridge_model = FridgeModel()
 _fridge_model_sdf = UnionSDF([l.to_plainmp_sdf() for l in _fridge_model.links])
+
+
+def get_fridge_model() -> FridgeModel:
+    return _fridge_model  # no copy required, and not supposed to be modified
+
+
+def get_fridge_model_sdf() -> UnionSDF:
+    return _fridge_model_sdf.clone()  # copy required to avoid modification
 
 
 def randomize_region(region: Region, n_obstacles: int = 5) -> np.ndarray:
@@ -241,7 +255,7 @@ class JskFridgeWorld(SamplableWorldBase):
         raise NotImplementedError
 
     def get_obstacle_list(self) -> List[CylinderSkelton]:
-        region = _fridge_model.regions[self.attention_region_index]
+        region = get_fridge_model().regions[self.attention_region_index]
         H_region = region.box.extents[2]
         region_pos = region.box.worldpos()
 
@@ -263,11 +277,9 @@ class JskFridgeWorld(SamplableWorldBase):
             visualizable = obs.to_visualizable((150, 150, 150, 255))
             viewer.add(visualizable)
 
-
     def get_exact_sdf(self) -> UnionSDF:
-        fridge_sdf = _fridge_model_sdf.clone()
-        region = _fridge_model.regions[self.attention_region_index]
-        obstacle_sdfs = []
+        fridge_sdf = get_fridge_model_sdf()
+        region = get_fridge_model().regions[self.attention_region_index]
         for param in self.obstacles_param.reshape(-1, 4):
             x, y, h, r = param
             H_region = region.box.extents[2]
@@ -280,7 +292,7 @@ class JskFridgeWorld(SamplableWorldBase):
         return fridge_sdf
 
     def sample_pose(self) -> Coordinates:
-        region = _fridge_model.regions[self.attention_region_index]
+        region = get_fridge_model().regions[self.attention_region_index]
         D, W, H = region.box.extents
         horizontal_margin = 0.08
         depth_margin = 0.03
@@ -330,7 +342,7 @@ class JskFridgeWorld(SamplableWorldBase):
 
     def sample_pose_vertical(self) -> Coordinates:
         # NOTE: unlike sample pose height is also sampled
-        region = _fridge_model.regions[self.attention_region_index]
+        region = get_fridge_model().regions[self.attention_region_index]
         b_min = -0.5 * region.box.extents
         b_max = +0.5 * region.box.extents
 

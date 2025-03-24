@@ -15,7 +15,7 @@ from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.pr2.common import CachedLArmFixedPR2ConstProvider
 from rpbench.articulated.vision import create_heightmap_z_slice
-from rpbench.articulated.world.jskfridge import JskFridgeWorld, _fridge_model
+from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
 
 
@@ -105,7 +105,7 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         other_vec = np.hstack(self.description)
         if use_matrix:
             world_vec = None
-            region = _fridge_model.regions[self.world.attention_region_index]
+            region = get_fridge_model().regions[self.world.attention_region_index]
             obstacles = self.world.get_obstacle_list()
             world_mat = create_heightmap_z_slice(region.box, obstacles, 112)
         else:
