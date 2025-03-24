@@ -1,6 +1,6 @@
 import time
 from abc import abstractmethod
-from typing import ClassVar, Type, TypeVar
+from typing import Type, TypeVar
 
 import numpy as np
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
@@ -13,7 +13,6 @@ from skrobot.model.robot_model import RobotModel
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer
 
-from rpbench.articulated.pr2.common import CachedLArmFixedPR2ConstProvider
 from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
@@ -53,13 +52,9 @@ DescriptionT = TypeVar("DescriptionT")
 
 
 class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray, RobotModel]):
-
-    config_provider: ClassVar[
-        Type[CachedLArmFixedPR2ConstProvider]
-    ] = CachedLArmFixedPR2ConstProvider
-
     @classmethod
     def get_robot_model(cls) -> RobotModel:
+        # dummy to pass the abstract method
         pass
 
     @staticmethod
@@ -183,17 +178,33 @@ class JskFridgeVerticalReachingTask(JskFridgeReachingTaskBase):
 
 if __name__ == "__main__":
     # np.random.seed()
+    import tqdm
+
+    for _ in tqdm.tqdm(range(200)):
+        task = JskFridgeReachingTask.sample()
+        param = task.to_task_param()
+        task_again = JskFridgeReachingTask.from_task_param(param)
+        param_again = task_again.to_task_param()
+        assert np.allclose(param, param_again)
+
     while True:
         print("trial..")
         task = JskFridgeReachingTask.sample()
+        ts = time.time()
         ret = task.solve_default()
+        print(time.time() - ts)
         if ret.traj is not None:
             break
 
-    print(ret)
+    expression = task.export_task_expression(True)
+    import matplotlib.pyplot as plt
+
+    plt.imshow(expression.world_mat)
+    plt.show()
 
     param = task.to_task_param()
     task_again = JskFridgeReachingTask.from_task_param(param)
+    param_again = task_again.to_task_param()
 
     v = PyrenderViewer()
     task.world.visualize(v)
