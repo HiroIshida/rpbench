@@ -1,45 +1,39 @@
-import copy
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import ycb_utils
+from plainmp.psdf import CylinderSDF, Pose, UnionSDF
 from skrobot.coordinates import CascadedCoords, Coordinates
-from skrobot.sdf import UnionSDF
-from skrobot.viewers import TrimeshSceneViewer
-from trimesh import Trimesh
+from skrobot.model.primitives import PointCloudLink
+from skrobot.viewers import PyrenderViewer, TrimeshSceneViewer
 
 from rpbench.articulated.vision import HeightmapConfig, LocatedHeightmap
 from rpbench.articulated.world.utils import (
     BoxSkeleton,
     CylinderSkelton,
-    MeshSkelton,
     PrimitiveSkelton,
 )
 from rpbench.interface import SamplableWorldBase
-from rpbench.planer_box_utils import Box2d, Circle, PlanerCoords, is_colliding
 from rpbench.utils import SceneWrapper
 
 
-@dataclass
 class FridgeParameter:
-    W: float = 0.54
-    D: float = 0.53
-    upper_H: float = 0.65
-    container_w: float = 0.48
-    container_h: float = 0.62
-    container_d: float = 0.49
-    panel_d: float = 0.32
-    panel_t: float = 0.01
+    W: ClassVar[float] = 0.54
+    D: ClassVar[float] = 0.53
+    upper_H: ClassVar[float] = 0.65
+    container_w: ClassVar[float] = 0.48
+    container_h: ClassVar[float] = 0.62
+    container_d: ClassVar[float] = 0.49
+    panel_d: ClassVar[float] = 0.32
+    panel_t: ClassVar[float] = 0.01
     # panel_hights: Tuple[float, ...] = (0.15, 0.34, 0.46)  # uncalibrated
-    panel_hights: Tuple[float, ...] = (0.15, 0.34, 0.48)
-    door_D = 0.05
-    lower_H = 0.81 + 0.02  # 0.02 if use calibrated
-    joint_x = -0.035
-    joint_y = +0.015
-    t_bump = 0.02
-    d_bump = 0.06
+    panel_hights: ClassVar[Tuple[float, ...]] = (0.15, 0.34, 0.48)
+    door_D: ClassVar[float] = 0.05
+    lower_H: ClassVar[float] = 0.81 + 0.02  # 0.02 if use calibrated
+    joint_x: ClassVar[float] = -0.035
+    joint_y: ClassVar[float] = +0.015
+    t_bump: ClassVar[float] = 0.02
+    d_bump: ClassVar[float] = 0.06
 
 
 @dataclass
@@ -63,7 +57,7 @@ class FridgeModel(CascadedCoords):
     joint_angle: float
     _visualizable_table: Dict
 
-    def __init__(self, joint_angle: float = 1.3, param: Optional[FridgeParameter] = None):
+    def __init__(self, joint_angle: float = 0.9 * np.pi, param: Optional[FridgeParameter] = None):
 
         super().__init__()
         if param is None:
@@ -205,8 +199,26 @@ class FridgeModel(CascadedCoords):
                 table[obstacle] = visualizable  # type: ignore
         self._visualizable_table = table
 
+    def translate(self, *args, **kwargs):
+        raise NotImplementedError
 
-def randomize_region(region: Region, n_obstacles: int = 5):
+    def rotate(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+_fridge_model = FridgeModel()
+_fridge_model_sdf = UnionSDF([l.to_plainmp_sdf() for l in _fridge_model.links])
+
+
+def get_fridge_model() -> FridgeModel:
+    return _fridge_model  # no copy required, and not supposed to be modified
+
+
+def get_fridge_model_sdf() -> UnionSDF:
+    return _fridge_model_sdf.clone()  # copy required to avoid modification
+
+
+def randomize_region(region: Region, n_obstacles: int = 5) -> np.ndarray:
     # randomize using only cylinder
     D, W, H = region.box._extents
     obstacle_h_max = H - 0.03
@@ -225,130 +237,62 @@ def randomize_region(region: Region, n_obstacles: int = 5):
         if not any([np.linalg.norm(pos_2d - pos_2d2) < (r + r2) for pos_2d2, r2 in pairs]):
             pairs.append((pos_2d, r))
 
+    params = np.zeros(n_obstacles * 4)
+    head = 0
     for pos_2d, r in pairs:
         h = np.random.rand() * (obstacle_h_max - obstacle_h_min) + obstacle_h_min
-        pos = np.array([*pos_2d, -0.5 * H + 0.5 * h])
-        obstacle = CylinderSkelton(r, h, pos=pos)
-        region.box.assoc(obstacle, relative_coords="local")
-        region.obstacles.append(obstacle)
-
-
-def randomize_region2(region: Region, n_obstacles: int = 5):
-    # randomize using both cylinder and box
-    D, W, H = region.box._extents
-    obstacle_h_max = H - 0.03
-    obstacle_h_min = 0.05
-
-    region2d = Box2d(np.array([D, W]), PlanerCoords.standard())
-
-    obj2d_list = []  # type: ignore
-    while len(obj2d_list) < n_obstacles:
-        center = region2d.sample_point()
-        sample_circle = np.random.rand() < 0.5
-        if sample_circle:
-            r = np.random.rand() * 0.03 + 0.02
-            obj2d = Circle(center, r)
-        else:
-            w = np.random.uniform(0.05, 0.1)
-            d = np.random.uniform(0.05, 0.1)
-            yaw = np.random.uniform(0.0, np.pi)
-            obj2d = Box2d(np.array([w, d]), PlanerCoords(center, yaw))  # type: ignore
-
-        if not region2d.contains(obj2d):
-            continue
-        if any([is_colliding(obj2d, o) for o in obj2d_list]):
-            continue
-        obj2d_list.append(obj2d)
-
-    for obj2d in obj2d_list:
-        h = np.random.rand() * (obstacle_h_max - obstacle_h_min) + obstacle_h_min
-        if isinstance(obj2d, Box2d):
-            extent = np.hstack([obj2d.extent, h])
-            obj = BoxSkeleton(extent, pos=np.hstack([obj2d.coords.pos, 0.0]))
-            obj.rotate(obj2d.coords.angle, "z")
-        elif isinstance(obj2d, Circle):
-            obj = CylinderSkelton(obj2d.radius, h, pos=np.hstack([obj2d.center, 0.0]))
-        else:
-            assert False
-        obj.translate([0.0, 0.0, -0.5 * H + 0.5 * h])
-        region.box.assoc(obj, relative_coords="local")
-        region.obstacles.append(obj)
-
-
-@lru_cache(maxsize=None)
-def ycb_utils_load_singleton(name: str, scale: float = 1.0) -> Trimesh:
-    return ycb_utils.load_with_scale(name, scale=scale)
-
-
-def randomize_region3(region: Region, n_obstacles: int = 5):
-
-    mesh_list = [
-        ycb_utils_load_singleton("006_mustard_bottle", scale=0.75),
-        ycb_utils_load_singleton("010_potted_meat_can"),
-        ycb_utils_load_singleton("013_apple"),
-        ycb_utils_load_singleton("019_pitcher_base", scale=0.6),
-    ]
-    skelton_list = [MeshSkelton(mesh, fill_value=0.03, dim_grid=30) for mesh in mesh_list]
-    box = region.box
-
-    obj_list = []  # type: ignore
-    while len(obj_list) < n_obstacles:
-        skelton = copy.deepcopy(np.random.choice(skelton_list))
-        assert isinstance(skelton, MeshSkelton)
-        pos = box.sample_points(1)[0]
-        pos[2] = box.worldpos()[2] - 0.5 * box._extents[2] + 0.01
-        skelton.newcoords(Coordinates(pos))
-        yaw = np.random.uniform(0.0, 2 * np.pi)
-        skelton.rotate(yaw, "z")
-
-        values = box.sdf(skelton.surface_points)
-        is_containd = np.all(values < -0.005)
-        if not is_containd:
-            continue
-
-        is_colliding = False
-        for obj in obj_list:
-            if np.any(skelton.sdf(obj.surface_points) < 0.0):
-                is_colliding = True
-                break
-        if is_colliding:
-            continue
-        skelton.sdf.itp.fill_value = 1.0
-        raise NotImplementedError("itp affects hmap and robot sampling")
-        obj_list.append(skelton)
-        region.box.assoc(skelton, relative_coords="world")
-        region.obstacles.append(skelton)
+        params[head : head + 4] = np.array([*pos_2d, h, r])
+        head += 4
+    return params
 
 
 @dataclass
-class JskFridgeWorldBase(SamplableWorldBase):
-    fridge: FridgeModel
-    _heightmap: Optional[np.ndarray] = None  # lazy
+class JskFridgeWorld(SamplableWorldBase):
+    obstacles_param: np.ndarray
     attention_region_index: ClassVar[int] = 1
 
     def export_intrinsic_description(self) -> np.ndarray:
         raise NotImplementedError
 
-    def heightmap(self) -> np.ndarray:
-        if self._heightmap is None:
-            self._heightmap = self.fridge.regions[self.attention_region_index].create_heightmap()
-        return self._heightmap
+    def get_obstacle_list(self) -> List[CylinderSkelton]:
+        region = get_fridge_model().regions[self.attention_region_index]
+        H_region = region.box.extents[2]
+        region_pos = region.box.worldpos()
+
+        obstacle_list = []
+        for param in self.obstacles_param.reshape(-1, 4):
+            x, y, h, r = param
+            pos_relative = np.hstack([x, y, -0.5 * H_region + 0.5 * h])
+            pos = region_pos + pos_relative
+            cylinder = CylinderSkelton(r, h, pos)
+            obstacle_list.append(cylinder)
+        return obstacle_list
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
-        self.fridge.add(viewer)  # type: ignore
+        fridge = FridgeModel()
+        fridge.add(viewer)
+
+        obs_list = self.get_obstacle_list()
+        for obs in obs_list:
+            visualizable = obs.to_visualizable((150, 150, 150, 255))
+            viewer.add(visualizable)
 
     def get_exact_sdf(self) -> UnionSDF:
-        sdfs = []
-        for link in self.fridge.links:
-            sdfs.append(link.sdf)
-        for region in self.fridge.regions:
-            for obstacle in region.obstacles:
-                sdfs.append(obstacle.sdf)
-        sdf = UnionSDF(sdfs)
-        return sdf
+        fridge_sdf = get_fridge_model_sdf()
+        region = get_fridge_model().regions[self.attention_region_index]
+        for param in self.obstacles_param.reshape(-1, 4):
+            x, y, h, r = param
+            H_region = region.box.extents[2]
+            region_pos = region.box.worldpos()
+            pos_relative = np.hstack([x, y, -0.5 * H_region + 0.5 * h])
+            pos = region_pos + pos_relative
+            pose = Pose(pos, np.eye(3))
+            cylinder_sdf = CylinderSDF(r, h, pose)
+            fridge_sdf.add(cylinder_sdf)
+        return fridge_sdf
 
     def sample_pose(self) -> Coordinates:
-        region = self.fridge.regions[self.attention_region_index]
+        region = get_fridge_model().regions[self.attention_region_index]
         D, W, H = region.box.extents
         horizontal_margin = 0.08
         depth_margin = 0.03
@@ -361,15 +305,16 @@ class JskFridgeWorldBase(SamplableWorldBase):
             trans = np.hstack([trans, -0.5 * H + 0.09])
             co = region.box.copy_worldcoords()
             co.translate(trans)
-            if sdf(np.expand_dims(co.worldpos(), axis=0)) < 0.03:
+            if sdf.evaluate(co.worldpos()) < 0.03:
                 continue
             co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
             co_dummy = co.copy_worldcoords()
             co_dummy.translate([-0.07, 0.0, 0.0])
-            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+
+            if sdf.evaluate(co_dummy.worldpos()) < 0.04:
                 continue
             co_dummy.translate([-0.07, 0.0, 0.0])
-            if sdf(np.expand_dims(co_dummy.worldpos(), axis=0)) < 0.04:
+            if sdf.evaluate(co_dummy.worldpos()) < 0.04:
                 continue
             return co
         return co  # invalid one but no choice
@@ -397,7 +342,7 @@ class JskFridgeWorldBase(SamplableWorldBase):
 
     def sample_pose_vertical(self) -> Coordinates:
         # NOTE: unlike sample pose height is also sampled
-        region = self.fridge.regions[self.attention_region_index]
+        region = get_fridge_model().regions[self.attention_region_index]
         b_min = -0.5 * region.box.extents
         b_max = +0.5 * region.box.extents
 
@@ -424,32 +369,29 @@ class JskFridgeWorldBase(SamplableWorldBase):
             return co
         return co  # invalid one but no choice
 
-
-class JskFridgeWorld(JskFridgeWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld"]:
         fridge = FridgeModel(joint_angle=np.pi * 0.9)
-        if not standard:
-            n_obstacles = np.random.randint(1, 6)
-            randomize_region(fridge.regions[cls.attention_region_index], n_obstacles)
-        return cls(fridge, None)
+        n_obstacles = np.random.randint(1, 6)
+        obstacles_param = randomize_region(fridge.regions[cls.attention_region_index], n_obstacles)
+        return cls(obstacles_param)
 
 
-class JskFridgeWorld2(JskFridgeWorldBase):
-    @classmethod
-    def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld2"]:
-        fridge = FridgeModel(joint_angle=np.pi * 0.9)
-        if not standard:
-            n_obstacles = np.random.randint(1, 6)
-            randomize_region2(fridge.regions[cls.attention_region_index], n_obstacles)
-        return cls(fridge, None)
+if __name__ == "__main__":
+    np.random.seed(0)
+    world = JskFridgeWorld.sample()
+    sdf = world.get_exact_sdf()
+    points = np.random.randn(1000000, 3)
+    points[:, 0] *= 0.7
+    points[:, 1] *= 0.7
+    points[:, 2] += 0.5
+    sdf_values = sdf.evaluate_batch(points.T)
+    points_inside = points[sdf_values < 0.0]
+    link = PointCloudLink(points_inside)
+    v = PyrenderViewer()
+    world.visualize(v)
+    v.add(link)
+    v.show()
+    import time
 
-
-class JskFridgeWorld3(JskFridgeWorldBase):
-    @classmethod
-    def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld3"]:
-        fridge = FridgeModel(joint_angle=np.pi * 0.9)
-        if not standard:
-            n_obstacles = np.random.randint(1, 6)
-            randomize_region3(fridge.regions[cls.attention_region_index], n_obstacles)
-        return cls(fridge, None)
+    time.sleep(1000)
