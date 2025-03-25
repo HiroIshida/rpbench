@@ -250,6 +250,7 @@ def randomize_region(region: Region, n_obstacles: int = 5) -> np.ndarray:
 class JskFridgeWorld(SamplableWorldBase):
     obstacles_param: np.ndarray
     attention_region_index: ClassVar[int] = 1
+    N_MAX_OBSTACLES: ClassVar[int] = 5
 
     def export_intrinsic_description(self) -> np.ndarray:
         raise NotImplementedError
@@ -372,7 +373,7 @@ class JskFridgeWorld(SamplableWorldBase):
     @classmethod
     def sample(cls, standard: bool = False) -> Optional["JskFridgeWorld"]:
         fridge = FridgeModel(joint_angle=np.pi * 0.9)
-        n_obstacles = np.random.randint(1, 6)
+        n_obstacles = np.random.randint(1, cls.N_MAX_OBSTACLES + 1)
         obstacles_param = randomize_region(fridge.regions[cls.attention_region_index], n_obstacles)
         return cls(obstacles_param)
 

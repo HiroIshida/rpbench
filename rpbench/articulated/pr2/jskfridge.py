@@ -109,14 +109,19 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
             obstacles = self.world.get_obstacle_list()
             world_mat = create_heightmap_z_slice(region.box, obstacles, 112)
         else:
-            world_vec = self.world.obstacles_param
+            n_elem = 1 + (self.world.N_MAX_OBSTACLES * 4)  # 1 for the number of obstacles
+            world_vec = np.zeros(n_elem)
+            world_vec[0] = len(self.world.obstacles_param) // 4
+            world_vec[1 : 1 + len(self.world.obstacles_param)] = self.world.obstacles_param
             world_mat = None
         return TaskExpression(world_vec, world_mat, other_vec)
 
     @classmethod
     def from_task_param(cls, param: np.ndarray) -> "JskFridgeReachingTaskBase":
         # the last 7 elements for other param
-        world_param, other_param = param[:-7], param[-7:]
+        world_param_all, other_param = param[:-7], param[-7:]
+        n_obstacle = round(world_param_all[0])
+        world_param = world_param_all[1 : 1 + n_obstacle * 4]
         world = JskFridgeWorld(world_param)
         description = other_param
         return cls(world, description)
@@ -229,6 +234,7 @@ if __name__ == "__main__":
     param = task.to_task_param()
     task_again = JskFridgeReachingTask.from_task_param(param)
     param_again = task_again.to_task_param()
+    task = task_again
 
     v = PyrenderViewer()
     task.world.visualize(v)
