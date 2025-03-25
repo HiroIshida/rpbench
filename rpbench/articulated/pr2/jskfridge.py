@@ -3,6 +3,7 @@ from abc import abstractmethod
 from typing import Type, TypeVar
 
 import numpy as np
+from plainmp.constraint import SphereCollisionCst
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
 from plainmp.problem import Problem
 from plainmp.robot_spec import BaseType, PR2LarmSpec
@@ -14,7 +15,11 @@ from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.vision import create_heightmap_z_slice
-from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
+from rpbench.articulated.world.jskfridge import (
+    JskFridgeWorld,
+    get_fridge_model,
+    get_fridge_model_sdf,
+)
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
 
 
@@ -87,9 +92,9 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         q[:7] = Q_INIT
 
         while True:
-            x = np.random.uniform(-0.65, -0.3)
-            y = np.random.uniform(-0.45, -0.1)
-            yaw = np.random.uniform(-0.25 * np.pi, 0.25 * np.pi)
+            x = np.random.uniform(-0.6, -0.3)
+            y = np.random.uniform(-0.3, +0.2)
+            yaw = np.random.uniform(-0.5 * np.pi, 0.25 * np.pi)
             q[7] = x
             q[8] = y
             q[9] = yaw
@@ -130,6 +135,17 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         quat = np.array([0, 0, np.sin(yaw / 2), np.cos(yaw / 2)])
         gripper_cst = spec.create_gripper_pose_const(np.hstack([pos, quat]))
 
+        def create_ik_cst(x_eps, y_eps, yaw_eps) -> SphereCollisionCst:
+            yaw_now = target_pose[3]
+            rotmat = np.array(
+                [[np.cos(yaw_now), -np.sin(yaw_now)], [np.sin(yaw_now), np.cos(yaw_now)]]
+            )
+            pos2d = target_pose[:2] + np.dot(rotmat, np.array([x_eps, y_eps]))
+            pos = np.hstack([pos2d, target_pose[2]])
+            yaw = target_pose[3] + yaw_eps
+            quat = np.array([0, 0, np.sin(yaw / 2), np.cos(yaw / 2)])
+            return spec.create_gripper_pose_const(np.hstack([pos, quat]))
+
         spec.get_kin().set_base_pose(
             [
                 base_pose[0],
@@ -144,12 +160,20 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
 
         lb, ub = spec.angle_bounds()
         problem = Problem(Q_INIT, lb, ub, gripper_cst, ineq_cst, None, motion_step_box)
+
+        problem.post_ik_goal_eq_consts = [
+            create_ik_cst(0.075, 0.0, 0.0),
+            create_ik_cst(0.15, 0.0, 0.0),
+        ]
+        ineq_cst2 = spec.create_collision_const(use_cache=False)
+        ineq_cst2.set_sdf(get_fridge_model_sdf())
+        problem.post_ik_goal_ineq_const = ineq_cst2
         return problem
 
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
         conf = OMPLSolverConfig(
-            shortcut=True, bspline=True, n_max_call=1000000, timeout=3.0, n_max_ik_trial=1000
+            shortcut=True, bspline=True, n_max_call=1000000, timeout=5.0, n_max_ik_trial=1000
         )
         solver = OMPLSolver(conf)
         ret = solver.solve(problem)
