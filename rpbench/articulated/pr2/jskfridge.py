@@ -15,11 +15,7 @@ from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.vision import create_heightmap_z_slice
-from rpbench.articulated.world.jskfridge import (
-    JskFridgeWorld,
-    get_fridge_model,
-    get_fridge_model_sdf,
-)
+from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
 
 
@@ -165,14 +161,13 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
 
         lb, ub = spec.angle_bounds()
         problem = Problem(Q_INIT, lb, ub, gripper_cst, ineq_cst, None, motion_step_box)
-
-        problem.post_ik_goal_eq_consts = [
-            create_ik_cst(0.075, 0.0, 0.0),
-            create_ik_cst(0.15, 0.0, 0.0),
-        ]
-        ineq_cst2 = spec.create_collision_const(use_cache=False)
-        ineq_cst2.set_sdf(get_fridge_model_sdf())
-        problem.post_ik_goal_ineq_const = ineq_cst2
+        # problem.post_ik_goal_eq_consts = [
+        #     create_ik_cst(0.075, 0.0, 0.0),
+        #     create_ik_cst(0.15, 0.0, 0.0),
+        # ]
+        # ineq_cst2 = spec.create_collision_const(use_cache=False)
+        # ineq_cst2.set_sdf(get_fridge_model_sdf())
+        # problem.post_ik_goal_ineq_const = ineq_cst2
         return problem
 
     def solve_default(self) -> ResultProtocol:
