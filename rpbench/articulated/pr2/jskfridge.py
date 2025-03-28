@@ -1,6 +1,6 @@
 import time
 from abc import abstractmethod
-from typing import ClassVar, Type, TypeVar
+from typing import ClassVar, Tuple, Type, TypeVar
 
 import numpy as np
 from plainmp.constraint import SphereAttachmentSpec, SphereCollisionCst
@@ -10,7 +10,7 @@ from plainmp.psdf import CylinderSDF, Pose
 from plainmp.robot_spec import BaseType, PR2LarmSpec
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
-from skrobot.model.primitives import Axis
+from skrobot.model.primitives import Axis, Cylinder
 from skrobot.model.robot_model import RobotModel
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer
@@ -272,6 +272,41 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
 
 class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
     eps: ClassVar[float] = 0.01  # to avoid collision between grasping object and the fridge
+
+    def visualize(self) -> Tuple[PyrenderViewer, PR2]:
+        v = PyrenderViewer()
+        self.world.visualize(v)
+        gripper_width, grasp_cylinder_param, target_pose, base_pose = (
+            self.description[0],
+            self.description[1:5],
+            self.description[5:9],
+            self.description[-3:],
+        )
+        pr2 = PR2(use_tight_joint_limit=False)
+        pr2.angle_vector(AV_INIT)
+        pr2.l_gripper_l_finger_joint.joint_angle(gripper_width)
+        z_cylinder = determine_cylinder_height(grasp_cylinder_param[2], self.eps)
+        z_cylinder_offset = z_cylinder - target_pose[2]
+        pos_relative = np.array(
+            [grasp_cylinder_param[0], grasp_cylinder_param[1], z_cylinder_offset]
+        )
+
+        cylinder = Cylinder(grasp_cylinder_param[3], grasp_cylinder_param[2])
+        cylinder.translate(pos_relative)
+        pr2.l_gripper_tool_frame.assoc(cylinder, "local")
+
+        x, y, yaw = base_pose
+        pr2.translate(np.hstack([x, y, 0.0]))
+        pr2.rotate(yaw, "z")
+
+        v.add(pr2)
+        v.add(cylinder)
+
+        axis = Axis()
+        axis.translate(target_pose[:3])
+        axis.rotate(target_pose[3], "z")
+        v.add(axis)
+        return v, pr2
 
     @classmethod
     def is_grasping(cls) -> bool:
