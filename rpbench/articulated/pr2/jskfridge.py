@@ -182,8 +182,33 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
 
 class JskFridgeReachingTask(JskFridgeReachingTaskBase):
     @staticmethod
-    def sample_pose(world: JskFridgeWorld) -> Coordinates:
-        return world.sample_pose()
+    def sample_pose(self) -> Coordinates:
+        region = get_fridge_model().regions[self.attention_region_index]
+        D, W, H = region.box.extents
+        horizontal_margin = 0.08
+        depth_margin = 0.03
+        width_effective = np.array([D - 2 * depth_margin, W - 2 * horizontal_margin])
+        sdf = self.get_exact_sdf()
+
+        n_max_trial = 100
+        for _ in range(n_max_trial):
+            trans = np.random.rand(2) * width_effective - 0.5 * width_effective
+            trans = np.hstack([trans, -0.5 * H + 0.09])
+            co = region.box.copy_worldcoords()
+            co.translate(trans)
+            if sdf.evaluate(co.worldpos()) < 0.03:
+                continue
+            co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
+            co_dummy = co.copy_worldcoords()
+            co_dummy.translate([-0.07, 0.0, 0.0])
+
+            if sdf.evaluate(co_dummy.worldpos()) < 0.04:
+                continue
+            co_dummy.translate([-0.07, 0.0, 0.0])
+            if sdf.evaluate(co_dummy.worldpos()) < 0.04:
+                continue
+            return co
+        return co  # invalid one but no choice
 
     @staticmethod
     def get_world_type() -> Type[JskFridgeWorld]:
@@ -192,8 +217,34 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
 
 class JskFridgeVerticalReachingTask(JskFridgeReachingTaskBase):
     @staticmethod
-    def sample_pose(world: JskFridgeWorld) -> Coordinates:
-        return world.sample_pose_vertical()
+    def sample_pose(self) -> Coordinates:
+        # NOTE: unlike sample pose height is also sampled
+        region = get_fridge_model().regions[self.attention_region_index]
+        b_min = -0.5 * region.box.extents
+        b_max = +0.5 * region.box.extents
+
+        horizontal_margin = 0.05
+        height_margin = 0.06
+        b_min[
+            0
+        ] -= horizontal_margin  # - is not a mistake. this makes it possible to pose be slightly outside
+        b_max[0] -= horizontal_margin
+        b_min[2] += height_margin
+        b_max[2] -= height_margin
+
+        sdf = self.get_exact_sdf()
+
+        n_max_trial = 100
+        for _ in range(n_max_trial):
+            trans = np.random.rand(3) * (b_max - b_min) + b_min
+            co = region.box.copy_worldcoords()
+            co.translate(trans)
+            co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
+            co.rotate(0.5 * np.pi, "x")
+            if self.is_obviously_infeasible(sdf, co):
+                continue
+            return co
+        return co  # invalid one but no choice
 
     @staticmethod
     def get_world_type() -> Type[JskFridgeWorld]:
