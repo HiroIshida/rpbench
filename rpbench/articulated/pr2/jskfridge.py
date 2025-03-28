@@ -1,5 +1,4 @@
 import time
-from abc import abstractmethod
 from typing import Type, TypeVar
 
 import numpy as np
@@ -52,16 +51,11 @@ AV_INIT, Q_INIT = _prepare_angle_vector()
 DescriptionT = TypeVar("DescriptionT")
 
 
-class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray, RobotModel]):
+class JskFridgeReachingTask(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray, RobotModel]):
     @classmethod
     def get_robot_model(cls) -> RobotModel:
         # dummy to pass the abstract method
         pass
-
-    @staticmethod
-    @abstractmethod
-    def sample_pose(world: JskFridgeWorld) -> Coordinates:
-        ...
 
     @classmethod
     def sample_description(cls, world: JskFridgeWorld) -> np.ndarray:
@@ -179,8 +173,6 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         ret = solver.solve(problem)
         return ret
 
-
-class JskFridgeReachingTask(JskFridgeReachingTaskBase):
     @staticmethod
     def sample_pose(self) -> Coordinates:
         region = get_fridge_model().regions[self.attention_region_index]
@@ -206,42 +198,6 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
                 continue
             co_dummy.translate([-0.07, 0.0, 0.0])
             if sdf.evaluate(co_dummy.worldpos()) < 0.04:
-                continue
-            return co
-        return co  # invalid one but no choice
-
-    @staticmethod
-    def get_world_type() -> Type[JskFridgeWorld]:
-        return JskFridgeWorld
-
-
-class JskFridgeVerticalReachingTask(JskFridgeReachingTaskBase):
-    @staticmethod
-    def sample_pose(self) -> Coordinates:
-        # NOTE: unlike sample pose height is also sampled
-        region = get_fridge_model().regions[self.attention_region_index]
-        b_min = -0.5 * region.box.extents
-        b_max = +0.5 * region.box.extents
-
-        horizontal_margin = 0.05
-        height_margin = 0.06
-        b_min[
-            0
-        ] -= horizontal_margin  # - is not a mistake. this makes it possible to pose be slightly outside
-        b_max[0] -= horizontal_margin
-        b_min[2] += height_margin
-        b_max[2] -= height_margin
-
-        sdf = self.get_exact_sdf()
-
-        n_max_trial = 100
-        for _ in range(n_max_trial):
-            trans = np.random.rand(3) * (b_max - b_min) + b_min
-            co = region.box.copy_worldcoords()
-            co.translate(trans)
-            co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
-            co.rotate(0.5 * np.pi, "x")
-            if self.is_obviously_infeasible(sdf, co):
                 continue
             return co
         return co  # invalid one but no choice
