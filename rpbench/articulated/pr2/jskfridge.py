@@ -405,9 +405,9 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
         q[:7] = Q_INIT
 
         while True:
-            x = np.random.uniform(-0.6, -0.3)
-            y = np.random.uniform(-0.3, +0.2)
-            yaw = np.random.uniform(-0.5 * np.pi, 0.25 * np.pi)
+            x = np.random.uniform(-0.6, -0.4)
+            y = np.random.uniform(-0.4, +0.0)
+            yaw = np.random.uniform(-0.25 * np.pi, 0.0 * np.pi)
             q[7] = x
             q[8] = y
             q[9] = yaw
@@ -417,7 +417,7 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
         conf = OMPLSolverConfig(
-            shortcut=True, bspline=True, n_max_call=10000000, timeout=10.0, n_max_ik_trial=100000
+            shortcut=True, bspline=True, n_max_call=100000000, timeout=20.0, n_max_ik_trial=100000
         )
         solver = OMPLSolver(conf)
         ret = solver.solve(problem)
