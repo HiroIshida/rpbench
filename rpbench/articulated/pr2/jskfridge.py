@@ -15,6 +15,7 @@ from skrobot.model.robot_model import RobotModel
 from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer
 
+from rpbench.articulated.pr2.pr2_reachability_map.model import load_classifier
 from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
@@ -51,6 +52,9 @@ def _prepare_angle_vector():
 AV_INIT, Q_INIT = _prepare_angle_vector()
 
 DescriptionT = TypeVar("DescriptionT")
+
+larm_reach_clf = load_classifier("larm")
+larm_reach_clf.torso_position = 0.11444855356985413  # same as above  # FIXME: hard coded
 
 
 def create_cylinder_points(height: float, radius: float, n: int) -> np.ndarray:
@@ -332,7 +336,10 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
                 return np.array([x, y, grasping_cylinder_height, grasping_cylinder_radius])
 
     @classmethod
-    def sample_pose(cls, world, grasping_cylinder_param: np.ndarray) -> Coordinates:
+    def sample_pose(
+        cls, world, grasping_cylinder_param: np.ndarray, pr2_pose: np.ndarray
+    ) -> Coordinates:
+        larm_reach_clf.set_base_pose(pr2_pose)
         pts_inside_local = create_cylinder_points(
             grasping_cylinder_param[2], grasping_cylinder_param[3], 8
         )
@@ -352,6 +359,8 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
             if sdf.evaluate(co.worldpos()) < 0.03:
                 continue
             co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
+            if not larm_reach_clf.predict(co):
+                continue
             co_dummy = co.copy_worldcoords()
             co_dummy.translate([-0.07, 0.0, 0.0])
 
@@ -382,15 +391,6 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
         gripper_width = np.random.uniform(0.0, 0.548)
         grasp_cylinder_param = cls.sample_grasp_cylinder_param()
 
-        pose = None
-        while True:
-            pose = cls.sample_pose(world, grasp_cylinder_param)
-            if pose is not None:
-                break
-        assert isinstance(pose, Coordinates)
-        y, p, r = rpy_angle(pose.worldrot())[0]
-        pose = np.hstack([pose.worldpos()[:3], y])
-
         spec = PR2LarmSpec(base_type=BaseType.PLANAR, use_fixed_uuid=True)
         pr2 = spec.get_robot_model(deepcopy=False)
         pr2.angle_vector(AV_INIT)
@@ -411,6 +411,11 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
             q[7] = x
             q[8] = y
             q[9] = yaw
+            co_reach = cls.sample_pose(world, grasp_cylinder_param, q[7:10])
+            assert isinstance(co_reach, Coordinates)
+            ypr = rpy_angle(co_reach.worldrot())[0]
+            pose = np.hstack([co_reach.worldpos()[:3], ypr[0]])
+
             if cst.is_valid(q):
                 return np.hstack([gripper_width, grasp_cylinder_param, pose, x, y, yaw])
 
