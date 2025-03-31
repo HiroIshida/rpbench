@@ -275,7 +275,7 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
 
 
 class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
-    eps: ClassVar[float] = 0.01  # to avoid collision between grasping object and the fridge
+    eps: ClassVar[float] = 0.025  # to avoid collision between grasping object and the fridge
 
     def visualize(self) -> Tuple[PyrenderViewer, PR2]:
         v = PyrenderViewer()
