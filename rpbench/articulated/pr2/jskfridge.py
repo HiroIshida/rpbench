@@ -138,15 +138,16 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
 
         attachements = tuple()
         # FIXME: temporary disabled
-        # if self.is_grasping():
-        #     # cylinder
-        #     x_relative, y_relative, h, r = grasp_cylinder_param
-        #     z_cylinder = determine_cylinder_height(h, self.eps)
-        #     z_relative = z_cylinder - target_pose[2]
-        #     pts = create_cylinder_points(h, r, 8) + np.array([x_relative, y_relative, z_relative])
-        #     radii = np.ones(len(pts)) * 0.005
-        #     attachement = SphereAttachmentSpec("l_gripper_tool_frame", pts.T, radii, False)
-        #     attachements = (attachement,)
+        if self.is_grasping():
+            # cylinder
+            x_relative, y_relative, h, r = grasp_cylinder_param
+            h = 0.1
+            z_cylinder = determine_cylinder_height(h, self.eps)
+            z_relative = z_cylinder - target_pose[2]
+            pts = create_cylinder_points(h, r, 8) + np.array([x_relative, y_relative, z_relative])
+            radii = np.ones(len(pts)) * 0.005
+            attachement = SphereAttachmentSpec("l_gripper_tool_frame", pts.T, radii, False)
+            attachements = (attachement,)
 
         spec.reflect_skrobot_model_to_kin(pr2)
         ineq_cst = spec.create_collision_const(attachements=attachements)
