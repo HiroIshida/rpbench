@@ -141,12 +141,13 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         if self.is_grasping():
             # cylinder
             x_relative, y_relative, h, r = grasp_cylinder_param
-            h = 0.1
+            h = 0.02
             x_reltaive = 0.0
             y_relative = 0.0
             r = 0.01
             z_cylinder = determine_cylinder_height(h, self.eps)
-            z_relative = z_cylinder - target_pose[2]
+            # z_relative = z_cylinder - target_pose[2]
+            z_relative = 0.0
             pts = create_cylinder_points(h, r, 8) + np.array([x_relative, y_relative, z_relative])
             radii = np.ones(len(pts)) * 0.005
             attachement = SphereAttachmentSpec("l_gripper_tool_frame", pts.T, radii, False)
