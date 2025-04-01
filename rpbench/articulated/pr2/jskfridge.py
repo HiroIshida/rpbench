@@ -142,6 +142,9 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
             # cylinder
             x_relative, y_relative, h, r = grasp_cylinder_param
             h = 0.1
+            x_reltaive = 0.0
+            y_relative = 0.0
+            r = 0.01
             z_cylinder = determine_cylinder_height(h, self.eps)
             z_relative = z_cylinder - target_pose[2]
             pts = create_cylinder_points(h, r, 8) + np.array([x_relative, y_relative, z_relative])
