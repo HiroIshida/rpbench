@@ -137,14 +137,11 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
             pr2.l_gripper_l_finger_joint.joint_angle(gripper_width)
 
         attachements = tuple()
-        # FIXME: temporary disabled
         if self.is_grasping():
             # cylinder
             x_relative, y_relative, h, r = grasp_cylinder_param
-            h = 0.12
             z_cylinder = determine_cylinder_height(h, self.eps)
-            # z_relative = z_cylinder - target_pose[2]
-            z_relative = 0
+            z_relative = z_cylinder - target_pose[2]
             pts = create_cylinder_points(h, r, 8) + np.array([x_relative, y_relative, z_relative])
             radii = np.ones(len(pts)) * 0.005
             attachement = SphereAttachmentSpec("l_gripper_tool_frame", pts.T, radii, False)
@@ -278,7 +275,7 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
 
 
 class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
-    eps: ClassVar[float] = 0.01  # to avoid collision between grasping object and the fridge
+    eps: ClassVar[float] = 0.025  # to avoid collision between grasping object and the fridge
 
     def visualize(self) -> Tuple[PyrenderViewer, PR2]:
         v = PyrenderViewer()
