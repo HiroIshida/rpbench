@@ -1,6 +1,6 @@
 import time
 from abc import abstractmethod
-from typing import ClassVar, Tuple, Type, TypeVar
+from typing import ClassVar, Optional, Tuple, Type, TypeVar
 
 import numpy as np
 from plainmp.constraint import SphereAttachmentSpec, SphereCollisionCst
@@ -87,7 +87,7 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
 
     @classmethod
     @abstractmethod
-    def sample_description(cls, world: JskFridgeWorld) -> np.ndarray:
+    def is_grasping(cls) -> bool:
         ...
 
     @classmethod
@@ -195,15 +195,22 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
     def get_world_type() -> Type[JskFridgeWorld]:
         return JskFridgeWorld
 
-
-class JskFridgeReachingTask(JskFridgeReachingTaskBase):
     @classmethod
-    def is_grasping(cls) -> bool:
-        return False
+    def sample_pose(
+        cls,
+        world,
+        pr2_pose: np.ndarray,
+        grasping_cylinder_param: Optional[np.ndarray],
+    ) -> Coordinates:
+        larm_reach_clf.set_base_pose(pr2_pose)
 
-    @classmethod
-    def sample_pose(cls, world) -> Coordinates:
-        region = get_fridge_model().regions[world.attention_region_index]
+        pts_inside_local = None
+        if grasping_cylinder_param is not None:
+            pts_inside_local = create_cylinder_points(
+                grasping_cylinder_param[2], grasping_cylinder_param[3], 8
+            )
+
+        region = get_fridge_model().regions[1]
         D, W, H = region.box.extents
         horizontal_margin = 0.08
         depth_margin = 0.03
@@ -219,6 +226,8 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
             if sdf.evaluate(co.worldpos()) < 0.03:
                 continue
             co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
+            if not larm_reach_clf.predict(co):
+                continue
             co_dummy = co.copy_worldcoords()
             co_dummy.translate([-0.07, 0.0, 0.0])
 
@@ -227,19 +236,31 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
             co_dummy.translate([-0.07, 0.0, 0.0])
             if sdf.evaluate(co_dummy.worldpos()) < 0.04:
                 continue
+
+            if grasping_cylinder_param is not None:
+                # cylinder pose
+                co_cylinder_center = co.copy_worldcoords()
+                z = determine_cylinder_height(grasping_cylinder_param[2], cls.eps)
+                z_now = co_cylinder_center.worldpos()[2]
+                z_trans = z - z_now
+                co_cylinder_center.translate(
+                    [grasping_cylinder_param[0], grasping_cylinder_param[1], z_trans]
+                )
+
+                # translate the cylinder points
+                pts_inside = pts_inside_local + co_cylinder_center.worldpos()
+                if np.any(sdf.evaluate_batch(pts_inside.T) < 0.0):
+                    continue
             return co
         return co  # invalid one but no choice
 
     @classmethod
     def sample_description(cls, world: JskFridgeWorld) -> np.ndarray:
-        pose = None
-        while True:
-            pose = cls.sample_pose(world)
-            if pose is not None:
-                break
-        assert isinstance(pose, Coordinates)
-        y, p, r = rpy_angle(pose.worldrot())[0]
-        pose = np.hstack([pose.worldpos()[:3], y])
+        grasp_cylinder_param = None
+        gripper_width = None
+        if cls.is_grasping():
+            gripper_width = np.random.uniform(0.0, 0.548)
+            grasp_cylinder_param = cls.sample_grasp_cylinder_param()
 
         spec = PR2LarmSpec(base_type=BaseType.PLANAR, use_fixed_uuid=True)
         pr2 = spec.get_robot_model(deepcopy=False)
@@ -261,8 +282,22 @@ class JskFridgeReachingTask(JskFridgeReachingTaskBase):
             q[7] = x
             q[8] = y
             q[9] = yaw
+            co_reach = cls.sample_pose(world, q[7:10], grasp_cylinder_param)
+            assert isinstance(co_reach, Coordinates)
+            ypr = rpy_angle(co_reach.worldrot())[0]
+            pose = np.hstack([co_reach.worldpos()[:3], ypr[0]])
+
             if cst.is_valid(q):
-                return np.hstack([pose, x, y, yaw])
+                if cls.is_grasping():
+                    return np.hstack([gripper_width, grasp_cylinder_param, pose, x, y, yaw])
+                else:
+                    return np.hstack([pose, x, y, yaw])
+
+
+class JskFridgeReachingTask(JskFridgeReachingTaskBase):
+    @classmethod
+    def is_grasping(cls) -> bool:
+        return False
 
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
@@ -334,90 +369,6 @@ class JskFridgeGraspingReachingTask(JskFridgeReachingTaskBase):
             dist = np.sqrt(x**2 + y**2)
             if dist < sampling_radius:
                 return np.array([x, y, grasping_cylinder_height, grasping_cylinder_radius])
-
-    @classmethod
-    def sample_pose(
-        cls, world, grasping_cylinder_param: np.ndarray, pr2_pose: np.ndarray
-    ) -> Coordinates:
-        larm_reach_clf.set_base_pose(pr2_pose)
-        pts_inside_local = create_cylinder_points(
-            grasping_cylinder_param[2], grasping_cylinder_param[3], 8
-        )
-        region = get_fridge_model().regions[1]
-        D, W, H = region.box.extents
-        horizontal_margin = 0.08
-        depth_margin = 0.03
-        width_effective = np.array([D - 2 * depth_margin, W - 2 * horizontal_margin])
-        sdf = world.get_exact_sdf()
-
-        n_max_trial = 100
-        for _ in range(n_max_trial):
-            trans = np.random.rand(2) * width_effective - 0.5 * width_effective
-            trans = np.hstack([trans, -0.5 * H + 0.09])
-            co = region.box.copy_worldcoords()
-            co.translate(trans)
-            if sdf.evaluate(co.worldpos()) < 0.03:
-                continue
-            co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
-            if not larm_reach_clf.predict(co):
-                continue
-            co_dummy = co.copy_worldcoords()
-            co_dummy.translate([-0.07, 0.0, 0.0])
-
-            if sdf.evaluate(co_dummy.worldpos()) < 0.04:
-                continue
-            co_dummy.translate([-0.07, 0.0, 0.0])
-            if sdf.evaluate(co_dummy.worldpos()) < 0.04:
-                continue
-
-            # cylinder pose
-            co_cylinder_center = co.copy_worldcoords()
-            z = determine_cylinder_height(grasping_cylinder_param[2], cls.eps)
-            z_now = co_cylinder_center.worldpos()[2]
-            z_trans = z - z_now
-            co_cylinder_center.translate(
-                [grasping_cylinder_param[0], grasping_cylinder_param[1], z_trans]
-            )
-
-            # translate the cylinder points
-            pts_inside = pts_inside_local + co_cylinder_center.worldpos()
-            if np.any(sdf.evaluate_batch(pts_inside.T) < 0.0):
-                continue
-            return co
-        return co  # invalid one but no choice
-
-    @classmethod
-    def sample_description(cls, world: JskFridgeWorld) -> np.ndarray:
-        gripper_width = np.random.uniform(0.0, 0.548)
-        grasp_cylinder_param = cls.sample_grasp_cylinder_param()
-
-        spec = PR2LarmSpec(base_type=BaseType.PLANAR, use_fixed_uuid=True)
-        pr2 = spec.get_robot_model(deepcopy=False)
-        pr2.angle_vector(AV_INIT)
-        spec.reflect_skrobot_model_to_kin(pr2)
-
-        spec.get_kin()
-        cst = spec.create_collision_const()
-        sdf = world.get_exact_sdf()
-        cst.set_sdf(sdf)
-
-        q = np.zeros(len(spec.control_joint_names) + 3)
-        q[:7] = Q_INIT
-
-        while True:
-            x = np.random.uniform(-0.6, -0.3)
-            y = np.random.uniform(-0.3, +0.2)
-            yaw = np.random.uniform(-0.5 * np.pi, 0.25 * np.pi)
-            q[7] = x
-            q[8] = y
-            q[9] = yaw
-            co_reach = cls.sample_pose(world, grasp_cylinder_param, q[7:10])
-            assert isinstance(co_reach, Coordinates)
-            ypr = rpy_angle(co_reach.worldrot())[0]
-            pose = np.hstack([co_reach.worldpos()[:3], ypr[0]])
-
-            if cst.is_valid(q):
-                return np.hstack([gripper_width, grasp_cylinder_param, pose, x, y, yaw])
 
     def solve_default(self) -> ResultProtocol:
         problem = self.export_problem()
