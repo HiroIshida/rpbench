@@ -219,11 +219,17 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
 
         n_max_trial = 100
         for _ in range(n_max_trial):
-            trans = np.random.rand(2) * width_effective - 0.5 * width_effective
+            trans_lb = -0.5 * width_effective
+            trans_lb[
+                0
+            ] -= 0.05  # because gripper position when grasping the object inside the region must be smaller than object's x position
+            trans_ub = 0.5 * width_effective
+            trans = np.random.uniform(trans_lb, trans_ub)
+
             trans = np.hstack([trans, -0.5 * H + 0.09])
             co = region.box.copy_worldcoords()
             co.translate(trans)
-            if sdf.evaluate(co.worldpos()) < 0.03:
+            if sdf.evaluate(co.worldpos()) < 0.02:
                 continue
             co.rotate(np.random.uniform(-(1.0 / 4.0) * np.pi, (1.0 / 4.0) * np.pi), "z")
             if not larm_reach_clf.predict(co):
