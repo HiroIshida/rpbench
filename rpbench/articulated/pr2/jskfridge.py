@@ -44,7 +44,7 @@ def _prepare_angle_vector():
     pr2.head_pan_joint.joint_angle(-0.026808257310632896)
     pr2.head_tilt_joint.joint_angle(0.82)
 
-    spec = PR2LarmSpec(use_fixed_uuid=True)
+    spec = PR2LarmSpec(use_fixed_spec_id=True)
     q = np.array([getattr(pr2, name).joint_angle() for name in spec.control_joint_names])
     return pr2.angle_vector(), q
 
@@ -129,7 +129,7 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
             grasp_cylinder_param = None
             target_pose, base_pose = self.description[:4], self.description[-3:]
 
-        spec = PR2LarmSpec(use_fixed_uuid=True)
+        spec = PR2LarmSpec(spec_id="rpbench-pr2-jskfridge")
         pr2 = spec.get_robot_model(deepcopy=False)
         pr2.angle_vector(AV_INIT)
 
@@ -268,7 +268,7 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
             gripper_width = np.random.uniform(0.0, 0.548)
             grasp_cylinder_param = cls.sample_grasp_cylinder_param()
 
-        spec = PR2LarmSpec(base_type=BaseType.PLANAR, use_fixed_uuid=True)
+        spec = PR2LarmSpec(base_type=BaseType.PLANAR, use_fixed_spec_id=True)
         pr2 = spec.get_robot_model(deepcopy=False)
         pr2.angle_vector(AV_INIT)
         spec.reflect_skrobot_model_to_kin(pr2)
@@ -434,7 +434,7 @@ if __name__ == "__main__":
     v.add(axis)
     v.show()
 
-    spec = PR2LarmSpec(use_fixed_uuid=True)
+    spec = PR2LarmSpec(use_fixed_spec_id=True)
     for q in ret.traj.resample(30):
         spec.set_skrobot_model_state(pr2, q)
         time.sleep(0.1)
