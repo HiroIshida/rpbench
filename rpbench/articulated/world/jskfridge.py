@@ -268,9 +268,12 @@ class JskFridgeWorld(SamplableWorldBase):
         fridge.add(viewer)
 
         obs_list = self.get_obstacle_list()
+        vis_list = []
         for obs in obs_list:
             visualizable = obs.to_visualizable((150, 150, 150, 255))
             viewer.add(visualizable)
+            vis_list.append(visualizable)
+        return vis_list
 
     def get_exact_sdf(self) -> UnionSDF:
         fridge_sdf = get_fridge_model_sdf()
