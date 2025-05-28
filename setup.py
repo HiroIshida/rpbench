@@ -10,7 +10,7 @@ install_requires = [
     "scikit-motionplan",
     "threadpoolctl",
     "ycb_utils",
-    "plainmp>=0.2.1",
+    "plainmp>=0.3",
 ]
 private_requires = ["plainmp>=0.0.2"]
 

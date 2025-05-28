@@ -136,7 +136,7 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         if self.is_grasping():
             pr2.l_gripper_l_finger_joint.joint_angle(gripper_width)
 
-        attachements = tuple()
+        attachments = tuple()
         if self.is_grasping():
             # cylinder
             x_relative, y_relative, h, r = grasp_cylinder_param
@@ -144,11 +144,11 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
             z_relative = z_cylinder - target_pose[2]
             pts = create_cylinder_points(h, r, 8) + np.array([x_relative, y_relative, z_relative])
             radii = np.ones(len(pts)) * 0.005
-            attachement = SphereAttachmentSpec("l_gripper_tool_frame", pts.T, radii, False)
-            attachements = (attachement,)
+            attachment = SphereAttachmentSpec("l_gripper_tool_frame", pts.T, radii, False)
+            attachments = (attachment,)
 
         spec.reflect_skrobot_model_to_kin(pr2)
-        ineq_cst = spec.create_collision_const(attachements=attachements)
+        ineq_cst = spec.create_collision_const(attachments=attachments)
         sdf = self.world.get_exact_sdf()
         ineq_cst.set_sdf(sdf)
 
