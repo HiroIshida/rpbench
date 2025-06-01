@@ -7,7 +7,8 @@ from plainmp.constraint import SphereAttachmentSpec, SphereCollisionCst
 from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
 from plainmp.problem import Problem
 from plainmp.psdf import CylinderSDF, Pose
-from plainmp.robot_spec import BaseType, PR2LarmSpec
+from plainmp.robot_spec import BaseType
+from plainmp.robot_spec import PR2LarmSpec as _PR2LarmSpec
 from skrobot.coordinates import Coordinates
 from skrobot.coordinates.math import rpy_angle
 from skrobot.model.primitives import Axis, Cylinder
@@ -19,6 +20,35 @@ from rpbench.articulated.pr2.pr2_reachability_map.model import load_classifier
 from rpbench.articulated.vision import create_heightmap_z_slice
 from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
+
+
+class PR2LarmSpec(_PR2LarmSpec):
+
+    # the original angle bounds from urdf does not consider hardware limits
+    def angle_bounds(self) -> Tuple[np.ndarray, np.ndarray]:
+        mins = np.array(
+            [
+                -0.5646017957154016,
+                -0.3536002157955471,
+                -0.6500007560154842,
+                -2.121308079458948,
+                -np.pi * 2,
+                -2.000007696445342,
+                -np.pi * 2,
+            ]
+        )
+        maxs = np.array(
+            [
+                2.1353928865225424,
+                1.2962996686874884,
+                3.7499969775424966,
+                -0.15000005363462504,
+                np.pi * 2,
+                -0.10000003575641671,
+                np.pi * 2,
+            ]
+        )
+        return mins, maxs
 
 
 def _prepare_angle_vector():
