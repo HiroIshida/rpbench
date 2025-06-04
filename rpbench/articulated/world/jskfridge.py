@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import ClassVar, Dict, List, Optional, Tuple, Union
 
@@ -245,6 +246,19 @@ class JskFridgeWorld(SamplableWorldBase):
     obstacles_param: np.ndarray
     attention_region_index: ClassVar[int] = 1
     N_MAX_OBSTACLES: ClassVar[int] = 5
+
+    @classmethod
+    @contextmanager
+    def temp_max_obstacles(cls, n: int):
+        # N_MAX_OBSTACLES is usufull to encode the world into a single fixed-size vector.
+        # But it is used only for the sampling process, and it is not used in the inference process.
+        # In the inference process, you may want to use a larger number of obstacles. so...
+        original = cls.N_MAX_OBSTACLES
+        cls.N_MAX_OBSTACLES = n
+        try:
+            yield
+        finally:
+            cls.N_MAX_OBSTACLES = original
 
     def export_intrinsic_description(self) -> np.ndarray:
         raise NotImplementedError
