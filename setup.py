@@ -11,6 +11,7 @@ install_requires = [
     "threadpoolctl",
     "ycb_utils",
     "plainmp>=0.3",
+    "pr2_ikfast>=0.0.2",
 ]
 private_requires = ["plainmp>=0.0.2"]
 

@@ -3,14 +3,18 @@ from abc import abstractmethod
 from typing import ClassVar, Optional, Tuple, Type, TypeVar
 
 import numpy as np
-from plainmp.constraint import SphereAttachmentSpec, SphereCollisionCst
-from plainmp.ompl_solver import OMPLSolver, OMPLSolverConfig
+from plainmp.constraint import LinkPoseCst, SphereAttachmentSpec, SphereCollisionCst
+from plainmp.ik import IKResult
+from plainmp.ompl_solver import OMPLSolver as _OMPLSolver
+from plainmp.ompl_solver import OMPLSolverConfig
 from plainmp.problem import Problem
 from plainmp.psdf import CylinderSDF, Pose
 from plainmp.robot_spec import BaseType
 from plainmp.robot_spec import PR2LarmSpec as _PR2LarmSpec
-from skrobot.coordinates import Coordinates
-from skrobot.coordinates.math import rpy_angle
+from plainmp.trajectory import Trajectory
+from pr2_ikfast import sample_ik_solution
+from skrobot.coordinates import Coordinates, Transform
+from skrobot.coordinates.math import quaternion2matrix, rpy_angle, xyzw2wxyz
 from skrobot.model.primitives import Axis, Cylinder
 from skrobot.model.robot_model import RobotModel
 from skrobot.models.pr2 import PR2
@@ -49,6 +53,86 @@ class PR2LarmSpec(_PR2LarmSpec):
             ]
         )
         return mins, maxs
+
+
+class OMPLSolver(_OMPLSolver):
+    pass
+
+
+class OMPLSolver(_OMPLSolver):
+    def solve_ik(self, problem: Problem, guess: Optional[Trajectory] = None) -> IKResult:
+        # IK is supposed to stop within the timeout but somehow it does not work well
+        # so we set...
+        assert isinstance(problem.goal_const, LinkPoseCst)
+        assert isinstance(problem.global_ineq_const, SphereCollisionCst)
+        lb = problem.lb if problem.goal_lb is None else problem.goal_lb
+        ub = problem.ub if problem.goal_ub is None else problem.goal_ub
+
+        pose = problem.goal_const.get_desired_poses()[0]
+        assert len(pose) == 7
+        trans, quat = pose[:3], pose[3:]
+        rotmat = quaternion2matrix(xyzw2wxyz(quat))
+        tf_desired_to_world = Transform(trans, rotmat)
+
+        kin = PR2LarmSpec(spec_id="rpbench-pr2-jskfridge").get_kin()
+        pose = kin.get_base_pose()
+        trans_base, quat_base = pose[:3], pose[3:]
+        rotmat_base = quaternion2matrix(xyzw2wxyz(quat_base))
+        tf_base_to_world = Transform(trans_base, rotmat_base)
+        tf_desired_to_base = tf_desired_to_world * tf_base_to_world.inverse_transformation()
+
+        torso_value = 0.11444855356985413  # same as _prepare_angle_vector()
+
+        if guess is not None:
+            q_guess = guess._points[-1]
+            upper_arm_joint_guess = q_guess[2]
+
+            def sampler():
+                yield upper_arm_joint_guess
+                for deg_abs in np.linspace(1.0, 40.0, 20):
+                    rad_abs = np.pi * deg_abs / 180.0
+                    yield upper_arm_joint_guess + rad_abs
+                    yield upper_arm_joint_guess - rad_abs
+
+        else:
+            sampler = None
+
+        # NOTE: please do not care np.inf, I set it randomly for the value that will not be used later
+        if guess is None:
+            gen = sample_ik_solution(
+                tf_desired_to_base.translation,
+                tf_desired_to_base.rotation.tolist(),
+                torso_value,
+                False,
+                sampler,
+            )
+            for sol in gen:
+                if np.all(sol >= lb) and np.all(sol <= ub):
+                    if problem.global_ineq_const.is_valid(sol):
+                        return IKResult(sol, np.inf, True, np.inf)
+        else:
+            gen = sample_ik_solution(
+                tf_desired_to_base.translation,
+                tf_desired_to_base.rotation.tolist(),
+                torso_value,
+                False,
+                sampler,
+                batch=True,
+            )
+            for sols in gen:
+                sol_closest = None
+                min_dist = np.inf
+                for sol in sols:
+                    if np.all(sol >= lb) and np.all(sol <= ub):
+                        if problem.global_ineq_const.is_valid(sol):
+                            dist = np.linalg.norm(sol - q_guess)
+                            if dist < min_dist:
+                                min_dist = dist
+                                sol_closest = sol
+                if sol_closest is not None:
+                    return IKResult(sol_closest, np.inf, True, np.inf)
+
+        return IKResult(np.zeros(7), np.inf, False, np.inf)
 
 
 def _prepare_angle_vector():
@@ -423,7 +507,6 @@ if __name__ == "__main__":
     import tqdm
 
     task = JskFridgeGraspingReachingTask.sample()
-    assert False
 
     for _ in tqdm.tqdm(range(200)):
         task = JskFridgeReachingTask.sample()
