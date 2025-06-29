@@ -212,6 +212,29 @@ def create_heightmap_z_slice(
     return hmap
 
 
+def create_heightmap_z_slice_cylinders(  # if all objects are cylinders
+    target_region: BoxSkeleton, cylinders_param: np.ndarray, resolution: int
+) -> np.ndarray:
+    extent_plane = target_region.extents[:2]
+    xlin = np.linspace(-0.5 * extent_plane[0], +0.5 * extent_plane[0], resolution)
+    ylin = np.linspace(-0.5 * extent_plane[1], +0.5 * extent_plane[1], resolution)
+    X, Y = np.meshgrid(xlin, ylin)
+    pts = np.column_stack((X.ravel(), Y.ravel(), np.zeros_like(X.ravel())))
+    pts = target_region.transform_vector(pts)
+
+    z_region_bottom = target_region.worldpos()[2] - 0.5 * target_region.extents[2]
+
+    hmap_flatten = np.zeros_like(X.ravel())  # later we will reshape this
+    for param in cylinders_param:
+        x, y, z, h, r = param
+        h_max_obj = z + h * 0.5
+        pts[:, 2] = z
+        dists = np.linalg.norm(pts[:, :2] - (x, y), axis=1)
+        hmap_flatten[dists < r] = h_max_obj - z_region_bottom
+    hmap = hmap_flatten.reshape((resolution, resolution))
+    return hmap
+
+
 def create_voxelmap(
     target_region: BoxSkeleton,
     objects: List[PrimitiveSkelton],

@@ -17,7 +17,7 @@ from skrobot.models.pr2 import PR2
 from skrobot.viewers import PyrenderViewer
 
 from rpbench.articulated.pr2.pr2_reachability_map.model import load_classifier
-from rpbench.articulated.vision import create_heightmap_z_slice
+from rpbench.articulated.vision import create_heightmap_z_slice_cylinders
 from rpbench.articulated.world.jskfridge import JskFridgeWorld, get_fridge_model
 from rpbench.interface import ResultProtocol, TaskExpression, TaskWithWorldCondBase
 
@@ -130,8 +130,11 @@ class JskFridgeReachingTaskBase(TaskWithWorldCondBase[JskFridgeWorld, np.ndarray
         if use_matrix:
             world_vec = None
             region = get_fridge_model().regions[self.world.attention_region_index]
-            obstacles = self.world.get_obstacle_list()
-            world_mat = create_heightmap_z_slice(region.box, obstacles, 112)
+            cylinders_param = self.world.get_cylinder_params()
+            world_mat = create_heightmap_z_slice_cylinders(region.box, cylinders_param, 112)
+
+            # obstacles = self.world.get_obstacle_list()
+            # world_mat = create_heightmap_z_slice(region.box, obstacles, 112)
         else:
             n_elem = 1 + (self.world.N_MAX_OBSTACLES * 4)  # 1 for the number of obstacles
             world_vec = np.zeros(n_elem)

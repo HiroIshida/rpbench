@@ -273,9 +273,24 @@ class JskFridgeWorld(SamplableWorldBase):
             x, y, h, r = param
             pos_relative = np.hstack([x, y, -0.5 * H_region + 0.5 * h])
             pos = region_pos + pos_relative
-            cylinder = CylinderSkelton(r, h, pos)
+            cylinder = CylinderSkelton(r, h, pos, with_sdf=False)
             obstacle_list.append(cylinder)
         return obstacle_list
+
+    def get_cylinder_params(self) -> List[List[float]]:
+        # return the parameters of the obstacles in the attention region
+        # shape: (N, 5) where N is the number of obstacles
+        # where each row is [x, y, z, h, r]
+        region = get_fridge_model().regions[self.attention_region_index]
+        H_region = region.box.extents[2]
+        region_pos = region.box.worldpos()
+        cylinder_params = []
+        for param in self.obstacles_param.reshape(-1, 4):
+            x, y, h, r = param
+            pos_relative = np.hstack([x, y, -0.5 * H_region + 0.5 * h])
+            pos = region_pos + pos_relative
+            cylinder_params.append([*pos, h, r])
+        return cylinder_params
 
     def visualize(self, viewer: Union[TrimeshSceneViewer, SceneWrapper]) -> None:
         fridge = FridgeModel()

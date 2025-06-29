@@ -139,13 +139,14 @@ class CylinderSkelton(CascadedCoords, PrimitiveSkelton[Cylinder]):
     radius: float
     height: float
 
-    def __init__(self, radius, height, pos=(0, 0, 0)):
+    def __init__(self, radius, height, pos=(0, 0, 0), with_sdf: bool = True):
         CascadedCoords.__init__(self, pos=pos)
         self.radius = radius
         self.height = height
-        sdf = skrobot.sdf.CylinderSDF(height, radius)
-        self.assoc(sdf, relative_coords="local")
-        self.sdf = sdf
+        if with_sdf:
+            sdf = skrobot.sdf.CylinderSDF(height, radius)
+            self.assoc(sdf, relative_coords="local")
+            self.sdf = sdf
 
     def to_skrobot_primitive(self) -> Cylinder:
         cylidner = Cylinder(self.radius, self.height)
